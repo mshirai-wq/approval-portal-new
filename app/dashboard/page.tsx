@@ -162,7 +162,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {pendingApprovals.slice(0, 5).map(app => (
-                  <div key={app.id} className="p-3 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer">
+                  <div 
+                    key={app.id} 
+                    className="p-3 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer"
+                    onClick={() => router.push(`/application/${app.id}`)}
+                  >
                     <div className="font-medium text-sm">{app.title}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {app.applicantName} - {app.subType}
@@ -192,7 +196,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {circulations.slice(0, 5).map(app => (
-                  <div key={app.id} className="p-3 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer">
+                  <div 
+                    key={app.id} 
+                    className="p-3 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer"
+                    onClick={() => router.push(`/application/${app.id}`)}
+                  >
                     <div className="font-medium text-sm">{app.title}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {app.applicantName} - {app.subType}
