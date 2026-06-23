@@ -57,7 +57,7 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     })
 
-    // 承認待ち一覧（簡易版：全申請からフィルタリング）
+    // 承認待ち一覧（経路選択対応）
     const allAppsQuery = query(
       collection(db, 'applications'),
       where('workflow.status', '==', '承認待ち'),
@@ -69,19 +69,26 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      // ユーザーが承認者に含まれているものをフィルタ（簡易実装）
-      const filtered = apps.filter(app => 
-        app.workflow.currentStep === '部長' && user.title === '部長'
-      )
+      // ユーザーが現在のステップの承認者に含まれているものをフィルタ
+      const filtered = apps.filter(app => {
+        const currentStep = app.workflow.currentStep
+        const steps = (app.workflow as any).steps || {}
+        const currentStepData = steps[currentStep]
+        
+        if (!currentStepData) return false
+        
+        // 現在のステップの承認者にユーザーが含まれているかチェック
+        const approvers = currentStepData.approvers || []
+        return approvers.includes(user.name)
+      })
       setPendingApprovals(filtered)
     }, (error) => {
       console.error('Error fetching pending approvals:', error)
     })
 
-    // 回覧一覧
+    // 回覧一覧（経路選択対応）
     const circulationQuery = query(
       collection(db, 'applications'),
-      where('workflow.status', '==', '承認済み'),
       orderBy('createdAt', 'desc')
     )
 
@@ -90,10 +97,28 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      // ユーザーが回覧先に含まれているものをフィルタ（簡易実装）
-      const filtered = apps.filter(app => 
-        (app.workflow as any).circulations?.includes(user.name)
-      )
+      // ユーザーが回覧先に含まれているものをフィルタ
+      const filtered = apps.filter(app => {
+        const steps = (app.workflow as any).steps || {}
+        const circulations = (app.workflow as any).circulations || []
+        
+        // 各ステップの回覧待ちをチェック
+        for (const [stepName, stepData] of Object.entries(steps)) {
+          const step = stepData as any
+          if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
+            return true
+          }
+        }
+        
+        // 回覧先に含まれているかチェック
+        if (circulations.includes(user.name)) {
+          // 既に確認済みかチェック（circulationsコレクションを確認）
+          // 簡易実装のため、ここでは回覧先に含まれていれば表示
+          return true
+        }
+        
+        return false
+      })
       setCirculations(filtered)
     }, (error) => {
       console.error('Error fetching circulations:', error)
