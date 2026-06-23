@@ -30,11 +30,18 @@ export default function AdminUsersPage() {
   const [processing, setProcessing] = useState(false)
 
   // 1. 先に関数を作る
+  // Firebaseからデータを取ってくる処理を完成させる
   const fetchUsers = async () => {
     try {
-      // データの取得処理...
+      const querySnapshot = await getDocs(collection(db, 'users'))
+      const usersList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as User[]
+      
+      setUsers(usersList) // 取ってきたデータを画面(state)にセットする
     } catch (error) {
-      // ...
+      console.error('Error fetching users:', error)
     }
   }
 
