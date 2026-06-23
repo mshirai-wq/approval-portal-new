@@ -36,8 +36,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    setDataLoading(true)
-
     // 自分の申請一覧
     const myAppsQuery = query(
       collection(db, 'applications'),
@@ -96,8 +94,6 @@ export default function DashboardPage() {
     }, (error) => {
       console.error('Error fetching circulations:', error)
     })
-
-    setDataLoading(false)
 
     return () => {
       unsubscribeMyApps()

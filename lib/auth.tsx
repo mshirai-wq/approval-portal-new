@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string, title: string, department: string) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      await createUserWithEmailAndPassword(auth, email, password)
       
       // Create user document in Firestore
       await setDoc(doc(db, 'users', email), {
