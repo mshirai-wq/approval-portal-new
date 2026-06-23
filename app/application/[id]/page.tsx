@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -25,7 +25,9 @@ interface Application {
   createdAt: any
 }
 
-export default function ApplicationDetailPage({ params }: { params: { id: string } }) {
+export default function ApplicationDetailPage() {
+  const params = useParams()
+  const id = Array.isArray(params.id) ? params.id[0] : params.id || ''
   const { user } = useAuth()
   const router = useRouter()
   const [application, setApplication] = useState<Application | null>(null)
@@ -37,7 +39,7 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
   useEffect(() => {
     const fetchApplication = async () => {
       try {
-        const docRef = doc(db, 'applications', params.id)
+        const docRef = doc(db, 'applications', id)
         const docSnap = await getDoc(docRef)
         if (docSnap.exists()) {
           setApplication({ id: docSnap.id, ...docSnap.data() } as Application)
@@ -50,7 +52,7 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
     }
 
     fetchApplication()
-  }, [params.id])
+  }, [id])
 
   const handleAction = async (actionType: 'approve' | 'reject') => {
     if (!application || !user) return
