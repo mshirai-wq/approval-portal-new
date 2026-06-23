@@ -115,6 +115,10 @@ export default function DashboardPage() {
     }
   }
 
+  const handleAdminUsers = () => {
+    router.push('/admin/users')
+  }
+
   const handleApplicationClick = (app: Application) => {
     setSelectedApplication(app)
     setShowDetailModal(true)
@@ -149,6 +153,26 @@ export default function DashboardPage() {
     }
   }
 
+  const handleCirculation = async () => {
+    if (!selectedApplication || !user) return
+
+    try {
+      await addDoc(collection(db, 'circulations'), {
+        applicationId: selectedApplication.id,
+        userId: user.id,
+        userName: user.name,
+        confirmedAt: serverTimestamp()
+      })
+
+      alert('回覧を確認しました')
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+    } catch (error) {
+      console.error('Circulation error:', error)
+      alert('処理に失敗しました')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -167,6 +191,12 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold">社内承認ポータル</h1>
           <div className="flex items-center gap-4">
+            <button
+              onClick={handleAdminUsers}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              社員マスタ管理
+            </button>
             <span className="text-sm text-gray-600">
               {user.name} ({user.department} - {user.title})
             </span>
@@ -391,6 +421,17 @@ export default function DashboardPage() {
                       onApprove={handleApproval}
                       onClose={() => setShowDetailModal(false)}
                     />
+                  </div>
+                )}
+
+                {selectedApplication.workflow.status !== '承認待ち' && (
+                  <div className="border-t pt-4">
+                    <button
+                      onClick={handleCirculation}
+                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      回覧を確認
+                    </button>
                   </div>
                 )}
               </div>
