@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
   const [circulations, setCirculations] = useState<Application[]>([])
   const [myApplications, setMyApplications] = useState<Application[]>([])
-  const [dataLoading, setDataLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -156,9 +155,7 @@ export default function DashboardPage() {
             <p className="text-gray-500 text-sm mb-4">
               自分が承認者として設定されている申請
             </p>
-            {dataLoading ? (
-              <div className="text-center py-8 text-gray-400">読み込み中...</div>
-            ) : pendingApprovals.length === 0 ? (
+            {pendingApprovals.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 承認待ちの申請はありません
               </div>
@@ -188,9 +185,7 @@ export default function DashboardPage() {
             <p className="text-gray-500 text-sm mb-4">
               自分が回覧先に設定されている申請
             </p>
-            {dataLoading ? (
-              <div className="text-center py-8 text-gray-400">読み込み中...</div>
-            ) : circulations.length === 0 ? (
+            {circulations.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 回覧待ちの申請はありません
               </div>
@@ -229,9 +224,7 @@ export default function DashboardPage() {
         {/* 自分の申請一覧 */}
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold mb-4">自分の申請一覧</h2>
-          {dataLoading ? (
-            <div className="text-center py-8 text-gray-400">読み込み中...</div>
-          ) : myApplications.length === 0 ? (
+          {myApplications.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               申請はありません
             </div>
