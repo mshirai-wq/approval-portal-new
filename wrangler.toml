@@ -1,9 +1,10 @@
 name = "approval-portal"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
 
 [env.production]
-vars = { NODE_VERSION = "20" }
+vars = { NODE_VERSION = "22" }
 
 [env.preview]
-vars = { NODE_VERSION = "20" }
+vars = { NODE_VERSION = "22" }
