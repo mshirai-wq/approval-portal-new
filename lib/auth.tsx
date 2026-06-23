@@ -5,6 +5,8 @@ import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth'
@@ -24,6 +26,7 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
+  signInWithGoogle: () => Promise<void>
   signUp: (email: string, password: string, name: string, title: string, department: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -70,6 +73,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signInWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider()
+      const result = await signInWithPopup(auth, provider)
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', result.user.email!))
+      if (!userDoc.exists()) {
+        // User not in employee master, sign out
+        await firebaseSignOut(auth)
+        throw new Error('社員マスタに登録されていません。管理者にお問い合わせください。')
+      }
+      
+      // User exists, authentication successful
+    } catch (error: any) {
+      console.error('Google sign in error:', error)
+      throw new Error(error.message || 'Googleログインに失敗しました')
+    }
+  }
+
   const signUp = async (email: string, password: string, name: string, title: string, department: string) => {
     try {
       await createUserWithEmailAndPassword(auth, email, password)
@@ -100,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signInWithGoogle, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   )
