@@ -1,0 +1,9 @@
+name = "approval-portal"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+vars = { NODE_VERSION = "20" }
+
+[env.preview]
+vars = { NODE_VERSION = "20" }
