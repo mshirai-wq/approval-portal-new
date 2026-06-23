@@ -6,6 +6,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
+export const runtime = 'edge'
+
 interface Application {
   id: string
   appName: string
