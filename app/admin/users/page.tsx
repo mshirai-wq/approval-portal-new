@@ -29,28 +29,19 @@ export default function AdminUsersPage() {
   })
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
+  // 1. 先に関数を作る
+  const fetchUsers = async () => {
+    try {
+      // データの取得処理...
+    } catch (error) {
+      // ...
     }
-  }, [user, loading, router])
+  }
 
+  // 2. 作ったあとに呼び出す
   useEffect(() => {
     fetchUsers()
   }, [])
-
-  const fetchUsers = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'users'))
-      const usersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as User))
-      setUsers(usersData)
-    } catch (error) {
-      console.error('Error fetching users:', error)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
