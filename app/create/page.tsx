@@ -503,7 +503,7 @@ export default function CreatePage() {
                 {(() => {
                   const route = getApprovalRoute(subType, user?.department || '', user?.title || '')
                   
-                  const renderGeneralAffairsSelector = (selectedList, setSelectedList) => {
+                  const renderGeneralAffairsSelector = (selectedList: any, setSelectedList: any) => {
                     return (
                       <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
                         <div className="relative">
@@ -549,7 +549,7 @@ export default function CreatePage() {
                     )
                   }
 
-                  const renderMemberSelector = (selectedList, setSelectedList, filterType) => {
+                  const renderMemberSelector = (selectedList: any, setSelectedList: any, filterType: any) => {
                     return (
                       <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
                         {filterType === '回覧' && (
