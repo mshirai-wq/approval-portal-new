@@ -18,6 +18,35 @@ interface EmployeeMaster {
   [dept: string]: Employee[]
 }
 
+// 修正ポイント1：AccordItem を画面の描画処理（CreatePage）の「外側」に追い出しました！
+const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
+  <div className="border-b border-gray-200 last:border-0">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <Users size={18} className="text-gray-600" />
+        <span className="text-sm font-bold text-gray-700">{title}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded">
+          {count}名選択済
+        </span>
+        <span className={`transition-transform ${isActive ? 'rotate-180' : ''}`}>
+          <Clock size={16} className="text-gray-400" />
+        </span>
+      </div>
+    </button>
+    {isActive && (
+      <div className="p-3 bg-gray-50/30 border-t border-gray-150">
+        {children}
+      </div>
+    )}
+  </div>
+)
+
 export default function CreatePage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -46,10 +75,7 @@ export default function CreatePage() {
   const [paymentDate, setPaymentDate] = useState('')
   const [payee, setPayee] = useState('')
 
-  useEffect(() => {
-    fetchEmployeeMaster()
-  }, [])
-
+  // 修正ポイント2：呼び出される関数を上に移動し、順番エラーを解消しました！
   const fetchEmployeeMaster = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
@@ -71,6 +97,10 @@ export default function CreatePage() {
       console.error('Error fetching employee master:', error)
     }
   }
+
+  useEffect(() => {
+    fetchEmployeeMaster()
+  }, [])
 
   const generalManagers = useMemo(() => {
     if (!employeeMaster) return []
@@ -270,6 +300,7 @@ export default function CreatePage() {
       setSelectedGeneralAffairs(route.defaultGeneralAffairs)
       setSelectedCirculation(route.defaultCirculation)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subType, user, employeeMaster])
 
   useEffect(() => {
@@ -359,6 +390,173 @@ export default function CreatePage() {
       setLoading(false)
     }
   }
+
+  // 修正ポイント3：型の指定（anyではなく正確な型）をしてUI部分の関数を綺麗に整理しました！
+  const renderGeneralAffairsSelector = (selectedList: string[], setSelectedList: (list: string[]) => void) => {
+    const generalAffairsDept = employeeMaster['総務管理本部'] || []
+    const filteredMembers = searchQuery
+      ? generalAffairsDept.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      : generalAffairsDept
+
+    return (
+      <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="総務管理本部の社員を検索..."
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {filteredMembers.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-gray-400 block px-1">総務管理本部</span>
+            {filteredMembers.map((m) => {
+              const isSelected = selectedList.includes(m.name)
+              return (
+                <button
+                  key={m.name}
+                  type="button"
+                  onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
+                    ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
+                >
+                  <span>{m.name}</span>
+                  {isSelected && <Check size={12} className="text-blue-700" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderMemberSelector = (selectedList: string[], setSelectedList: (list: string[]) => void, filterType: string) => {
+    return (
+      <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
+        {filterType === '回覧' && (
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="社員を検索..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+        {Object.entries(employeeMaster).map(([dept, members]) => {
+          if (filterType === '社長') {
+            const filteredMembers = members.filter(m => m.title.includes('社長'))
+            if (filteredMembers.length === 0) return null
+            return (
+              <div key={dept} className="space-y-1">
+                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
+                {filteredMembers.map((m) => {
+                  const isSelected = selectedList.includes(m.name)
+                  return (
+                    <button
+                      key={m.name}
+                      type="button"
+                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
+                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
+                    >
+                      <span>{m.name}</span>
+                      {isSelected && <Check size={12} className="text-blue-700" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          }
+          if (filterType === '部長' && user) {
+            if (dept !== user.department) return null
+            const filteredMembers = members.filter(m => m.title.includes('部長'))
+            if (filteredMembers.length === 0) return null
+            return (
+              <div key={dept} className="space-y-1">
+                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
+                {filteredMembers.map((m) => {
+                  const isSelected = selectedList.includes(m.name)
+                  return (
+                    <button
+                      key={m.name}
+                      type="button"
+                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
+                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
+                    >
+                      <span>{m.name}</span>
+                      {isSelected && <Check size={12} className="text-blue-700" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          }
+          if (filterType === '本部長') {
+            const filteredMembers = members.filter(m => m.title.includes('本部長'))
+            if (filteredMembers.length === 0) return null
+            return (
+              <div key={dept} className="space-y-1">
+                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
+                {filteredMembers.map((m) => {
+                  const isSelected = selectedList.includes(m.name)
+                  return (
+                    <button
+                      key={m.name}
+                      type="button"
+                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
+                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
+                    >
+                      <span>{m.name}</span>
+                      {isSelected && <Check size={12} className="text-blue-700" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          }
+          if (filterType === '回覧') {
+            const filteredMembers = searchQuery
+              ? members.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+              : members
+            if (filteredMembers.length === 0) return null
+            return (
+              <div key={dept} className="space-y-1">
+                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
+                {filteredMembers.map((m) => {
+                  const isSelected = selectedList.includes(m.name)
+                  return (
+                    <button
+                      key={m.name}
+                      type="button"
+                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
+                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
+                    >
+                      <span>{m.name}</span>
+                      {isSelected && <Check size={12} className="text-blue-700" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          }
+          return null
+        })}
+      </div>
+    )
+  }
+
+  // ルート設定（JSXを綺麗にするために外に用意）
+  const route = getApprovalRoute(subType, user?.department || '', user?.title || '')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -500,267 +698,64 @@ export default function CreatePage() {
                 承認・回覧経路
               </h3>
               <div className="border border-gray-200 rounded-xl overflow-hidden">
-                {(() => {
-                  const route = getApprovalRoute(subType, user?.department || '', user?.title || '')
-                  
-                  const renderGeneralAffairsSelector = (selectedList: any, setSelectedList: any) => {
-                    return (
-                      <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
-                        <div className="relative">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="総務管理本部の社員を検索..."
-                            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        {(() => {
-                          const generalAffairsDept = employeeMaster['総務管理本部'] || []
-                          const filteredMembers = searchQuery
-                            ? generalAffairsDept.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                            : generalAffairsDept
-                          
-                          if (filteredMembers.length === 0) return null
-                          
-                          return (
-                            <div className="space-y-1">
-                              <span className="text-xs font-bold text-gray-400 block px-1">総務管理本部</span>
-                              {filteredMembers.map((m) => {
-                                const isSelected = selectedList.includes(m.name)
-                                return (
-                                  <button
-                                    key={m.name}
-                                    type="button"
-                                    onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
-                                      ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
-                                  >
-                                    <span>{m.name}</span>
-                                    {isSelected && <Check size={12} className="text-blue-700" />}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    )
-                  }
-
-                  const renderMemberSelector = (selectedList: any, setSelectedList: any, filterType: any) => {
-                    return (
-                      <div className="space-y-3 bg-white p-3 rounded-xl border border-gray-200 mt-2 max-h-48 overflow-y-auto">
-                        {filterType === '回覧' && (
-                          <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="text"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="社員を検索..."
-                              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        )}
-                        {Object.entries(employeeMaster).map(([dept, members]) => {
-                          if (filterType === '社長') {
-                            const filteredMembers = members.filter(m => m.title.includes('社長'))
-                            if (filteredMembers.length === 0) return null
-                            return (
-                              <div key={dept} className="space-y-1">
-                                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
-                                {filteredMembers.map((m) => {
-                                  const isSelected = selectedList.includes(m.name)
-                                  return (
-                                    <button
-                                      key={m.name}
-                                      type="button"
-                                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
-                                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
-                                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
-                                    >
-                                      <span>{m.name}</span>
-                                      {isSelected && <Check size={12} className="text-blue-700" />}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )
-                          }
-                          if (filterType === '部長' && user) {
-                            if (dept !== user.department) return null
-                            const filteredMembers = members.filter(m => m.title.includes('部長'))
-                            if (filteredMembers.length === 0) return null
-                            return (
-                              <div key={dept} className="space-y-1">
-                                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
-                                {filteredMembers.map((m) => {
-                                  const isSelected = selectedList.includes(m.name)
-                                  return (
-                                    <button
-                                      key={m.name}
-                                      type="button"
-                                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
-                                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
-                                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
-                                    >
-                                      <span>{m.name}</span>
-                                      {isSelected && <Check size={12} className="text-blue-700" />}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )
-                          }
-                          if (filterType === '本部長') {
-                            const filteredMembers = members.filter(m => m.title.includes('本部長'))
-                            if (filteredMembers.length === 0) return null
-                            return (
-                              <div key={dept} className="space-y-1">
-                                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
-                                {filteredMembers.map((m) => {
-                                  const isSelected = selectedList.includes(m.name)
-                                  return (
-                                    <button
-                                      key={m.name}
-                                      type="button"
-                                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
-                                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
-                                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
-                                    >
-                                      <span>{m.name}</span>
-                                      {isSelected && <Check size={12} className="text-blue-700" />}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )
-                          }
-                          if (filterType === '回覧') {
-                            const filteredMembers = searchQuery
-                              ? members.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                              : members
-                            if (filteredMembers.length === 0) return null
-                            return (
-                              <div key={dept} className="space-y-1">
-                                <span className="text-xs font-bold text-gray-400 block px-1">{dept}</span>
-                                {filteredMembers.map((m) => {
-                                  const isSelected = selectedList.includes(m.name)
-                                  return (
-                                    <button
-                                      key={m.name}
-                                      type="button"
-                                      onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)}
-                                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold text-left mb-1
-                                        ${isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900' : 'hover:bg-gray-50 border border-transparent text-gray-700'}`}
-                                    >
-                                      <span>{m.name}</span>
-                                      {isSelected && <Check size={12} className="text-blue-700" />}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )
-                          }
-                          return null
-                        })}
-                      </div>
-                    )
-                  }
-
-                  const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
-                    <div className="border-b border-gray-200 last:border-0">
-                      <button
-                        type="button"
-                        onClick={onClick}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Users size={18} className="text-gray-600" />
-                          <span className="text-sm font-bold text-gray-700">{title}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded">
-                            {count}名選択済
-                          </span>
-                          <span className={`transition-transform ${isActive ? 'rotate-180' : ''}`}>
-                            <Clock size={16} className="text-gray-400" />
-                          </span>
-                        </div>
-                      </button>
-                      {isActive && (
-                        <div className="p-3 bg-gray-50/30 border-t border-gray-150">
-                          {children}
-                        </div>
-                      )}
-                    </div>
-                  )
-
-                  return (
-                    <>
-                      {route.showDeptHead && (
-                        <AccordItem
-                          title="所属長"
-                          count={selectedDeptHead.length}
-                          isActive={activeAccord === '所属長'}
-                          onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}
-                        >
-                          {renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}
-                        </AccordItem>
-                      )}
-                      {route.showGM && (
-                        <AccordItem
-                          title="本部長（承認）"
-                          count={selectedGM.length}
-                          isActive={activeAccord === '本部長（承認）'}
-                          onClick={() => setActiveAccord(activeAccord === '本部長（承認）' ? '' : '本部長（承認）')}
-                        >
-                          {renderMemberSelector(selectedGM, setSelectedGM, '本部長')}
-                        </AccordItem>
-                      )}
-                      {route.showExec && (
-                        <AccordItem
-                          title="社長"
-                          count={selectedExec.length}
-                          isActive={activeAccord === '社長'}
-                          onClick={() => setActiveAccord(activeAccord === '社長' ? '' : '社長')}
-                        >
-                          {renderMemberSelector(selectedExec, setSelectedExec, '社長')}
-                        </AccordItem>
-                      )}
-                      {route.showGeneralAffairs && (
-                        <AccordItem
-                          title="総務管理本部"
-                          count={selectedGeneralAffairs.length}
-                          isActive={activeAccord === '総務管理本部'}
-                          onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}
-                        >
-                          {renderGeneralAffairsSelector(selectedGeneralAffairs, setSelectedGeneralAffairs)}
-                        </AccordItem>
-                      )}
-                      {route.showGMForCirculation && (
-                        <AccordItem
-                          title="本部長（回覧）"
-                          count={selectedGMForCirculation.length}
-                          isActive={activeAccord === '本部長（回覧）'}
-                          onClick={() => setActiveAccord(activeAccord === '本部長（回覧）' ? '' : '本部長（回覧）')}
-                        >
-                          {renderMemberSelector(selectedGMForCirculation, setSelectedGMForCirculation, '本部長')}
-                        </AccordItem>
-                      )}
-                      <AccordItem
-                        title="回覧先"
-                        count={selectedCirculation.length}
-                        isActive={activeAccord === '回覧先'}
-                        onClick={() => setActiveAccord(activeAccord === '回覧先' ? '' : '回覧先')}
-                      >
-                        {renderMemberSelector(selectedCirculation, setSelectedCirculation, '回覧')}
-                      </AccordItem>
-                    </>
-                  )
-                })()}
+                {route.showDeptHead && (
+                  <AccordItem
+                    title="所属長"
+                    count={selectedDeptHead.length}
+                    isActive={activeAccord === '所属長'}
+                    onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}
+                  >
+                    {renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}
+                  </AccordItem>
+                )}
+                {route.showGM && (
+                  <AccordItem
+                    title="本部長（承認）"
+                    count={selectedGM.length}
+                    isActive={activeAccord === '本部長（承認）'}
+                    onClick={() => setActiveAccord(activeAccord === '本部長（承認）' ? '' : '本部長（承認）')}
+                  >
+                    {renderMemberSelector(selectedGM, setSelectedGM, '本部長')}
+                  </AccordItem>
+                )}
+                {route.showExec && (
+                  <AccordItem
+                    title="社長"
+                    count={selectedExec.length}
+                    isActive={activeAccord === '社長'}
+                    onClick={() => setActiveAccord(activeAccord === '社長' ? '' : '社長')}
+                  >
+                    {renderMemberSelector(selectedExec, setSelectedExec, '社長')}
+                  </AccordItem>
+                )}
+                {route.showGeneralAffairs && (
+                  <AccordItem
+                    title="総務管理本部"
+                    count={selectedGeneralAffairs.length}
+                    isActive={activeAccord === '総務管理本部'}
+                    onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}
+                  >
+                    {renderGeneralAffairsSelector(selectedGeneralAffairs, setSelectedGeneralAffairs)}
+                  </AccordItem>
+                )}
+                {route.showGMForCirculation && (
+                  <AccordItem
+                    title="本部長（回覧）"
+                    count={selectedGMForCirculation.length}
+                    isActive={activeAccord === '本部長（回覧）'}
+                    onClick={() => setActiveAccord(activeAccord === '本部長（回覧）' ? '' : '本部長（回覧）')}
+                  >
+                    {renderMemberSelector(selectedGMForCirculation, setSelectedGMForCirculation, '本部長')}
+                  </AccordItem>
+                )}
+                <AccordItem
+                  title="回覧先"
+                  count={selectedCirculation.length}
+                  isActive={activeAccord === '回覧先'}
+                  onClick={() => setActiveAccord(activeAccord === '回覧先' ? '' : '回覧先')}
+                >
+                  {renderMemberSelector(selectedCirculation, setSelectedCirculation, '回覧')}
+                </AccordItem>
               </div>
             </div>
 
