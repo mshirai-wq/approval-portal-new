@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Check, Clock, ArrowLeft } from 'lucide-react'
+import { Users, Search, Check, Clock, ArrowLeft, Paperclip, X } from 'lucide-react' // PaperclipとXを追加
 
 interface Employee {
   name: string
@@ -18,7 +18,6 @@ interface EmployeeMaster {
   [dept: string]: Employee[]
 }
 
-// 修正ポイント1：AccordItem を画面の描画処理（CreatePage）の「外側」に追い出しました！
 const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
   <div className="border-b border-gray-200 last:border-0">
     <button
@@ -69,13 +68,13 @@ export default function CreatePage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [remarks, setRemarks] = useState('')
+  const [files, setFiles] = useState<File[]>([]) // ★ファイル保持用のStateを追加
   
   // 通常申請
   const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState('')
   const [payee, setPayee] = useState('')
 
-  // 修正ポイント2：呼び出される関数を上に移動し、順番エラーを解消しました！
   const fetchEmployeeMaster = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
@@ -327,6 +326,11 @@ export default function CreatePage() {
     }
   }
 
+  // ★ファイルを削除する関数
+  const removeFile = (indexToRemove: number) => {
+    setFiles(files.filter((_, index) => index !== indexToRemove))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) {
@@ -338,6 +342,31 @@ export default function CreatePage() {
     setError('')
 
     try {
+      // ★1. Googleドライブへのアップロード処理
+      const uploadedAttachments = []
+      if (files.length > 0) {
+        for (const file of files) {
+          const formData = new FormData()
+          formData.append('file', file)
+
+          const uploadRes = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          })
+
+          if (!uploadRes.ok) {
+            throw new Error(`${file.name} のアップロードに失敗しました`)
+          }
+
+          const uploadData = await uploadRes.json()
+          uploadedAttachments.push({
+            name: uploadData.name,
+            url: uploadData.url, // GoogleドライブのプレビューURL
+            type: uploadData.type
+          })
+        }
+      }
+
       let formDetails: any = { description, remarks }
 
       if (subType === '通常申請') {
@@ -376,7 +405,7 @@ export default function CreatePage() {
           circulations: selectedCirculation,
           confirmedBy: []
         },
-        attachments: [],
+        attachments: uploadedAttachments, // ★アップロードしたURLを保存
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }
@@ -391,7 +420,6 @@ export default function CreatePage() {
     }
   }
 
-  // 修正ポイント3：型の指定（anyではなく正確な型）をしてUI部分の関数を綺麗に整理しました！
   const renderGeneralAffairsSelector = (selectedList: string[], setSelectedList: (list: string[]) => void) => {
     const generalAffairsDept = employeeMaster['総務管理本部'] || []
     const filteredMembers = searchQuery
@@ -555,7 +583,7 @@ export default function CreatePage() {
     )
   }
 
-  // ルート設定（JSXを綺麗にするために外に用意）
+  // ルート設定
   const route = getApprovalRoute(subType, user?.department || '', user?.title || '')
 
   return (
@@ -691,8 +719,51 @@ export default function CreatePage() {
               />
             </div>
 
+            {/* ★添付ファイル機能 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                添付ファイル (画像・PDF)
+              </label>
+              <div className="flex items-center gap-4">
+                <label className="cursor-pointer bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors">
+                  <Paperclip size={18} />
+                  <span className="text-sm font-medium">ファイルを選択</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+                      }
+                    }}
+                  />
+                </label>
+                <span className="text-xs text-gray-500">複数選択可能</span>
+              </div>
+
+              {/* 選択されたファイルのリスト表示 */}
+              {files.length > 0 && (
+                <ul className="mt-3 space-y-2">
+                  {files.map((file, index) => (
+                    <li key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                      <span className="text-sm text-gray-600 truncate mr-4">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <X size={18} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Workflow Selection */}
-            <div className="space-y-4">
+            <div className="space-y-4 pt-4">
               <h3 className="text-base font-bold text-gray-700 flex items-center gap-2">
                 <Users size={18} className="text-blue-600" />
                 承認・回覧経路
