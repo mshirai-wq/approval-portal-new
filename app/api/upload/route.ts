@@ -3,13 +3,12 @@ import { SignJWT, importPKCS8 } from 'jose'
 
 export const runtime = 'edge'
 
-// Googleのアクセストークンを取得する関数
 async function getGoogleToken(clientEmail: string, privateKey: string) {
   const alg = 'RS256'
   const key = await importPKCS8(privateKey, alg)
   const jwt = await new SignJWT({
     iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/drive.file', // ドライブのファイル操作権限
+    scope: 'https://www.googleapis.com/auth/drive.file',
     aud: 'https://oauth2.googleapis.com/token',
   })
     .setProtectedHeader({ alg })
@@ -46,50 +45,46 @@ export async function POST(req: Request) {
       throw new Error('環境変数が不足しています')
     }
 
-    // 1. Google APIのトークンを取得
     const accessToken = await getGoogleToken(clientEmail, privateKey)
 
-    // 2. Google Driveの「multipartアップロード」用のBodyを手動で組み立てる (Edge環境対策)
-    const boundary = 'foo_bar_baz'
-    const metadata = JSON.stringify({
-      name: file.name,
-      parents: [folderId],
-    })
-
-    const fileBuffer = await file.arrayBuffer()
-    const encoder = new TextEncoder()
-
-    const part1 = encoder.encode(
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
-      `--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n`
-    )
-    const part2 = encoder.encode(`\r\n--${boundary}--` )
-
-    // 全てのバイナリを結合
-    const bodyBuffer = new Uint8Array(part1.byteLength + fileBuffer.byteLength + part2.byteLength)
-    bodyBuffer.set(new Uint8Array(part1), 0)
-    bodyBuffer.set(new Uint8Array(fileBuffer), part1.byteLength)
-    bodyBuffer.set(new Uint8Array(part2), part1.byteLength + fileBuffer.byteLength)
-
-    // Googleドライブにアップロード
-    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    // ★Edge環境で最も安全な「FormDataを使ったシンプルな2段階方式」に変更
+    // 1. メタデータ（ファイル名と保存先）だけを先に送信して、ファイル枠（ID）を作る
+    const metadataRes = await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
+        'Content-Type': 'application/json',
       },
-      body: bodyBuffer,
+      body: JSON.stringify({
+        name: file.name,
+        parents: [folderId],
+      }),
+    })
+
+    if (!metadataRes.ok) {
+      const errText = await metadataRes.text()
+      throw new Error(`Google Drive Metadata Failed: ${errText}`)
+    }
+
+    const metadataData = await metadataRes.json()
+    const fileId = metadataData.id
+
+    // 2. 作成したファイルIDに対して、中身のバイナリ（データ）だけをパッチ（上書き）する
+    const uploadRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': file.type,
+      },
+      body: file, // バイナリをそのまま流し込む（Edge環境で一番安全な方法）
     })
 
     if (!uploadRes.ok) {
       const errText = await uploadRes.text()
-      throw new Error(`Google Drive Upload Failed: ${errText}`)
+      throw new Error(`Google Drive Content Upload Failed: ${errText}`)
     }
 
-    const uploadData = await uploadRes.json()
-    const fileId = uploadData.id
-
-    // 3. 【重要】ポータルでプレビュー表示できるように、ファイルの権限を「リンクを知っている全員が閲覧可能」に変更する
+    // 3. ファイルの権限を「リンクを知っている全員が閲覧可能」に変更
     await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
       method: 'POST',
       headers: {
@@ -98,11 +93,10 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         role: 'reader',
-        type: 'anyone', // リンクを知っている全員。もしGoogle Workspaceのドメイン内に制限したい場合は 'domain' にします
+        type: 'anyone',
       }),
     })
 
-    // ポータルのプレビュー表示やダウンロードで使えるGoogle公式のURL形式
     const previewUrl = `https://drive.google.com/uc?id=${fileId}&export=view`
 
     return NextResponse.json({
