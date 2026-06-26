@@ -1,21 +1,65 @@
 import { NextResponse } from 'next/server'
-import { SignJWT, importPKCS8 } from 'jose'
 
 export const runtime = 'edge'
 
-async function getGoogleToken(clientEmail: string, privateKey: string) {
-  const alg = 'RS256'
-  const key = await importPKCS8(privateKey, alg)
-  const jwt = await new SignJWT({
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    aud: 'https://oauth2.googleapis.com/token',
-  })
-    .setProtectedHeader({ alg })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(key)
+// ライブラリを使わず、Web標準のcryptoだけでGoogleの認証JWTを作成する関数
+async function getGoogleTokenWithoutLibrary(clientEmail: string, privateKeyStr: string) {
+  // PEM形式の鍵文字列からヘッダーとフッター、改行を除去して純粋なBase64にする
+  const pemHeader = "-----BEGIN PRIVATE KEY-----"
+  const pemFooter = "-----END PRIVATE KEY-----"
+  let pemContents = privateKeyStr.replace(pemHeader, "").replace(pemFooter, "")
+  pemContents = pemContents.replace(/\s+/g, "")
 
+  // Base64をバイナリ配列にデコード
+  const binaryDerString = atob(pemContents)
+  const binaryDer = new Uint8Array(binaryDerString.length)
+  for (let i = 0; i < binaryDerString.length; i++) {
+    binaryDer[i] = binaryDerString.charCodeAt(i)
+  }
+
+  // Web Crypto APIで秘密鍵としてインポート
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer.buffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  // JWTのヘッダーとクレームを構築
+  const header = { alg: "RS256", typ: "JWT" }
+  const now = Math.floor(Date.now() / 1000)
+  const payload = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/drive.file",
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now
+  }
+
+  // Base64URLエンコード関数
+  const base64UrlEncode = (obj: any) => {
+    const str = btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+    return str.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
+  };
+
+  const encodedHeader = base64UrlEncode(header)
+  const encodedPayload = base64UrlEncode(payload)
+  const dataToSign = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+
+  // 署名の実行
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    privateKey,
+    dataToSign
+  )
+
+  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
+
+  const jwt = `${encodedHeader}.${encodedPayload}.${encodedSignature}`
+
+  // Googleのトークンエンドポイントへリクエスト
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -45,10 +89,10 @@ export async function POST(req: Request) {
       throw new Error('環境変数が不足しています')
     }
 
-    const accessToken = await getGoogleToken(clientEmail, privateKey)
+    // 外部ライブラリに依存しない方法でトークンを取得
+    const accessToken = await getGoogleTokenWithoutLibrary(clientEmail, privateKey)
 
-    // ★Edge環境で最も安全な「FormDataを使ったシンプルな2段階方式」に変更
-    // 1. メタデータ（ファイル名と保存先）だけを先に送信して、ファイル枠（ID）を作る
+    // 1. メタデータだけを先に送信してファイルIDを確保
     const metadataRes = await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: {
@@ -69,14 +113,14 @@ export async function POST(req: Request) {
     const metadataData = await metadataRes.json()
     const fileId = metadataData.id
 
-    // 2. 作成したファイルIDに対して、中身のバイナリ（データ）だけをパッチ（上書き）する
+    // 2. 確保したファイルIDに対してバイナリデータを流し込む
     const uploadRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': file.type,
       },
-      body: file, // バイナリをそのまま流し込む（Edge環境で一番安全な方法）
+      body: file,
     })
 
     if (!uploadRes.ok) {
@@ -84,7 +128,7 @@ export async function POST(req: Request) {
       throw new Error(`Google Drive Content Upload Failed: ${errText}`)
     }
 
-    // 3. ファイルの権限を「リンクを知っている全員が閲覧可能」に変更
+    // 3. 全員閲覧権限を付与
     await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
       method: 'POST',
       headers: {
