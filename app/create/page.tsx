@@ -5,7 +5,8 @@ import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Users, Search, Check, Clock, ArrowLeft, Paperclip, X } from 'lucide-react' // PaperclipとXを追加
+import { Users, Search, Check, Clock, ArrowLeft, Paperclip, X } from 'lucide-react'
+import { uploadToGoogleDriveAction } from './actions' // ★追加したActionをインポート
 
 interface Employee {
   name: string
@@ -68,7 +69,7 @@ export default function CreatePage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [files, setFiles] = useState<File[]>([]) // ★ファイル保持用のStateを追加
+  const [files, setFiles] = useState<File[]>([])
   
   // 通常申請
   const [amount, setAmount] = useState('')
@@ -326,7 +327,6 @@ export default function CreatePage() {
     }
   }
 
-  // ★ファイルを削除する関数
   const removeFile = (indexToRemove: number) => {
     setFiles(files.filter((_, index) => index !== indexToRemove))
   }
@@ -342,27 +342,24 @@ export default function CreatePage() {
     setError('')
 
     try {
-      // ★1. Googleドライブへのアップロード処理
+      // ★API通信をやめ、直接インポートしたサーバーActionを叩く方式に変更！
       const uploadedAttachments = []
       if (files.length > 0) {
         for (const file of files) {
           const formData = new FormData()
           formData.append('file', file)
 
-          const uploadRes = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
+          // サーバー側の関数を直で実行
+          const result = await uploadToGoogleDriveAction(formData)
 
-          if (!uploadRes.ok) {
-            throw new Error(`${file.name} のアップロードに失敗しました`)
+          if (!result.success) {
+            throw new Error(`${file.name} のアップロードに失敗しました: ${result.error}`)
           }
 
-          const uploadData = await uploadRes.json()
           uploadedAttachments.push({
-            name: uploadData.name,
-            url: uploadData.url, // GoogleドライブのプレビューURL
-            type: uploadData.type
+            name: result.name,
+            url: result.url,
+            type: result.type
           })
         }
       }
@@ -405,7 +402,7 @@ export default function CreatePage() {
           circulations: selectedCirculation,
           confirmedBy: []
         },
-        attachments: uploadedAttachments, // ★アップロードしたURLを保存
+        attachments: uploadedAttachments,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }
@@ -583,7 +580,6 @@ export default function CreatePage() {
     )
   }
 
-  // ルート設定
   const route = getApprovalRoute(subType, user?.department || '', user?.title || '')
 
   return (
@@ -719,7 +715,7 @@ export default function CreatePage() {
               />
             </div>
 
-            {/* ★添付ファイル機能 */}
+            {/* 添付ファイル機能 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 添付ファイル (画像・PDF)
