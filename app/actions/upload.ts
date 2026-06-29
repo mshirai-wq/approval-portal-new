@@ -1,7 +1,5 @@
 'use server'
 
-export const runtime = 'edge'
-
 interface UploadResult {
   success: boolean
   fileId?: string
