@@ -274,20 +274,14 @@ export default function CreatePage() {
       // ファイルをGoogle Driveにアップロード
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       if (files.length > 0) {
+        // 一時的にファイルアップロードをスキップ
+        console.log('File upload temporarily disabled')
         for (const file of files) {
-          const result = await uploadToDrive(file)
-          if (result.success && result.fileId && result.url) {
-            uploadedAttachments.push({
-              name: result.fileName || file.name,
-              url: result.url,
-              type: file.type
-            })
-          } else {
-            console.error('Upload failed:', result.error)
-            setError(`ファイル ${file.name} のアップロードに失敗しました: ${result.error}`)
-            setLoading(false)
-            return
-          }
+          uploadedAttachments.push({
+            name: file.name,
+            url: '#',
+            type: file.type
+          })
         }
       }
 
