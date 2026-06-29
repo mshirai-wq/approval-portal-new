@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Users, Search, Check, Clock, ArrowLeft, Paperclip, X } from 'lucide-react'
+import { uploadToDrive } from '@/app/actions/upload'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント（入れ子を排除してトップレベルに配置）
@@ -270,18 +271,24 @@ export default function CreatePage() {
     setError('')
 
     try {
-      // ★エラーの元凶だった fetch('/api/upload') を完全削除
-      // ファイルがある場合はダミーのデータ構造を作り、エラーを100%回避する
-      
-     const uploadedAttachments: { name: string; url: string; type: string }[] = []
+      // ファイルをGoogle Driveにアップロード
+      const uploadedAttachments: { name: string; url: string; type: string }[] = []
       if (files.length > 0) {
-        files.forEach(file => {
-          uploadedAttachments.push({
-            name: file.name,
-            url: '#', // ドライブ連携停止中のため仮URL
-            type: file.type
-          })
-        })
+        for (const file of files) {
+          const result = await uploadToDrive(file)
+          if (result.success && result.fileId && result.url) {
+            uploadedAttachments.push({
+              name: result.fileName || file.name,
+              url: result.url,
+              type: file.type
+            })
+          } else {
+            console.error('Upload failed:', result.error)
+            setError(`ファイル ${file.name} のアップロードに失敗しました: ${result.error}`)
+            setLoading(false)
+            return
+          }
+        }
       }
 
       let formDetails: any = { description, remarks }
