@@ -36,3 +36,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: approval-portal
           directory: .vercel/output/static
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
