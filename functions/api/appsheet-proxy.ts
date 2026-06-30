@@ -70,14 +70,32 @@ export async function onRequest(context: { request: Request; env: Env }) {
         },
         body: JSON.stringify(modifiedBody),
       })
-      const data = await response.json()
+      
+      // レスポンスをテキストとして取得し、JSONパースを試みる
+      const text = await response.text()
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = { error: text || 'Invalid response from Apps Script' }
+      }
+      
       return new Response(JSON.stringify(data), {
         status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     } else {
       const response = await fetch(targetRequest)
-      const data = await response.json()
+      
+      // レスポンスをテキストとして取得し、JSONパースを試みる
+      const text = await response.text()
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = { error: text || 'Invalid response from Apps Script' }
+      }
+      
       return new Response(JSON.stringify(data), {
         status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
