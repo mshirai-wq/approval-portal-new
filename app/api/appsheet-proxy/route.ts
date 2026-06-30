@@ -3,65 +3,66 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'edge'
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const action = searchParams.get('action')
-
-  const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
-  const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
-
-  if (!appsScriptUrl || !appsScriptApiKey) {
-    return NextResponse.json(
-      { error: 'Apps Script configuration is missing' },
-      { status: 500 }
-    )
-  }
-
-  // Apps ScriptへのリクエストURLを構築
-  const targetUrl = new URL(appsScriptUrl)
-  targetUrl.searchParams.set('action', action || '')
-  targetUrl.searchParams.set('apiKey', appsScriptApiKey)
-
-  // 他のクエリパラメータを転送
-  searchParams.forEach((value, key) => {
-    if (key !== 'action') {
-      targetUrl.searchParams.set(key, value)
-    }
-  })
-
   try {
+    const searchParams = request.nextUrl.searchParams
+    const action = searchParams.get('action')
+
+    const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
+    const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
+
+    // 1. 環境変数がちゃんとCloudflareから渡ってきているかチェック
+    if (!appsScriptUrl || !appsScriptApiKey) {
+      return NextResponse.json(
+        { error: `設定エラー: URLが存在するか(${!!appsScriptUrl})、APIキーが存在するか(${!!appsScriptApiKey})` },
+        { status: 500 }
+      )
+    }
+
+    // 2. URLの形式がおかしくないかチェック（ここで落ちるケースが多いです）
+    const targetUrl = new URL(appsScriptUrl.trim())
+    targetUrl.searchParams.set('action', action || '')
+    targetUrl.searchParams.set('apiKey', appsScriptApiKey.trim())
+
+    searchParams.forEach((value, key) => {
+      if (key !== 'action') {
+        targetUrl.searchParams.set(key, value)
+      }
+    })
+
+    // 3. GASへリクエスト
     const response = await fetch(targetUrl.toString())
     const text = await response.text()
+    
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      data = { error: text || 'Invalid response from Apps Script' }
+      // GAS側がエラー画面（HTML）を返してきた場合
+      data = { error: 'GASからの返答がJSONではありません。GASのURLやアクセス権限(全員OKか)を確認してください。', details: text }
     }
 
     return NextResponse.json(data, { status: response.status })
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Proxy error'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+  } catch (error: any) {
+    // 予測不能なエラーをすべてここで捕まえる
+    return NextResponse.json({ error: `プロキシ内部エラー (GET): ${error.message}` }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
-  const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
-  const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
-
-  if (!appsScriptUrl || !appsScriptApiKey) {
-    return NextResponse.json(
-      { error: 'Apps Script configuration is missing' },
-      { status: 500 }
-    )
-  }
-
   try {
-    const body = await request.json()
+    const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
+    const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
 
-    // Apps ScriptへのリクエストURLを構築
-    const targetUrl = new URL(appsScriptUrl)
-    targetUrl.searchParams.set('apiKey', appsScriptApiKey)
+    if (!appsScriptUrl || !appsScriptApiKey) {
+      return NextResponse.json(
+        { error: `設定エラー: URLが存在するか(${!!appsScriptUrl})、APIキーが存在するか(${!!appsScriptApiKey})` },
+        { status: 500 }
+      )
+    }
+
+    const body = await request.json()
+    const targetUrl = new URL(appsScriptUrl.trim())
+    targetUrl.searchParams.set('apiKey', appsScriptApiKey.trim())
 
     const response = await fetch(targetUrl.toString(), {
       method: 'POST',
@@ -76,13 +77,12 @@ export async function POST(request: NextRequest) {
     try {
       data = JSON.parse(text)
     } catch {
-      data = { error: text || 'Invalid response from Apps Script' }
+      data = { error: 'GASからの返答がJSONではありません。GASのURLやアクセス権限(全員OKか)を確認してください。', details: text }
     }
 
     return NextResponse.json(data, { status: response.status })
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Proxy error'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+  } catch (error: any) {
+    return NextResponse.json({ error: `プロキシ内部エラー (POST): ${error.message}` }, { status: 500 })
   }
 }
 
