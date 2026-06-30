@@ -4,8 +4,8 @@
 
 // プロキシAPIを使用（CORS回避）
 const PROXY_API_URL = '/api/appsheet-proxy'
-const WEB_APP_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_WEB_APP_URL || ''
-const API_KEY = process.env.NEXT_PUBLIC_APPS_SCRIPT_API_KEY || ''
+
+// ※ セキュリティ向上のため、WEB_APP_URL と API_KEY のバリデーションはサーバー側（プロキシAPI）へ一元化しました。
 
 export interface Expense {
   申請ID: string
@@ -45,10 +45,7 @@ export interface ExpenseResponse {
 // ==========================================
 
 async function callAppsScript(action: string, params?: Record<string, string>): Promise<any> {
-  if (!WEB_APP_URL || !API_KEY) {
-    throw new Error('Apps Script configuration is missing')
-  }
-
+  // ブラウザ側での不要な環境変数チェックを削除し、直接プロキシへ流すようにしました
   const url = new URL(PROXY_API_URL, window.location.origin)
   url.searchParams.append('action', action)
   
@@ -69,10 +66,7 @@ async function callAppsScript(action: string, params?: Record<string, string>): 
 }
 
 async function postAppsScript(data: any): Promise<any> {
-  if (!WEB_APP_URL || !API_KEY) {
-    throw new Error('Apps Script configuration is missing')
-  }
-
+  // ブラウザ側での不要な環境変数チェックを削除し、直接プロキシへ流すようにしました
   const url = new URL(PROXY_API_URL, window.location.origin)
 
   const response = await fetch(url.toString(), {
