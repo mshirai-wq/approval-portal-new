@@ -1,16 +1,4 @@
 name = "approval-portal"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
-
-# これはPagesプロジェクトだという宣言（重要）
 pages_build_output_dir = ".vercel/output/static"
-
-[env.production]
-vars = { NODE_VERSION = "22" }
-
-[env.preview]
-vars = { NODE_VERSION = "22" }
-
-[observability.logs]
-enabled = true
-invocation_logs = true
