@@ -2,6 +2,8 @@
 // Apps Script API クライアント
 // ==========================================
 
+// プロキシAPIを使用（CORS回避）
+const PROXY_API_URL = '/api/appsheet-proxy'
 const WEB_APP_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_WEB_APP_URL || ''
 const API_KEY = process.env.NEXT_PUBLIC_APPS_SCRIPT_API_KEY || ''
 
@@ -47,9 +49,8 @@ async function callAppsScript(action: string, params?: Record<string, string>): 
     throw new Error('Apps Script configuration is missing')
   }
 
-  const url = new URL(WEB_APP_URL)
+  const url = new URL(PROXY_API_URL, window.location.origin)
   url.searchParams.append('action', action)
-  url.searchParams.append('apiKey', API_KEY)
   
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -72,8 +73,7 @@ async function postAppsScript(data: any): Promise<any> {
     throw new Error('Apps Script configuration is missing')
   }
 
-  const url = new URL(WEB_APP_URL)
-  url.searchParams.append('apiKey', API_KEY)
+  const url = new URL(PROXY_API_URL, window.location.origin)
 
   const response = await fetch(url.toString(), {
     method: 'POST',
