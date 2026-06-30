@@ -178,3 +178,72 @@ npm run pages:dev
   createdAt: timestamp
 }
 ```
+
+## AppSheet経費申請連携
+
+このポータルはGoogle Apps Scriptを介してAppSheetで作成した経費申請アプリと連携し、ポータル上で承認作業を行うことができます。
+
+### 連携アーキテクチャ
+
+```
+AppSheet（経費申請アプリ）
+    ↓（Apps ScriptがGoogle Sheetsにアクセス）
+Google Apps Script（Web APIとして公開）
+    ↓（REST API呼び出し）
+Approval Portal（Next.js）
+```
+
+### 設定手順
+
+#### 1. Google Apps Scriptのデプロイ
+
+詳細な手順は `apps-script/README.md` を参照してください。
+
+1. [Google Apps Script](https://script.google.com/) で新しいプロジェクトを作成
+2. `apps-script/Code.gs` の内容をコピーして貼り付け
+3. `CONFIG` セクションを更新（スプレッドシートID、シート名、APIキー）
+4. Webアプリとしてデプロイ（「全員」がアクセス可能に設定）
+5. WebアプリURLをコピー
+
+#### 2. 環境変数の設定
+
+`.env.local` ファイルに以下を追加：
+
+```bash
+# Apps Script連携設定
+NEXT_PUBLIC_APPS_SCRIPT_WEB_APP_URL=https://script.google.com/macros/s/XXXXX/exec
+NEXT_PUBLIC_APPS_SCRIPT_API_KEY=YOUR_API_KEY
+```
+
+#### 3. Cloudflare Pagesへの環境変数追加
+
+デプロイ先のCloudflare Pagesプロジェクト設定で、以下の環境変数を追加：
+
+```
+NEXT_PUBLIC_APPS_SCRIPT_WEB_APP_URL=https://script.google.com/macros/s/XXXXX/exec
+NEXT_PUBLIC_APPS_SCRIPT_API_KEY=YOUR_API_KEY
+```
+
+### 使用方法
+
+1. ダッシュボードの「経費申請」カードをクリック
+2. 経費申請一覧が表示される（ステータスでフィルタ可能）
+3. 申請をクリックして詳細を表示
+4. 「承認する」または「却下する」ボタンで処理
+
+### 注意事項
+
+- AppSheetのデータソース（Google Sheets）の列名は以下を想定しています：
+  - `ID`: 申請ID
+  - `申請者`: 申請者名
+  - `部署`: 部署名
+  - `金額`: 金額（数値）
+  - `用途`: 用途
+  - `申請日`: 申請日
+  - `ステータス`: ステータス（申請中、承認済み、却下など）
+  - `承認者`: 承認者名
+  - `承認日`: 承認日時
+  - `承認コメント`: 承認時のコメント
+  - `却下理由`: 却下時の理由
+
+- 実際のAppSheetアプリのデータ構造に合わせて、Apps Scriptのコード（`apps-script/Code.gs`）の列名を調整してください

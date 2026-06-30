@@ -236,7 +236,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* 承認依頼一覧 */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -303,6 +303,23 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* 経費申請 */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
+              経費申請
+            </h2>
+            <p className="text-gray-500 text-sm mb-4">
+              AppSheet経費申請の承認・確認
+            </p>
+            <button
+              onClick={() => router.push('/expenses')}
+              className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors"
+            >
+              経費申請一覧
+            </button>
           </div>
 
           {/* 申請作成 */}
