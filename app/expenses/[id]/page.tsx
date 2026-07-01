@@ -1,7 +1,5 @@
 'use client'
 
-export const runtime = 'edge'
-
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useParams } from 'next/navigation'
@@ -85,11 +83,12 @@ export default function ExpenseDetailPage() {
             却下
           </span>
         )
+      case '承認待ち':
       default:
         return (
           <span className="inline-flex items-center gap-2 px-3 py-1 text-sm font-semibold bg-yellow-100 text-yellow-800 rounded-full">
             <Clock size={16} />
-            {status || '申請中'}
+            {status || '承認待ち'}
           </span>
         )
     }
@@ -112,7 +111,14 @@ export default function ExpenseDetailPage() {
     }).format(amount)
   }
 
-  const canApprove = expense?.承認ステータス === '申請中'
+  // ==========================================
+  // 【修正】ステータスが「承認待ち」かつ「自分が承認者」の時だけボタンを出す
+  // ==========================================
+  const myEmail = user?.email?.trim().toLowerCase()
+  const approverEmail = (expense?.承認者メールアドレス || '').trim().toLowerCase()
+  const isMeApprover = myEmail && approverEmail.includes(myEmail)
+  
+  const canApprove = expense?.承認ステータス === '承認待ち' && isMeApprover
 
   if (loading) {
     return (

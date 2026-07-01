@@ -5,9 +5,9 @@
 // 設定
 const CONFIG = {
   // AppSheetアプリのデータソース（Google SheetsのURL）
-  SPREADSHEET_ID: 'YOUR_SPREADSHEET_ID', // 経費申請データが格納されているスプレッドシートID
+  SPREADSHEET_ID: 'YOUR_SPREADSHEET_ID', // 経費申請データが格納されているスプレッドシートID - 実際のIDに置き換えてください
   SHEET_NAME: '経費申請', // シート名
-  API_KEY: 'YOUR_API_KEY' // API認証用キー
+  API_KEY: 'my-secret-api-key-2026' // Firebase App HostingのAPPS_SCRIPT_API_KEYと同じ値を設定してください
 }
 
 // ==========================================

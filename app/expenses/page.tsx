@@ -12,7 +12,9 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  
+  // 🟢 初期表示を「承認待ち」に変更しました
+  const [filterStatus, setFilterStatus] = useState<string>('承認待ち')
   const [searchQuery, setSearchQuery] = useState('')
 
   const fetchExpenses = async () => {
@@ -34,19 +36,18 @@ export default function ExpensesPage() {
   }, [filterStatus])
 
   // ==========================================
-  // 【修正ポイント】自分が承認者のデータのみに絞り込むフィルター
+  // 【修正】自分が承認者、かつ指定ステータスのデータのみに絞り込む
   // ==========================================
   const filteredExpenses = expenses.filter(expense => {
-    // 1. ログインユーザーのメールアドレスと、スプレッドシートの「承認者メールアドレス」を比較
-    // ※ 念のため、メールアドレスの前後空白や大文字小文字の違いを無視して比較します
     const myEmail = user?.email?.trim().toLowerCase()
-    const approverEmail = expense.承認者メールアドレス?.trim().toLowerCase()
+    const approverEmail = (expense.承認者メールアドレス || '').trim().toLowerCase()
 
-    if (myEmail && approverEmail !== myEmail) {
-      return false // 自分宛ての申請ではないデータは除外
+    // 🟢 S列（承認者メールアドレス）に自分のメールアドレスが含まれているデータのみを確実に残す
+    if (!myEmail || !approverEmail.includes(myEmail)) {
+      return false
     }
 
-    // 2. 検索キーワードがある場合はさらに絞り込む
+    // 検索キーワードがある場合はさらに絞り込む
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       return (
@@ -59,6 +60,7 @@ export default function ExpensesPage() {
     return true
   })
 
+  // 🟢 ステータスバッジの文言を「承認待ち」に合わせました
   const getStatusBadge = (status: string) => {
     switch (status) {
       case '承認済み':
@@ -75,11 +77,12 @@ export default function ExpensesPage() {
             却下
           </span>
         )
+      case '承認待ち':
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded">
             <Clock size={12} />
-            {status || '申請中'}
+            {status || '承認待ち'}
           </span>
         )
     }
@@ -128,22 +131,21 @@ export default function ExpensesPage() {
         {/* フィルターと検索 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* ステータスフィルター */}
             <div className="flex items-center gap-2">
               <Filter size={18} className="text-gray-500" />
+              {/* 🟢 セレクトボックスの選択肢を「承認待ち」に修正しました */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">すべてのステータス</option>
-                <option value="申請中">申請中</option>
+                <option value="承認待ち">承認待ち</option>
                 <option value="承認済み">承認済み</option>
                 <option value="却下">却下</option>
               </select>
             </div>
 
-            {/* 検索 */}
             <div className="flex-1 relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -165,7 +167,7 @@ export default function ExpensesPage() {
           </div>
         ) : filteredExpenses.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500">あなた宛ての経費申請がありません</p>
+            <p className="text-gray-500">現在、あなた宛ての「{filterStatus}」の経費申請はありません</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -173,56 +175,26 @@ export default function ExpensesPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      申請ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      日付
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      申請者
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      使用部署
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      内容
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      実行金額
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ステータス
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      操作
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">申請ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日付</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">申請者</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用部署</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内容</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">実行金額</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ステータス</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredExpenses.map((expense) => (
                     <tr key={expense.申請ID} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {expense.申請ID}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(expense.日付)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {expense.申請者}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {expense.使用部署}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {expense.内容}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatAmount(expense.実行金額)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(expense.承認ステータス)}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{expense.申請ID}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(expense.日付)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{expense.申請者}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.使用部署}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{expense.内容}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatAmount(expense.実行金額)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(expense.承認ステータス)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => router.push(`/expenses/${expense.申請ID}`)}
