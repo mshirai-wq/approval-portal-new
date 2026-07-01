@@ -1,3 +1,6 @@
+export const runtime = 'edge'
+
+// 💡 この下に、元からあった import ... などのコードが続くようにしてください
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
