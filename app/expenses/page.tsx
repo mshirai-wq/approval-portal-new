@@ -33,7 +33,20 @@ export default function ExpensesPage() {
     fetchExpenses()
   }, [filterStatus])
 
+  // ==========================================
+  // 【修正ポイント】自分が承認者のデータのみに絞り込むフィルター
+  // ==========================================
   const filteredExpenses = expenses.filter(expense => {
+    // 1. ログインユーザーのメールアドレスと、スプレッドシートの「承認者メールアドレス」を比較
+    // ※ 念のため、メールアドレスの前後空白や大文字小文字の違いを無視して比較します
+    const myEmail = user?.email?.trim().toLowerCase()
+    const approverEmail = expense.承認者メールアドレス?.trim().toLowerCase()
+
+    if (myEmail && approverEmail !== myEmail) {
+      return false // 自分宛ての申請ではないデータは除外
+    }
+
+    // 2. 検索キーワードがある場合はさらに絞り込む
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       return (
@@ -152,7 +165,7 @@ export default function ExpensesPage() {
           </div>
         ) : filteredExpenses.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500">経費申請がありません</p>
+            <p className="text-gray-500">あなた宛ての経費申請がありません</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
