@@ -20,7 +20,7 @@ export default function ExpensesPage() {
   const fetchExpenses = async () => {
     try {
       setLoading(true)
-      // 確実を期すため、GAS側からは一旦「全件」を取得し、フィルターはブラウザ側で処理します
+      // GAS側からは全件を取得
       const data = await getExpenses(undefined)
       setExpenses(data)
     } catch (err: any) {
@@ -33,13 +33,13 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     fetchExpenses()
-  }, []) // 初回のみ全件取得
+  }, [])
 
   // ==========================================
-  // ブラウザ側で「承認待ち」かつ「自分宛て」を確実に仕分ける
+  // ブラウザ側での仕分け処理
   // ==========================================
   const filteredExpenses = expenses.filter(expense => {
-    // 1. ステータスフィルターのチェック（選択が 'all' でない場合は、R列のステータスと一致するか）
+    // 1. ステータスフィルターのチェック
     if (filterStatus !== 'all') {
       const currentStatus = (expense.承認ステータス || '').trim()
       if (currentStatus !== filterStatus) {
@@ -47,12 +47,12 @@ export default function ExpensesPage() {
       }
     }
 
-    // 2. 承認者メールアドレス（S列）のチェック
+    // 2. 承認者メールアドレスのチェック
     const myEmail = user?.email?.trim().toLowerCase()
     const approverEmail = (expense.承認者メールアドレス || '').trim().toLowerCase()
 
     if (!myEmail || !approverEmail.includes(myEmail)) {
-      return false // 自分宛てではないデータを除外
+      return false
     }
 
     // 3. 検索キーワードのチェック
@@ -172,8 +172,31 @@ export default function ExpensesPage() {
             <p className="mt-2 text-gray-600">読み込み中...</p>
           </div>
         ) : filteredExpenses.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500">現在、あなた宛ての「{filterStatus}」の経費申請はありません</p>
+          <div className="bg-white rounded-lg shadow-md p-8 text-center space-y-6">
+            <p className="text-gray-500 font-medium">現在、あなた宛ての「{filterStatus}」の経費申請はありません</p>
+            
+            {/* 🛠️ 【一時的な原因調査用デバッグ画面】 */}
+            <div className="text-left bg-gray-100 p-4 rounded-lg text-xs font-mono max-w-2xl mx-auto space-y-2 border border-gray-300">
+              <p className="font-bold text-blue-700 text-sm border-b pb-1">🔍 データ不一致の原因調査パネル</p>
+              <p>・ログイン中のユーザー氏名: <span className="font-bold text-gray-800">{user?.name || '取得不可'}</span></p>
+              <p>・ログイン中のユーザーEmail: <span className="font-bold text-red-600">{user?.email || '⚠️空っぽです（これが原因で弾かれています）'}</span></p>
+              <p>・スプレッドシートから読み込めた総件数: <span className="font-bold text-green-700">{expenses.length} 件</span></p>
+              
+              {expenses.length > 0 && (
+                <div className="mt-3">
+                  <p className="font-bold text-gray-700 mb-1">▼ シートにある「最初の1件」の生データ状態：</p>
+                  <pre className="bg-white p-2 rounded border text-gray-600 overflow-x-auto">
+                    {JSON.stringify({
+                      申請ID: expenses[0]['申請ID'],
+                      申請者: expenses[0]['申請者'],
+                      承認ステータス: expenses[0]['承認ステータス'],
+                      承認者メールアドレス: expenses[0]['承認者メールアドレス']
+                    }, null, 2)}
+                  </pre>
+                  <p className="text-gray-500 mt-2">※ここの「承認ステータス」や「承認者メールアドレス」の文字が、ログイン情報と完全に一致している必要があります。</p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
