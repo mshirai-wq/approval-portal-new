@@ -271,30 +271,19 @@ export default function CreatePage() {
     setError('')
 
     try {
-      // ファイルをGoogle Driveにアップロード
+      // ファイルをFirebase Storageにアップロード
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       if (files.length > 0) {
         for (const file of files) {
-          const formData = new FormData()
-          formData.append('file', file)
-
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-          })
-
-          const data = await response.json()
-
-          if (!response.ok || !data.success) {
-            console.error('Upload failed:', data.error)
-            setError(`ファイル ${file.name} のアップロードに失敗しました: ${data.error}`)
-            setLoading(false)
-            return
-          }
-
+          const timestamp = Date.now()
+          const storageRef = ref(storage, `applications/${timestamp}_${file.name}`)
+          
+          await uploadBytes(storageRef, file)
+          const downloadURL = await getDownloadURL(storageRef)
+          
           uploadedAttachments.push({
-            name: data.fileName || file.name,
-            url: data.url,
+            name: file.name,
+            url: downloadURL,
             type: file.type
           })
         }

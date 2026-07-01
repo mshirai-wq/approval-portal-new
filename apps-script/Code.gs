@@ -61,6 +61,22 @@ function doPost(e) {
 }
 
 // ==========================================
+// OPTIONSメソッド（CORSプリフライト対応）
+// ==========================================
+
+function doOptions(e) {
+  const output = ContentService.createTextOutput('')
+  output.setMimeType(ContentService.MimeType.JSON)
+  
+  // CORSヘッダーを設定
+  output.setHeader('Access-Control-Allow-Origin', '*')
+  output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  
+  return output
+}
+
+// ==========================================
 // 経費申請データ取得関数
 // ==========================================
 
@@ -199,8 +215,15 @@ function rejectExpense(data) {
 // ==========================================
 
 function createResponse(data, statusCode = 200) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON)
+  const output = ContentService.createTextOutput(JSON.stringify(data))
+  output.setMimeType(ContentService.MimeType.JSON)
+  
+  // CORSヘッダーを設定
+  output.setHeader('Access-Control-Allow-Origin', '*')
+  output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  
+  return output
 }
 
 // ==========================================
