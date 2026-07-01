@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
     const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
     const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
 
+    console.log('GET Environment check:', {
+      hasUrl: !!appsScriptUrl,
+      hasApiKey: !!appsScriptApiKey,
+      urlPrefix: appsScriptUrl?.substring(0, 20) + '...'
+    })
+
     // 1. 環境変数がちゃんとCloudflareから渡ってきているかチェック
     if (!appsScriptUrl || !appsScriptApiKey) {
       return NextResponse.json(
@@ -28,8 +34,11 @@ export async function GET(request: NextRequest) {
     })
 
     // 3. GASへリクエスト
+    console.log('Fetching GAS URL:', targetUrl.toString())
     const response = await fetch(targetUrl.toString())
     const text = await response.text()
+    console.log('GAS response status:', response.status)
+    console.log('GAS response text (first 200 chars):', text.substring(0, 200))
     
     let data
     try {
@@ -51,6 +60,12 @@ export async function POST(request: NextRequest) {
     const appsScriptUrl = process.env.APPS_SCRIPT_WEB_APP_URL
     const appsScriptApiKey = process.env.APPS_SCRIPT_API_KEY
 
+    console.log('POST Environment check:', {
+      hasUrl: !!appsScriptUrl,
+      hasApiKey: !!appsScriptApiKey,
+      urlPrefix: appsScriptUrl?.substring(0, 20) + '...'
+    })
+
     if (!appsScriptUrl || !appsScriptApiKey) {
       return NextResponse.json(
         { error: `設定エラー: URLが存在するか(${!!appsScriptUrl})、APIキーが存在するか(${!!appsScriptApiKey})` },
@@ -71,6 +86,9 @@ export async function POST(request: NextRequest) {
     })
 
     const text = await response.text()
+    console.log('POST GAS response status:', response.status)
+    console.log('POST GAS response text (first 200 chars):', text.substring(0, 200))
+    
     let data
     try {
       data = JSON.parse(text)
