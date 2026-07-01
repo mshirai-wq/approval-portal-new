@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db, storage } from '@/lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, Clock, ArrowLeft, Paperclip, X } from 'lucide-react'
-import { uploadToDrive } from '@/app/actions/upload'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント（入れ子を排除してトップレベルに配置）
@@ -275,19 +275,28 @@ export default function CreatePage() {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       if (files.length > 0) {
         for (const file of files) {
-          const result = await uploadToDrive(file)
-          if (result.success && result.fileId && result.url) {
-            uploadedAttachments.push({
-              name: result.fileName || file.name,
-              url: result.url,
-              type: file.type
-            })
-          } else {
-            console.error('Upload failed:', result.error)
-            setError(`ファイル ${file.name} のアップロードに失敗しました: ${result.error}`)
+          const formData = new FormData()
+          formData.append('file', file)
+
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
+
+          const data = await response.json()
+
+          if (!response.ok || !data.success) {
+            console.error('Upload failed:', data.error)
+            setError(`ファイル ${file.name} のアップロードに失敗しました: ${data.error}`)
             setLoading(false)
             return
           }
+
+          uploadedAttachments.push({
+            name: data.fileName || file.name,
+            url: data.url,
+            type: file.type
+          })
         }
       }
 
@@ -328,6 +337,7 @@ export default function CreatePage() {
 
       await addDoc(collection(db, 'applications'), applicationData)
       router.push('/dashboard')
+      router.refresh()
     } catch (err: any) {
       console.error('Error creating application:', err)
       setError('申請の作成に失敗しました: ' + (err.message || '不明なエラー'))
