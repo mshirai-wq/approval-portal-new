@@ -13,15 +13,15 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   
-  // 🟢 初期表示を「承認待ち」に変更しました
+  // 初期フィルターを「承認待ち」に設定
   const [filterStatus, setFilterStatus] = useState<string>('承認待ち')
   const [searchQuery, setSearchQuery] = useState('')
 
   const fetchExpenses = async () => {
     try {
       setLoading(true)
-      const status = filterStatus === 'all' ? undefined : filterStatus
-      const data = await getExpenses(status)
+      // 確実を期すため、GAS側からは一旦「全件」を取得し、フィルターはブラウザ側で処理します
+      const data = await getExpenses(undefined)
       setExpenses(data)
     } catch (err: any) {
       console.error('Error fetching expenses:', err)
@@ -33,21 +33,29 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     fetchExpenses()
-  }, [filterStatus])
+  }, []) // 初回のみ全件取得
 
   // ==========================================
-  // 【修正】自分が承認者、かつ指定ステータスのデータのみに絞り込む
+  // ブラウザ側で「承認待ち」かつ「自分宛て」を確実に仕分ける
   // ==========================================
   const filteredExpenses = expenses.filter(expense => {
+    // 1. ステータスフィルターのチェック（選択が 'all' でない場合は、R列のステータスと一致するか）
+    if (filterStatus !== 'all') {
+      const currentStatus = (expense.承認ステータス || '').trim()
+      if (currentStatus !== filterStatus) {
+        return false
+      }
+    }
+
+    // 2. 承認者メールアドレス（S列）のチェック
     const myEmail = user?.email?.trim().toLowerCase()
     const approverEmail = (expense.承認者メールアドレス || '').trim().toLowerCase()
 
-    // 🟢 S列（承認者メールアドレス）に自分のメールアドレスが含まれているデータのみを確実に残す
     if (!myEmail || !approverEmail.includes(myEmail)) {
-      return false
+      return false // 自分宛てではないデータを除外
     }
 
-    // 検索キーワードがある場合はさらに絞り込む
+    // 3. 検索キーワードのチェック
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       return (
@@ -60,7 +68,6 @@ export default function ExpensesPage() {
     return true
   })
 
-  // 🟢 ステータスバッジの文言を「承認待ち」に合わせました
   const getStatusBadge = (status: string) => {
     switch (status) {
       case '承認済み':
@@ -133,7 +140,6 @@ export default function ExpensesPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-2">
               <Filter size={18} className="text-gray-500" />
-              {/* 🟢 セレクトボックスの選択肢を「承認待ち」に修正しました */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
