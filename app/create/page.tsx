@@ -491,24 +491,30 @@ export default function CreatePage() {
             {/* 基本情報セクション */}
             <section className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 申請種別 (矢印アイコンをクッキリ配置) */}
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">申請種別</label>
-                  <select
-                    value={subType}
-                    onChange={(e) => setSubType(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="通常申請">通常申請</option>
-                    <option value="求人稟議（パート・アルバイト採用）">求人稟議（パート・アルバイト採用）</option>
-                    <option value="求人稟議（キャリア・新卒採用）">求人稟議（キャリア・新卒採用）</option>
-                    <option value="代表者印捺印申請">代表者印捺印申請</option>
-                    <option value="営業統括本部長決裁見積申請（300万円未満）">営業統括本部長決裁見積申請（300万円未満）</option>
-                    <option value="社長決裁見積書申請（300万円以上）">社長決裁見積書申請（300万円以上）</option>
-                    <option value="協力会社登録">協力会社登録</option>
-                    <option value="出張旅費申請">出張旅費申請</option>
-                    <option value="車両リース決裁">車両リース決裁</option>
-                    <option value="給与情報変更申請">給与情報変更申請</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={subType}
+                      onChange={(e) => setSubType(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none cursor-pointer pr-10"
+                    >
+                      <option value="通常申請">通常申請</option>
+                      <option value="求人稟議（パート・アルバイト採用）">求人稟議（パート・アルバイト採用）</option>
+                      <option value="求人稟議（キャリア・新卒採用）">求人稟議（キャリア・新卒採用）</option>
+                      <option value="代表者印捺印申請">代表者印捺印申請</option>
+                      <option value="営業統括本部長決裁見積申請（300万円未満）">営業統括本部長決裁見積申請（300万円未満）</option>
+                      <option value="社長決裁見積書申請（300万円以上）">社長決裁見積書申請（300万円以上）</option>
+                      <option value="協力会社登録">協力会社登録</option>
+                      <option value="出張旅費申請">出張旅費申請</option>
+                      <option value="車両リース決裁">車両リース決裁</option>
+                      <option value="給与情報変更申請">給与情報変更申請</option>
+                    </select>
+                    {/* 右端にカスタム矢印を絶対配置 */}
+                    <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-slate-200 transition-colors" />
+                  </div>
                 </div>
 
                 <div>
@@ -560,12 +566,14 @@ export default function CreatePage() {
                     </div>
                   </div>
 
+                  {/* 支払予定日 (カレンダーボタンをクッキリ白に強制最適化) */}
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日</label>
                     <input
                       type="date"
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
+                      style={{ colorScheme: 'dark' }} // ブラウザ標準のカレンダーアイコンを白色＆ピッカーをダーク対応にする魔法
                       className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
                     />
                   </div>
