@@ -310,10 +310,13 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
+      {/* 【ここを修正】渋いタイトルからモダンな名称に統合 */}
       <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button type="button" onClick={() => router.push('/dashboard')} className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"><ArrowLeft size={20} /></button>
-          <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">書類作成センター</h1>
+          <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+            新規申請・回覧作成
+          </h1>
         </div>
       </header>
 
