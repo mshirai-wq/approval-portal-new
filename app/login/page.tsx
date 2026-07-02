@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-// スマホエラーを回避するためにFirebase Authのポップアップ機能を直接インポート
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase' 
 import { LogIn, UserPlus, ShieldAlert } from 'lucide-react'
@@ -21,14 +20,12 @@ export default function LoginPage() {
   const { signIn, signUp } = useAuth()
   const router = useRouter()
 
-  // 【修正】スマホのストレージ制限に引っかからないポップアップ方式へ変更
   const handleGoogleSignIn = async () => {
     setError('')
     setLoading(true)
     
     try {
       const provider = new GoogleAuthProvider()
-      // リダイレクトではなく別窓（ポップアップ）で認証を通すため、sessionStorageエラーが起きません
       await signInWithPopup(auth, provider)
       router.push('/dashboard')
     } catch (err: any) {
@@ -84,7 +81,6 @@ export default function LoginPage() {
         )}
 
         <div className="space-y-5">
-          {/* Googleログインボタン（デザインをシックなダークトーンに統合） */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -167,7 +163,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                placeholder••••••••
+                placeholder="••••••••"
                 className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
               />
             </div>
