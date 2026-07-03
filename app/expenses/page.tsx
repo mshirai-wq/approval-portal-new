@@ -140,7 +140,6 @@ export default function ExpensesPage() {
         {/* フィルターと検索セクション */}
         <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 mb-8 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* クッキリ見えるドロップダウン対策 */}
             <div className="relative flex items-center min-w-[200px]">
               <Filter size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
               <select
@@ -156,7 +155,6 @@ export default function ExpensesPage() {
               <ChevronDown size={16} className="absolute right-4 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* 検索入力ボックス */}
             <div className="flex-1 relative">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -175,8 +173,8 @@ export default function ExpensesPage() {
           <div className="text-center py-20 text-slate-400 animate-pulse flex items-center justify-center gap-2 font-medium">
             データを読み込み中...
           </div>
-        ) : circulations.length === 0 ? (
-          /* データ空時のコンテナー */
+        ) : filteredExpenses.length === 0 ? (
+          /* 【ここを修正】circulations から経費用の filteredExpenses に正しく修正 */
           <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-2xl bg-slate-950/40">
             表示条件に一致する経費申請はありません
           </div>
@@ -225,7 +223,7 @@ export default function ExpensesPage() {
           </div>
         )}
 
-        {/* 🛠️ データが0件の時だけ表示される、お揃いの近未来風デバッグ調査パネル */}
+        {/* データが0件の時だけ表示される、原因調査パネル */}
         {!loading && filteredExpenses.length === 0 && (
           <div className="mt-8 text-left bg-slate-950/60 border border-slate-800/80 p-5 rounded-2xl text-xs font-mono max-w-3xl mx-auto space-y-3 shadow-lg">
             <div className="flex items-center gap-2 font-bold text-indigo-400 text-sm border-b border-slate-800 pb-2">
