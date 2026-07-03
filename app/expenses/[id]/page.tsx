@@ -1,10 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useParams } from 'next/navigation'
-import { getExpense, approveExpense, rejectExpense, Expense } from '@/lib/appsheet'
-import { ArrowLeft, CheckCircle, XCircle, Clock, Loader2, AlertCircle, ShieldAlert, FileText, Gavel, Check } from 'lucide-react'
+import { getExpense, approveExpense, rejectExpense } from '@/lib/appsheet'
+import { ArrowLeft, CheckCircle, XCircle, Clock, Loader2, AlertCircle, ShieldAlert, FileText, Gavel, Check, ExternalLink } from 'lucide-react'
+
+// AppSheetの型にGAS拡張用のdriveFileIdを内包
+interface ExtendedExpense {
+  申請ID: string
+  日付: string
+  申請者: string
+  メールアドレス: string
+  使用部署: string
+  拠点: string
+  内容: string
+  実行金額: number
+  '支払先・注文先'?: string
+  支払方法?: string
+  経費区分?: string
+  事前申請?: string
+  備考?: string
+  添付資料?: string
+  承認ステータス: string
+  承認者?: string
+  承認者メールアドレス?: string
+  承認日時?: string
+  承認コメント?: string
+  driveFileId?: string // GAS側から送られてくるドライブのファイルID
+}
 
 export default function ExpenseDetailPage() {
   const { user } = useAuth()
@@ -12,7 +36,7 @@ export default function ExpenseDetailPage() {
   const params = useParams()
   const id = params.id as string
 
-  const [expense, setExpense] = useState<Expense | null>(null)
+  const [expense, setExpense] = useState<ExtendedExpense | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -22,7 +46,7 @@ export default function ExpenseDetailPage() {
     try {
       setLoading(true)
       const data = await getExpense(id)
-      setExpense(data)
+      setExpense(data as ExtendedExpense)
     } catch (err: any) {
       console.error('Error fetching expense:', err)
       setError('経費申請データの取得に失敗しました: ' + (err.message || '不明なエラー'))
@@ -35,12 +59,38 @@ export default function ExpenseDetailPage() {
     fetchExpense()
   }, [id])
 
+  // Google DriveのプレビューURL生成ロジック
+  const driveUrls = useMemo(() => {
+    if (!expense) return null
+
+    if (expense.driveFileId && typeof expense.driveFileId === 'string' && expense.driveFileId.trim() !== '') {
+      return {
+        preview: `https://drive.google.com/file/d/${expense.driveFileId}/preview`,
+        view: `https://drive.google.com/file/d/${expense.driveFileId}/view`
+      }
+    }
+    
+    if (expense.添付資料 && expense.添付資料.startsWith('http')) {
+      const match = expense.添付資料.match(/\/d\/([a-zA-Z0-9-_]+)/)
+      const fileId = match ? match[1] : null
+      if (fileId) {
+        return {
+          preview: `https://drive.google.com/file/d/${fileId}/preview`,
+          view: `https://drive.google.com/file/d/${fileId}/view`
+        }
+      }
+    }
+    
+    return null
+  }, [expense])
+
   const handleApprove = async () => {
     if (!user) return
 
     try {
       setSubmitting(true)
-      await approveExpense(id, user.name, comment)
+      // 💡 user.name が undefined だった場合を想定してフォールバックを追加
+      await approveExpense(id, user.name || '', comment)
       await fetchExpense()
       setComment('')
     } catch (err: any) {
@@ -56,7 +106,8 @@ export default function ExpenseDetailPage() {
 
     try {
       setSubmitting(true)
-      await rejectExpense(id, user.name, comment)
+      // 💡 user.name が undefined だった場合を想定してフォールバックを追加
+      await rejectExpense(id, user.name || '', comment)
       await fetchExpense()
       setComment('')
     } catch (err: any) {
@@ -94,7 +145,8 @@ export default function ExpenseDetailPage() {
     }
   }
 
-  const formatDate = (dateStr: string) => {
+  // 💡【修正】引数を dateStr?: string に変更し、undefined も受け取れるように型拡張
+  const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-'
     try {
       const date = new Date(dateStr)
@@ -117,7 +169,6 @@ export default function ExpenseDetailPage() {
   
   const canApprove = expense?.承認ステータス === '承認待ち' && isMeApprover
 
-  // 1. ローディング画面のモダン化
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -127,7 +178,6 @@ export default function ExpenseDetailPage() {
     )
   }
 
-  // 2. エラー画面のプレミアム化
   if (error && !expense) {
     return (
       <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-4">
@@ -252,22 +302,51 @@ export default function ExpenseDetailPage() {
 
               {expense.備考 && (
                 <div className="mt-6 pt-4 border-t border-slate-800/60">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2明細">備考</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">備考</label>
                   <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{expense.備考}</p>
                 </div>
               )}
 
+              {/* 添付資料プレビューセクション */}
               {expense.添付資料 && (
                 <div className="mt-6 pt-4 border-t border-slate-800/60">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">添付資料・証憑リンク</label>
-                  <p className="text-sm text-indigo-400 hover:text-indigo-300 font-medium bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl break-all font-mono">
-                    {expense.添付資料}
-                  </p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">添付資料・証憑プレビュー</label>
+                  
+                  {driveUrls ? (
+                    <div className="space-y-3">
+                      <div className="w-full h-[550px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner relative">
+                        <iframe 
+                          src={driveUrls.preview}
+                          className="w-full h-full border-0"
+                          allow="autoplay"
+                          title="file-preview"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <a 
+                          href={driveUrls.view} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-indigo-400 hover:text-indigo-300 underline group"
+                        >
+                          Googleドライブで大きく開く
+                          <ExternalLink size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 mb-2">⚠️ 現在プレビュー生成用データを準備中です（GAS連携の反映待ち）。登録されているファイル名：</p>
+                      <p className="text-sm text-indigo-400 font-medium break-all font-mono">
+                        {expense.添付資料}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* 3. 承認情報履歴カード（過去の承認・却下データ） */}
+            {/* 3. 承認情報履歴カード */}
             {(expense.承認ステータス === '承認済み' || expense.承認ステータス === '却下') && (
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
@@ -297,7 +376,7 @@ export default function ExpenseDetailPage() {
               </div>
             )}
 
-            {/* 4. 承認・却下実行フォーム（自分が承認者の時のみ出現） */}
+            {/* 4. 承認・却下実行フォーム */}
             {canApprove && (
               <div className="bg-slate-900/60 border border-indigo-500/20 rounded-2xl p-6 shadow-[0_0_30px_rgba(99,102,241,0.1)] animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
