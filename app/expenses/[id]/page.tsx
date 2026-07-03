@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useParams } from 'next/navigation'
 import { getExpense, approveExpense, rejectExpense, Expense } from '@/lib/appsheet'
-import { ArrowLeft, CheckCircle, XCircle, Clock, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Clock, Loader2, AlertCircle, ShieldAlert, FileText, Gavel, Check } from 'lucide-react'
 
 export default function ExpenseDetailPage() {
   const { user } = useAuth()
@@ -71,23 +71,23 @@ export default function ExpenseDetailPage() {
     switch (status) {
       case '承認済み':
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 text-sm font-semibold bg-green-100 text-green-800 rounded-full">
-            <CheckCircle size={16} />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full tracking-wide">
+            <CheckCircle size={14} />
             承認済み
           </span>
         )
       case '却下':
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 text-sm font-semibold bg-red-100 text-red-800 rounded-full">
-            <XCircle size={16} />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full tracking-wide">
+            <XCircle size={14} />
             却下
           </span>
         )
       case '承認待ち':
       default:
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 text-sm font-semibold bg-yellow-100 text-yellow-800 rounded-full">
-            <Clock size={16} />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full tracking-wide">
+            <Clock size={14} />
             {status || '承認待ち'}
           </span>
         )
@@ -111,38 +111,36 @@ export default function ExpenseDetailPage() {
     }).format(amount)
   }
 
-  // ==========================================
-  // 【修正】ステータスが「承認待ち」かつ「自分が承認者」の時だけボタンを出す
-  // ==========================================
   const myEmail = user?.email?.trim().toLowerCase()
   const approverEmail = (expense?.承認者メールアドレス || '').trim().toLowerCase()
   const isMeApprover = myEmail && approverEmail.includes(myEmail)
   
   const canApprove = expense?.承認ステータス === '承認待ち' && isMeApprover
 
+  // 1. ローディング画面のモダン化
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="inline-block animate-spin text-blue-600" size={32} />
-          <p className="mt-2 text-gray-600">読み込み中...</p>
-        </div>
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center gap-3 text-slate-400">
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+        <p className="text-sm font-medium animate-pulse">データを読み込み中...</p>
       </div>
     )
   }
 
+  // 2. エラー画面のプレミアム化
   if (error && !expense) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg max-w-md">
-          <div className="flex items-center gap-2">
-            <AlertCircle size={20} />
-            <span className="font-medium">エラー</span>
+      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-4">
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+          <div className="flex items-center gap-3 border-b border-rose-500/10 pb-3 mb-4">
+            <AlertCircle size={22} />
+            <span className="font-extrabold text-base tracking-wide">通信エラーが発生しました</span>
           </div>
-          <p className="mt-2">{error}</p>
+          <p className="text-sm text-slate-400 leading-relaxed">{error}</p>
           <button
+            type="button"
             onClick={() => router.push('/expenses')}
-            className="mt-4 text-red-600 hover:text-red-800 underline"
+            className="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl border border-slate-700/50 transition-all text-sm tracking-widest"
           >
             一覧に戻る
           </button>
@@ -152,133 +150,146 @@ export default function ExpenseDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/expenses')}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-xl font-bold">経費申請詳細</h1>
-          </div>
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
+      {/* 共通ヘッダー */}
+      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => router.push('/expenses')}
+            className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+            経費申請詳細
+          </h1>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-5 py-4 rounded-xl mb-6 text-sm font-medium flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+            <ShieldAlert size={18} className="shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         {expense && (
-          <div className="space-y-6">
-            {/* 基本情報カード */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">基本情報</h2>
+          <div className="space-y-8">
+            
+            {/* 1. 基本情報カード */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <FileText size={18} className="text-indigo-400" />
+                  <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">基本情報</h2>
+                </div>
                 {getStatusBadge(expense.承認ステータス)}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">申請ID</label>
-                  <p className="text-gray-900 font-medium">{expense.申請ID}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請ID</label>
+                  <p className="text-sm font-mono font-semibold text-slate-200 bg-slate-950/40 border border-slate-800/50 px-3 py-2 rounded-xl">{expense.申請ID}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">日付</label>
-                  <p className="text-gray-900">{formatDate(expense.日付)}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請日</label>
+                  <p className="text-sm font-semibold text-slate-300 bg-slate-950/40 border border-slate-800/50 px-3 py-2 rounded-xl">{formatDate(expense.日付)}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">申請者</label>
-                  <p className="text-gray-900">{expense.申請者}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請者氏名</label>
+                  <p className="text-sm font-semibold text-slate-200">{expense.申請者}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">メールアドレス</label>
-                  <p className="text-gray-900">{expense.メールアドレス}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">メールアドレス</label>
+                  <p className="text-sm font-mono text-slate-400 truncate">{expense.メールアドレス}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">使用部署</label>
-                  <p className="text-gray-900">{expense.使用部署}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">使用部署</label>
+                  <p className="text-sm font-semibold text-slate-300">{expense.使用部署}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">拠点</label>
-                  <p className="text-gray-900">{expense.拠点}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">所属拠点</label>
+                  <p className="text-sm font-semibold text-slate-300">{expense.拠点}</p>
                 </div>
               </div>
             </div>
 
-            {/* 経費詳細カード */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-bold mb-4">経費詳細</h2>
+            {/* 2. 経費詳細カード */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+                <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">精算内容詳細</h2>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">内容</label>
-                  <p className="text-gray-900">{expense.内容}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">用途・内容</label>
+                  <p className="text-sm text-slate-200 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{expense.内容}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">実行金額</label>
-                  <p className="text-2xl font-bold text-gray-900">{formatAmount(expense.実行金額)}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">実行金額</label>
+                  <p className="text-3xl font-black text-cyan-400 font-mono tracking-tight">{formatAmount(expense.実行金額)}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">支払先・注文先</label>
-                  <p className="text-gray-900">{expense['支払先・注文先']}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">支払先・注文先</label>
+                  <p className="text-sm font-semibold text-slate-200 bg-slate-950/40 border border-slate-800/50 px-3 py-2.5 rounded-xl">{expense['支払先・注文先'] || '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">支払方法</label>
-                  <p className="text-gray-900">{expense.支払方法}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">支払方法</label>
+                  <p className="text-sm font-semibold text-slate-300">{expense.支払方法 || '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">経費区分</label>
-                  <p className="text-gray-900">{expense.経費区分}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">経費区分</label>
+                  <p className="text-sm font-semibold text-slate-300">{expense.経費区分 || '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">事前申請</label>
-                  <p className="text-gray-900">{expense.事前申請}</p>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">事前申請の有無</label>
+                  <p className="text-sm font-semibold text-slate-300">{expense.事前申請 || '-'}</p>
                 </div>
               </div>
 
               {expense.備考 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">備考</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded">{expense.備考}</p>
+                <div className="mt-6 pt-4 border-t border-slate-800/60">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2明細">備考</label>
+                  <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{expense.備考}</p>
                 </div>
               )}
 
               {expense.添付資料 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-500 mb-1">添付資料</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded">{expense.添付資料}</p>
+                <div className="mt-6 pt-4 border-t border-slate-800/60">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">添付資料・証憑リンク</label>
+                  <p className="text-sm text-indigo-400 hover:text-indigo-300 font-medium bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl break-all font-mono">
+                    {expense.添付資料}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* 承認情報カード */}
+            {/* 3. 承認情報履歴カード（過去の承認・却下データ） */}
             {(expense.承認ステータス === '承認済み' || expense.承認ステータス === '却下') && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-bold mb-4">承認情報</h2>
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+                  <Gavel size={18} className="text-slate-400" />
+                  <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">最終判定情報</h2>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">承認者</label>
-                    <p className="text-gray-900">{expense.承認者}</p>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">最終承認者</label>
+                    <p className="text-sm font-semibold text-slate-200">{expense.承認者 || '-'}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">承認日時</label>
-                    <p className="text-gray-900">{formatDate(expense.承認日時)}</p>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">処理完了日時</label>
+                    <p className="text-sm font-semibold text-slate-300 font-mono">{formatDate(expense.承認日時)}</p>
                   </div>
                 </div>
 
                 {expense.承認コメント && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">
-                      承認コメント
-                    </label>
-                    <p className="text-gray-900 bg-gray-50 p-3 rounded">
+                  <div className="mt-6 pt-4 border-t border-slate-800/60">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">判定者コメント</label>
+                    <p className="text-sm text-slate-300 bg-slate-950/30 border border-slate-800/60 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">
                       {expense.承認コメント}
                     </p>
                   </div>
@@ -286,47 +297,52 @@ export default function ExpenseDetailPage() {
               </div>
             )}
 
-            {/* 承認・却下フォーム */}
+            {/* 4. 承認・却下実行フォーム（自分が承認者の時のみ出現） */}
             {canApprove && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-bold mb-4">承認・却下</h2>
+              <div className="bg-slate-900/60 border border-indigo-500/20 rounded-2xl p-6 shadow-[0_0_30px_rgba(99,102,241,0.1)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1]"></div>
+                  <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">承認・却下アクション</h2>
+                </div>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-0.5">
                       コメント（オプション）
                     </label>
                     <textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       rows={3}
-                      placeholder="承認・却下の理由を入力してください..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="承認、または却下の理由や伝達事項を記入してください..."
+                      className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm leading-relaxed"
                     />
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <button
+                      type="button"
                       onClick={handleApprove}
                       disabled={submitting}
-                      className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-950/20 hover:shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
                     >
                       {submitting ? (
-                        <Loader2 size={18} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <CheckCircle size={18} />
+                        <Check size={16} />
                       )}
                       承認する
                     </button>
                     <button
+                      type="button"
                       onClick={handleReject}
                       disabled={submitting}
-                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      className="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black py-3.5 px-4 rounded-xl shadow-lg shadow-rose-950/20 hover:shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
                     >
                       {submitting ? (
-                        <Loader2 size={18} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <XCircle size={18} />
+                        <XCircle size={16} />
                       )}
                       却下する
                     </button>
