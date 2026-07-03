@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-// 型定義（エラーが出ないよう完全版を維持）
+// 型定義
 interface Application {
   id: string
   appName: string
@@ -25,6 +25,8 @@ interface Application {
   workflow: {
     currentStep: string
     status: string
+    currentApprovers?: string[]
+    allCirculators?: string[]
     steps?: Record<string, any>
     circulations?: string[]
   }
@@ -35,7 +37,6 @@ export default function DashboardPage() {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
   
-  // 画面の表示切り替え用 ('top' = 新トップページ, 'approvals' = 承認・回覧専用ページ)
   const [view, setView] = useState<'top' | 'approvals'>('top')
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
@@ -53,7 +54,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    // 1. 自分の申請一覧（直近30件に制限して課金ガード）
+    // 1. 自分の申請一覧（直近30件制限）
     const myAppsQuery = query(
       collection(db, 'applications'),
       where('applicantId', '==', user.id),
@@ -71,11 +72,10 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     })
 
-    // 2. 承認待ち一覧（💡Firestore側で自分宛ての承認待ちのみをピンポイント高速狙い撃ち！）
+    // 2. 承認待ち一覧（過去データ救済対応：limit(50)を維持しつつ新旧両対応でフィルター）
     const allAppsQuery = query(
       collection(db, 'applications'),
       where('workflow.status', '==', '承認待ち'),
-      where('workflow.currentApprovers', 'array-contains', user.name), // 💡 高速インデックス検索
       orderBy('createdAt', 'desc'),
       limit(50)
     )
@@ -85,15 +85,28 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setPendingApprovals(apps) // 💡 ブラウザ側での重い.filter()処理が完全不要に！
+      
+      const filtered = apps.filter(app => {
+        // 新しい目印(currentApprovers)がある場合はそれを使用
+        if (app.workflow.currentApprovers && app.workflow.currentApprovers.length > 0) {
+          return app.workflow.currentApprovers.includes(user.name)
+        }
+        // 過去の古いデータ用のフォールバック処理
+        const currentStep = app.workflow.currentStep
+        const steps = app.workflow.steps || {}
+        const currentStepData = steps[currentStep]
+        if (!currentStepData) return false
+        const approvers = currentStepData.approvers || []
+        return approvers.includes(user.name)
+      })
+      setPendingApprovals(filtered)
     }, (error) => {
       console.error('Error fetching pending approvals:', error)
     })
 
-    // 3. 回覧一覧（💡何万件あろうが、自分に関係ある回覧報告のみを最初から100%ピンポイント抽出。絶対に埋もれません）
+    // 3. 回覧一覧（過去データ救済対応：最重要・全件取得を阻止しつつ、新旧両方のデータをクッキリ復活）
     const circulationQuery = query(
       collection(db, 'applications'),
-      where('workflow.allCirculators', 'array-contains', user.name), // 💡 埋もれ防止の狙い撃ち検索
       orderBy('createdAt', 'desc'),
       limit(50)
     )
@@ -103,7 +116,27 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setCirculations(apps) // 💡 ブラウザ側での全件ループ処理を完全に廃止！
+
+      const filtered = apps.filter(app => {
+        // 新しい目印(allCirculators)がある場合はそれを使用
+        if (app.workflow.allCirculators && app.workflow.allCirculators.length > 0) {
+          return app.workflow.allCirculators.includes(user.name)
+        }
+        // 過去の古いデータ用のフォールバック処理
+        const steps = app.workflow.steps || {}
+        const circulations = app.workflow.circulations || []
+        for (const [stepName, stepData] of Object.entries(steps)) {
+          const step = stepData as any
+          if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
+            return true
+          }
+        }
+        if (circulations.includes(user.name)) {
+          return true
+        }
+        return false
+      })
+      setCirculations(filtered)
     }, (error) => {
       console.error('Error fetching circulations:', error)
     })
@@ -140,7 +173,7 @@ export default function DashboardPage() {
       await updateDoc(doc(db, 'applications', selectedApplication.id), {
         'workflow.status': newStatus,
         'workflow.currentStep': action === 'approve' ? '次のステップ' : '却下',
-        'workflow.currentApprovers': [], // 💡 承認完了、または却下されたため現在のタスク担当者インデックスをクリーンアップ
+        'workflow.currentApprovers': [],
         updatedAt: serverTimestamp()
       })
       await addDoc(collection(db, 'approvals'), {
@@ -228,7 +261,7 @@ export default function DashboardPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* ボタンカード1: 承認・回覧画面へ */}
+              {/* ボタンカード1 */}
               <div 
                 onClick={() => setView('approvals')}
                 className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
@@ -256,7 +289,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ボタンカード2: 新規申請・回覧報告の作成 */}
+              {/* ボタンカード2 */}
               <div 
                 onClick={() => router.push('/create')}
                 className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
@@ -282,7 +315,7 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* 下部：送信一覧（自分の申請一覧） */}
+            {/* 下部：送信一覧 */}
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
