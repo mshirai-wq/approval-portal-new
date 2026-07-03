@@ -59,50 +59,24 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
 // ==========================================
 // 2. 承認ルート計算ロジック
 // ==========================================
-function getRelatedGM(dept: string, generalManagers: any[]) {
-  if (!dept) return null
-  if (dept === '三保事業所' || dept === '九州支店') return generalManagers.find(m => m.dept === '営業管理本部')
-  if (dept === '特掃部' || dept === '警備管理部' || dept === '施設管理部' || dept === 'グリーン管理部') return generalManagers.find(m => m.dept === '技術管理本部')
-  return generalManagers.find(m => m.dept === dept)
-}
-
 function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[]) {
   const isDeptHead = applicantTitle === '部長'
-  const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
   const tanabe = generalAffairsDept.find(m => m.name.includes('田邉'))?.name || '田邉洋'
   const mori = generalAffairsDept.find(m => m.name.includes('森'))?.name || '森雅代'
-  const residentGM = generalManagers.find(m => m.dept === '常駐管理本部')
-  const salesGM = generalManagers.find(m => m.dept === '営業管理本部')
-  const generalAffairsGM = generalManagers.find(m => m.dept === '総務管理本部')
   
   const routes: any = {
-    '通常申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
-      defaultGM: relatedGM ? [relatedGM.name] : [], 
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
-      defaultGeneralAffairs: [tanabe, kaneda] 
-    },
-    '求人稟議（パート・アルバイト採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '常駐管理本部長', defaultGM: residentGM ? [residentGM.name] : [], defaultGeneralAffairs: [kaneda], defaultGMForCirculation: [] },
-    '求人稟議（キャリア・新卒採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe, kaneda], defaultGMForCirculation: [] },
-    '代表者印捺印申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
-      defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, mori].filter(Boolean) : [], 
-      defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name] : [],
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name)
-    },
-    '営業統括本部長決裁見積申請（300万円未満）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '営業管理本部長', defaultGM: salesGM ? [salesGM.name] : [], defaultGeneralAffairs: [mori], defaultGMForCirculation: [] },
-    '社長決裁見積書申請（300万円以上）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: salesGM ? [salesGM.name] : [], defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], defaultGMForCirculation: [] },
-    '協力会社登録': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe], defaultGMForCirculation: [] },
-    '出張旅費申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe, kaneda], defaultGMForCirculation: [] },
-    '車両リース決裁': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
-      defaultGM: relatedGM ? [relatedGM.name] : [], 
-      defaultGeneralAffairs: [tanabe],
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
-    },
-    '給与情報変更申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe], defaultGMForCirculation: [] }
+    '通常申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '求人稟議（パート・アルバイト採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '常駐管理本部長' },
+    '求人稟議（キャリア・新卒採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '代表者印捺印申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '営業統括本部長決裁見積申請（300万円未満）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '営業管理本部長' },
+    '社長決裁見積書申請（300万円以上）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '協力会社登録': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '出張旅費申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '車両リース決裁': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
+    '給与情報変更申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' }
   }
   return routes[subType] || routes['通常申請']
 }
@@ -117,10 +91,8 @@ export default function CreatePage() {
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
 
-  // モード切り替え ('approval' = 稟議, 'report' = 回覧報告)
   const [mode, setMode] = useState<'approval' | 'report'>('approval')
 
-  // Workflow selection
   const [selectedDeptHead, setSelectedDeptHead] = useState<string[]>([])
   const [selectedGM, setSelectedGM] = useState<string[]>([])
   const [selectedGMForCirculation, setSelectedGMForCirculation] = useState<string[]>([])
@@ -130,7 +102,6 @@ export default function CreatePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeAccord, setActiveAccord] = useState('所属長')
 
-  // Form state
   const [subType, setSubType] = useState('通常申請')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -140,7 +111,6 @@ export default function CreatePage() {
   const [paymentDate, setPaymentDate] = useState('')
   const [payee, setPayee] = useState('')
 
-  // 入札結果報告専用のState
   const [biddingDetails, setBiddingDetails] = useState({
     location: '',
     date: '',
@@ -155,7 +125,6 @@ export default function CreatePage() {
     participants: Array(6).fill({ name: '', bid1: '', bid2: '' })
   })
 
-  // 【修正】関数定義をuseEffectやuseMemoよりも上に移動（Cannot access before it is declaredエラーの解消）
   const fetchEmployeeMaster = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
@@ -173,7 +142,6 @@ export default function CreatePage() {
     fetchEmployeeMaster()
   }, [])
 
-  // 【修正】タブ切り替え時の同期的状態更新（Cascading renders警告）の解消用ハンドラ
   const handleModeChange = (newMode: 'approval' | 'report') => {
     setMode(newMode)
     setSubType(newMode === 'approval' ? '通常申請' : '退職者通知')
@@ -191,27 +159,6 @@ export default function CreatePage() {
   const currentRoute = useMemo(() => {
     return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers)
   }, [subType, user, employeeMaster, generalManagers])
-
-  useEffect(() => {
-    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval') {
-      setSelectedDeptHead(currentRoute.defaultDeptHead || [])
-      setSelectedGM(currentRoute.defaultGM || [])
-      setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
-      setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
-    }
-  }, [subType, user, employeeMaster, currentRoute, mode])
-
-  useEffect(() => {
-    if (employeeMaster && Object.keys(employeeMaster).length > 0) {
-      const presidentList: string[] = []
-      Object.entries(employeeMaster).forEach(([dept, members]) => {
-        members.forEach(m => {
-          if (m.title === '社長') { presidentList.push(m.name) }
-        })
-      })
-      if (presidentList.length > 0) { setSelectedExec(presidentList) }
-    }
-  }, [employeeMaster])
 
   const toggleMemberSelection = (member: string, list: string[], setList: (list: string[]) => void) => {
     if (list.includes(member)) setList(list.filter(m => m !== member))
@@ -244,6 +191,20 @@ export default function CreatePage() {
       }
       
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
+
+      // 💡【新設】現在のステップの初期承認者をフラットに抽出
+      const initialApprovers = mode === 'report' ? [] : (
+        currentRoute.showDeptHead ? selectedDeptHead :
+        currentRoute.showGM ? selectedGM :
+        currentRoute.showExec ? selectedExec : selectedGeneralAffairs
+      );
+
+      // 💡【新設】すべての回覧先グループをフラットに統合（重複を排除）
+      const allCirculators = Array.from(new Set([
+        ...selectedCirculation,
+        ...(mode === 'approval' ? selectedGeneralAffairs : []),
+        ...(mode === 'approval' ? selectedGMForCirculation : [])
+      ]));
       
       const applicationData = {
         appName, subType, title, description, remarks,
@@ -252,10 +213,11 @@ export default function CreatePage() {
         workflow: {
           currentStep: mode === 'report' ? '回覧先' : (currentRoute.showDeptHead ? '部長' : (currentRoute.showGM ? '本部長' : '社長')),
           status: mode === 'report' ? '承認済み' : '承認待ち',
+          currentApprovers: initialApprovers, // 💡 インデックス新設
+          allCirculators: allCirculators,     // 💡 インデックス新設
           steps: mode === 'approval' ? {
             ...(currentRoute.showDeptHead && { '部長': { approvers: selectedDeptHead, status: '承認待ち', comments: [] } }),
             ...(currentRoute.showGM && { '本部長': { approvers: selectedGM, status: '承認待ち', comments: [] } }),
-            ...(currentRoute.showGMForCirculation && { '本部長回覧': { approvers: selectedGMForCirculation, status: '回覧待ち', comments: [] } }),
             ...(currentRoute.showExec && { '社長': { approvers: selectedExec, status: '承認待ち', comments: [] } }),
             ...(currentRoute.showGeneralAffairs && { '総務管理本部': { approvers: selectedGeneralAffairs, status: '回覧待ち', comments: [] } })
           } : {},
@@ -310,7 +272,6 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
-      {/* 【ここを修正】渋いタイトルからモダンな名称に統合 */}
       <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button type="button" onClick={() => router.push('/dashboard')} className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"><ArrowLeft size={20} /></button>
@@ -321,7 +282,6 @@ export default function CreatePage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* モード切り替えタブ */}
         <div className="flex p-1.5 bg-slate-900/80 border border-slate-800 rounded-2xl mb-8 max-w-md mx-auto shadow-2xl">
           <button type="button" onClick={() => handleModeChange('approval')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'approval' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><FileText size={18}/> 稟議申請</button>
           <button type="button" onClick={() => handleModeChange('report')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'report' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Share2 size={18}/> 回覧報告</button>

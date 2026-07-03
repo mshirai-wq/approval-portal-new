@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-// 💡 limit をしっかりとインポートに追加
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -72,10 +71,11 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     })
 
-    // 2. 承認待ち一覧（全社データから直近50件に絞って自分宛てかを判定）
+    // 2. 承認待ち一覧（💡Firestore側で自分宛ての承認待ちのみをピンポイント高速狙い撃ち！）
     const allAppsQuery = query(
       collection(db, 'applications'),
       where('workflow.status', '==', '承認待ち'),
+      where('workflow.currentApprovers', 'array-contains', user.name), // 💡 高速インデックス検索
       orderBy('createdAt', 'desc'),
       limit(50)
     )
@@ -85,22 +85,15 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      const filtered = apps.filter(app => {
-        const currentStep = app.workflow.currentStep
-        const steps = app.workflow.steps || {}
-        const currentStepData = steps[currentStep]
-        if (!currentStepData) return false
-        const approvers = currentStepData.approvers || []
-        return approvers.includes(user.name)
-      })
-      setPendingApprovals(filtered)
+      setPendingApprovals(apps) // 💡 ブラウザ側での重い.filter()処理が完全不要に！
     }, (error) => {
       console.error('Error fetching pending approvals:', error)
     })
 
-    // 3. 回覧一覧（最重要：全件ダウンロードを阻止し、直近50件の動きのみを常時監視）
+    // 3. 回覧一覧（💡何万件あろうが、自分に関係ある回覧報告のみを最初から100%ピンポイント抽出。絶対に埋もれません）
     const circulationQuery = query(
       collection(db, 'applications'),
+      where('workflow.allCirculators', 'array-contains', user.name), // 💡 埋もれ防止の狙い撃ち検索
       orderBy('createdAt', 'desc'),
       limit(50)
     )
@@ -110,21 +103,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      const filtered = apps.filter(app => {
-        const steps = app.workflow.steps || {}
-        const circulations = app.workflow.circulations || []
-        for (const [stepName, stepData] of Object.entries(steps)) {
-          const step = stepData as any
-          if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
-            return true
-          }
-        }
-        if (circulations.includes(user.name)) {
-          return true
-        }
-        return false
-      })
-      setCirculations(filtered)
+      setCirculations(apps) // 💡 ブラウザ側での全件ループ処理を完全に廃止！
     }, (error) => {
       console.error('Error fetching circulations:', error)
     })
@@ -161,6 +140,7 @@ export default function DashboardPage() {
       await updateDoc(doc(db, 'applications', selectedApplication.id), {
         'workflow.status': newStatus,
         'workflow.currentStep': action === 'approve' ? '次のステップ' : '却下',
+        'workflow.currentApprovers': [], // 💡 承認完了、または却下されたため現在のタスク担当者インデックスをクリーンアップ
         updatedAt: serverTimestamp()
       })
       await addDoc(collection(db, 'approvals'), {
@@ -564,7 +544,6 @@ export default function DashboardPage() {
   )
 }
 
-// 【修正】型定義だけ残し、ESLintで警告（Warning）が出てビルドが落ちるのを100%回避する構造に調整
 function ApplicationApprovalForm({ 
   onApprove, 
 }: { 
