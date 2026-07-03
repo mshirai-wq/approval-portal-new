@@ -3,7 +3,8 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp } from 'firebase/firestore'
+// 💡 limit をしっかりとインポートに追加
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 // 型定義（エラーが出ないよう完全版を維持）
@@ -53,11 +54,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    // 自分の申請一覧
+    // 1. 自分の申請一覧（直近30件に制限して課金ガード）
     const myAppsQuery = query(
       collection(db, 'applications'),
       where('applicantId', '==', user.id),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(30)
     )
 
     const unsubscribeMyApps = onSnapshot(myAppsQuery, (snapshot) => {
@@ -70,11 +72,12 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     })
 
-    // 承認待ち一覧
+    // 2. 承認待ち一覧（全社データから直近50件に絞って自分宛てかを判定）
     const allAppsQuery = query(
       collection(db, 'applications'),
       where('workflow.status', '==', '承認待ち'),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     )
 
     const unsubscribePending = onSnapshot(allAppsQuery, (snapshot) => {
@@ -95,10 +98,11 @@ export default function DashboardPage() {
       console.error('Error fetching pending approvals:', error)
     })
 
-    // 回覧一覧
+    // 3. 回覧一覧（最重要：全件ダウンロードを阻止し、直近50件の動きのみを常時監視）
     const circulationQuery = query(
       collection(db, 'applications'),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     )
 
     const unsubscribeCirculation = onSnapshot(circulationQuery, (snapshot) => {
@@ -213,7 +217,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent cursor-pointer"
-            onClick={() => setView('top')} // タイトルクリックでトップに戻れる
+            onClick={() => setView('top')}
           >
             社内承認ポータル
           </h1>
@@ -242,7 +246,6 @@ export default function DashboardPage() {
         {view === 'top' && (
           <div className="space-y-12">
             
-            {/* メインの巨大2大ボタン（グリッド配置） */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
               {/* ボタンカード1: 承認・回覧画面へ */}
@@ -273,7 +276,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ボタンカード2: 新規申請・回覧報告の作成（即時遷移） */}
+              {/* ボタンカード2: 新規申請・回覧報告の作成 */}
               <div 
                 onClick={() => router.push('/create')}
                 className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
@@ -326,7 +329,7 @@ export default function DashboardPage() {
                         <tr 
                           key={app.id} 
                           className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                          onClick={() => handleApplicationClick(app)} // 送信一覧からも詳細を見られるように
+                          onClick={() => handleApplicationClick(app)}
                         >
                           <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
                           <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
@@ -357,7 +360,6 @@ export default function DashboardPage() {
         {view === 'approvals' && (
           <div className="space-y-6 animate-fadeIn">
             
-            {/* トップに戻るナビゲーション */}
             <div className="flex items-center">
               <button 
                 onClick={() => setView('top')}
@@ -367,7 +369,6 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* 承認、回覧、経費の3カラムグリッド */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
               {/* 承認依頼一覧 */}
@@ -450,6 +451,7 @@ export default function DashboardPage() {
                   <p className="text-slate-400 text-xs mb-6">AppSheet経費申請の承認・確認</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => router.push('/expenses')}
                   className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all text-sm tracking-wide"
                 >
@@ -463,7 +465,7 @@ export default function DashboardPage() {
 
       </main>
 
-      {/* 申請詳細モーダル（共通で使用可能） */}
+      {/* 申請詳細モーダル */}
       {showDetailModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
           <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -538,9 +540,7 @@ export default function DashboardPage() {
                 {selectedApplication.workflow.status === '承認待ち' && (
                   <div className="border-t border-slate-800 pt-4">
                     <ApplicationApprovalForm
-                      application={selectedApplication}
                       onApprove={handleApproval}
-                      onClose={() => setShowDetailModal(false)}
                     />
                   </div>
                 )}
@@ -564,14 +564,13 @@ export default function DashboardPage() {
   )
 }
 
+// 【修正】型定義だけ残し、ESLintで警告（Warning）が出てビルドが落ちるのを100%回避する構造に調整
 function ApplicationApprovalForm({ 
-  application, 
   onApprove, 
-  onClose 
 }: { 
-  application: Application
+  application?: Application
   onApprove: (action: 'approve' | 'reject', comment: string) => void
-  onClose: () => void
+  onClose?: () => void
 }) {
   const [comment, setComment] = useState('')
   const [processing, setProcessing] = useState(false)
@@ -600,6 +599,7 @@ function ApplicationApprovalForm({
         </div>
         <div className="flex gap-4">
           <button
+            type="button"
             onClick={() => handleAction('approve')}
             disabled={processing}
             className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
@@ -607,6 +607,7 @@ function ApplicationApprovalForm({
             {processing ? '処理中...' : '承認'}
           </button>
           <button
+            type="button"
             onClick={() => handleAction('reject')}
             disabled={processing}
             className="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
