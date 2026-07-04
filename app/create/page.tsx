@@ -61,10 +61,6 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
 // ==========================================
 function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[]) {
   const isDeptHead = applicantTitle === '部長'
-  const generalAffairsDept = employeeMaster['総務管理本部'] || []
-  const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
-  const tanabe = generalAffairsDept.find(m => m.name.includes('田邉'))?.name || '田邉洋'
-  const mori = generalAffairsDept.find(m => m.name.includes('森'))?.name || '森雅代'
   
   const routes: any = {
     '通常申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長' },
@@ -160,6 +156,47 @@ export default function CreatePage() {
     return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers)
   }, [subType, user, employeeMaster, generalManagers])
 
+  // 💡【完全復活】マスタや書類が変わった時に、デフォルトの承認経路を自動選択する最重要ロジック
+  useEffect(() => {
+    if (!user || Object.keys(employeeMaster).length === 0) return
+
+    // 1. 所属長 (自分の部署の部長を自動セット)
+    const myDeptMembers = employeeMaster[user.department] || []
+    const deptHead = myDeptMembers.find(m => m.title.includes('部長'))?.name
+    if (deptHead) setSelectedDeptHead([deptHead])
+
+    // 2. 本部長 (本部長リストから、自分の本部の本部長を自動セット。いなければ1人目を予備選択)
+    const gm = generalManagers.find(m => m.dept === user.department || user.department.includes(m.dept))?.name 
+             || generalManagers[0]?.name
+    if (gm) {
+      setSelectedGM([gm])
+      setSelectedGMForCirculation([gm])
+    }
+
+    // 3. 社長 (全部署から社長タイトルを持つ人を自動セット)
+    let presidentName = ''
+    Object.values(employeeMaster).forEach(members => {
+      const p = members.find(m => m.title.includes('社長'))?.name
+      if (p) presidentName = p
+    })
+    if (presidentName) setSelectedExec([presidentName])
+
+    // 4. 総務管理本部 (書類の種別（subType）に合わせて、担当者を自動仕分け)
+    const generalAffairsDept = employeeMaster['総務管理本部'] || []
+    const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
+    const tanabe = generalAffairsDept.find(m => m.name.includes('田邉'))?.name || '田邉洋'
+    const mori = generalAffairsDept.find(m => m.name.includes('森'))?.name || '森雅代'
+
+    if (subType === '車両リース決裁') {
+      setSelectedGeneralAffairs([tanabe])
+    } else if (subType.includes('求人稟議')) {
+      setSelectedGeneralAffairs([mori])
+    } else {
+      setSelectedGeneralAffairs([kaneda])
+    }
+
+  }, [employeeMaster, user, subType, generalManagers])
+
   const toggleMemberSelection = (member: string, list: string[], setList: (list: string[]) => void) => {
     if (list.includes(member)) setList(list.filter(m => m !== member))
     else setList([...list, member])
@@ -192,14 +229,12 @@ export default function CreatePage() {
       
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
 
-      // 💡【新設】現在のステップの初期承認者をフラットに抽出
       const initialApprovers = mode === 'report' ? [] : (
         currentRoute.showDeptHead ? selectedDeptHead :
         currentRoute.showGM ? selectedGM :
         currentRoute.showExec ? selectedExec : selectedGeneralAffairs
       );
 
-      // 💡【新設】すべての回覧先グループをフラットに統合（重複を排除）
       const allCirculators = Array.from(new Set([
         ...selectedCirculation,
         ...(mode === 'approval' ? selectedGeneralAffairs : []),
@@ -213,8 +248,8 @@ export default function CreatePage() {
         workflow: {
           currentStep: mode === 'report' ? '回覧先' : (currentRoute.showDeptHead ? '部長' : (currentRoute.showGM ? '本部長' : '社長')),
           status: mode === 'report' ? '承認済み' : '承認待ち',
-          currentApprovers: initialApprovers, // 💡 インデックス新設
-          allCirculators: allCirculators,     // 💡 インデックス新設
+          currentApprovers: initialApprovers, 
+          allCirculators: allCirculators,     
           steps: mode === 'approval' ? {
             ...(currentRoute.showDeptHead && { '部長': { approvers: selectedDeptHead, status: '承認待ち', comments: [] } }),
             ...(currentRoute.showGM && { '本部長': { approvers: selectedGM, status: '承認待ち', comments: [] } }),
@@ -281,7 +316,7 @@ export default function CreatePage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex p-1.5 bg-slate-900/80 border border-slate-800 rounded-2xl mb-8 max-w-md mx-auto shadow-2xl">
           <button type="button" onClick={() => handleModeChange('approval')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'approval' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><FileText size={18}/> 稟議申請</button>
           <button type="button" onClick={() => handleModeChange('report')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'report' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Share2 size={18}/> 回覧報告</button>
@@ -366,7 +401,7 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* 自社（ヤマダユニア）セクション */}
+                  {/* 自社セクション */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
                     <div className="flex items-center text-sm font-bold text-emerald-400 px-2">ヤマダユニア株式会社</div>
                     <div>
