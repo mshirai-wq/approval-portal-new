@@ -67,7 +67,6 @@ function getRelatedGM(dept: string, generalManagers: any[]) {
 }
 
 function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[]) {
-  const isDeptHead = applicantTitle === '部長'
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
@@ -80,9 +79,10 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   const applicantDeptMembers = employeeMaster[applicantDept] || []
   const applicantDeptHead = applicantDeptMembers.find(m => m.title === '部長')
   
+  // 【修正】すべての申請種別で 「showDeptHead: true」 に固定し、自動スキップを完全排除
   const routes: any = {
     '通常申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
+      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
       defaultGM: relatedGM ? [relatedGM.name] : [], 
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
       defaultGeneralAffairs: [tanabe, kaneda],
@@ -91,21 +91,21 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
     },
     '求人稟議（パート・アルバイト採用）': { 
-      showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
       decisionMaker: '常駐管理本部長', 
       defaultGM: residentGM ? [residentGM.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda],
       showPostDecisionCirculation: false
     },
     '求人稟議（キャリア・新卒採用）': { 
-      showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe, kaneda], 
       showPostDecisionCirculation: false
     },
     '代表者印捺印申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, mori].filter(Boolean) : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name] : [],
@@ -113,7 +113,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       showPostDecisionCirculation: false
     },
     '営業統括本部長決裁見積申請（300万円未満）': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
       decisionMaker: '営業管理本部長', 
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: salesGM ? [salesGM.name] : [], 
@@ -121,14 +121,14 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       showPostDecisionCirculation: false
     },
     '社長決裁見積書申請（300万円以上）': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: salesGM ? [salesGM.name] : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], 
       showPostDecisionCirculation: false
     },
     '協力会社登録': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe], 
@@ -137,7 +137,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: [tanabe]
     },
     '出張旅費申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe, kaneda], 
@@ -146,7 +146,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: [tanabe, kaneda]
     },
     '車両リース決裁': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: relatedGM ? [relatedGM.name] : [], 
       defaultGeneralAffairs: [tanabe],
@@ -156,7 +156,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: [tanabe]
     },
     '給与情報変更申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe], 
@@ -277,6 +277,7 @@ export default function CreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
+    loading = true
     setLoading(true)
 
     try {
@@ -342,7 +343,6 @@ export default function CreatePage() {
 
       const docRef = await addDoc(collection(db, 'applications'), applicationData)
       
-      // 新規申請時に最初のステップの承認者にメールを送信
       if (mode === 'approval' && initialApprovers.length > 0) {
         await sendNewApplicationNotification(applicationData, initialApprovers)
       }
@@ -354,11 +354,8 @@ export default function CreatePage() {
   const sendNewApplicationNotification = async (applicationData: any, initialApprovers: string[]) => {
     try {
       if (!initialApprovers || initialApprovers.length === 0) return
-
-      // 承認者のメールアドレスを取得
       const approverEmails = await getApproversEmails(initialApprovers)
 
-      // 各メールアドレスへ通知を送信
       for (const email of approverEmails) {
         await fetch('/api/send-email', {
           method: 'POST',
@@ -622,7 +619,7 @@ export default function CreatePage() {
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル</label>
                 <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-800 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
                   <Paperclip size={24} className="text-slate-600 group-hover:text-indigo-400 mb-2" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">選択してアップロード</span>
+                  <span className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">選択してアップロード</span>
                   <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files && setFiles(prev => [...prev, ...Array.from(e.target.files!)])} />
                 </label>
                 <div className="mt-2 space-y-1">{files.map((f, i) => (
@@ -639,6 +636,7 @@ export default function CreatePage() {
               <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
                 {mode === 'approval' && (
                   <>
+                    {/* 【修正】常に表示されるようになり、スキップ判定を完全に無くしました */}
                     {currentRoute.showDeptHead && <AccordItem title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>{renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}</AccordItem>}
                     
                     {currentRoute.showGM && (
