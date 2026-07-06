@@ -277,8 +277,7 @@ export default function CreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
-    loading = true
-    setLoading(true)
+    setLoading(true) // 【修正】余計な loading = true を消去しました
 
     try {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
@@ -523,7 +522,7 @@ export default function CreatePage() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">第2回落札金額</label>
-                      <input type="number" value={biddingDetails.winnerBid2} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid2: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={biddingDetails.winnerBid2} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid2: e.target.value})} className="w-full bg-slate-955 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
