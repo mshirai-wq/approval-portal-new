@@ -77,32 +77,109 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   const salesGM = generalManagers.find(m => m.dept === '営業管理本部')
   const generalAffairsGM = generalManagers.find(m => m.dept === '総務管理本部')
   
+  // 申請者の所属の部長を取得
+  const applicantDeptMembers = employeeMaster[applicantDept] || []
+  const applicantDeptHead = applicantDeptMembers.find(m => m.title === '部長')
+  
   const routes: any = {
     '通常申請': { 
       showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
       defaultGM: relatedGM ? [relatedGM.name] : [], 
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
-      defaultGeneralAffairs: [tanabe, kaneda] 
+      defaultGeneralAffairs: [tanabe, kaneda],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '本部長（回覧・確認）',
+      defaultPostDecisionCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
     },
-    '求人稟議（パート・アルバイト採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '常駐管理本部長', defaultGM: residentGM ? [residentGM.name] : [], defaultGeneralAffairs: [kaneda], defaultGMForCirculation: [] },
-    '求人稟議（キャリア・新卒採用）': { showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe, kaneda], defaultGMForCirculation: [] },
+    '求人稟議（パート・アルバイト採用）': { 
+      showDeptHead: false, showGM: false, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      decisionMaker: '常駐管理本部長', 
+      defaultGM: [], 
+      defaultGeneralAffairs: [tanabe], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: false
+    },
+    '求人稟議（キャリア・新卒採用）': { 
+      showDeptHead: false, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
+      defaultGM: generalManagers.map(m => m.name), 
+      defaultGeneralAffairs: [tanabe, kaneda], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe, kaneda]
+    },
     '代表者印捺印申請': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
       defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, mori].filter(Boolean) : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name] : [],
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name)
+      defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: generalAffairsGM ? [generalAffairsGM.name] : []
     },
-    '営業統括本部長決裁見積申請（300万円未満）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, decisionMaker: '営業管理本部長', defaultGM: salesGM ? [salesGM.name] : [], defaultGeneralAffairs: [mori], defaultGMForCirculation: [] },
-    '社長決裁見積書申請（300万円以上）': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: salesGM ? [salesGM.name] : [], defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], defaultGMForCirculation: [] },
-    '協力会社登録': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe], defaultGMForCirculation: [] },
-    '出張旅費申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe, kaneda], defaultGMForCirculation: [] },
+    '営業統括本部長決裁見積申請（300万円未満）': { 
+      showDeptHead: !isDeptHead, showGM: false, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      decisionMaker: '営業管理本部長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
+      defaultGM: salesGM ? [salesGM.name] : [], 
+      defaultGeneralAffairs: [tanabe], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe]
+    },
+    '社長決裁見積書申請（300万円以上）': { 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
+      defaultGM: salesGM ? [salesGM.name] : [], 
+      defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori]
+    },
+    '協力会社登録': { 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
+      defaultGM: generalManagers.map(m => m.name), 
+      defaultGeneralAffairs: [tanabe], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe]
+    },
+    '出張旅費申請': { 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
+      defaultGM: generalManagers.map(m => m.name), 
+      defaultGeneralAffairs: [tanabe, kaneda], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe, kaneda]
+    },
     '車両リース決裁': { 
-      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
       defaultGM: relatedGM ? [relatedGM.name] : [], 
       defaultGeneralAffairs: [tanabe],
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
+      defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe]
     },
-    '給与情報変更申請': { showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', defaultGM: generalManagers.map(m => m.name), defaultGeneralAffairs: [tanabe], defaultGMForCirculation: [] }
+    '給与情報変更申請': { 
+      showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
+      decisionMaker: '社長', 
+      defaultGM: generalManagers.map(m => m.name), 
+      defaultGeneralAffairs: [tanabe], 
+      defaultGMForCirculation: [],
+      showPostDecisionCirculation: true,
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultPostDecisionCirculation: [tanabe]
+    }
   }
   return routes[subType] || routes['通常申請']
 }
@@ -127,6 +204,7 @@ export default function CreatePage() {
   const [selectedExec, setSelectedExec] = useState<string[]>([])
   const [selectedCirculation, setSelectedCirculation] = useState<string[]>([])
   const [selectedGeneralAffairs, setSelectedGeneralAffairs] = useState<string[]>([])
+  const [selectedPostDecisionCirculation, setSelectedPostDecisionCirculation] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [activeAccord, setActiveAccord] = useState('所属長')
 
@@ -196,6 +274,7 @@ export default function CreatePage() {
       setSelectedGM(currentRoute.defaultGM || [])
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
       setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
+      setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
     }
   }, [subType, user, employeeMaster, currentRoute, mode])
 
@@ -252,7 +331,8 @@ export default function CreatePage() {
       const allCirculators = Array.from(new Set([
         ...selectedCirculation,
         ...(mode === 'approval' ? selectedGeneralAffairs : []),
-        ...(mode === 'approval' ? selectedGMForCirculation : [])
+        ...(mode === 'approval' ? selectedGMForCirculation : []),
+        ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
       ]));
       
       const applicationData = {
@@ -260,16 +340,18 @@ export default function CreatePage() {
         applicantId: user?.id || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
         formDetails,
         workflow: {
-          currentStep: mode === 'report' ? '回覧先' : (currentRoute.showDeptHead ? '部長' : (currentRoute.showGM ? '本部長' : '社長')),
+          currentStep: mode === 'report' ? '回覧先' : (currentRoute.showDeptHead ? '部長' : (currentRoute.showGM ? '本部長' : (currentRoute.showExec ? '社長' : '常駐管理本部長'))),
           status: mode === 'report' ? '承認済み' : '承認待ち',
           currentApprovers: initialApprovers, 
           allCirculators: allCirculators,     
+          decisionMaker: currentRoute.decisionMaker,
           steps: mode === 'approval' ? {
             ...(currentRoute.showDeptHead && { '部長': { approvers: selectedDeptHead, status: '承認待ち', comments: [] } }),
             ...(currentRoute.showGM && { '本部長': { approvers: selectedGM, status: '承認待ち', comments: [] } }),
             ...(currentRoute.showGMForCirculation && { '本部長回覧': { approvers: selectedGMForCirculation, status: '回覧待ち', comments: [] } }),
             ...(currentRoute.showExec && { '社長': { approvers: selectedExec, status: '承認待ち', comments: [] } }),
-            ...(currentRoute.showGeneralAffairs && { '総務管理本部': { approvers: selectedGeneralAffairs, status: '回覧待ち', comments: [] } })
+            ...(currentRoute.showGeneralAffairs && { '総務管理本部': { approvers: selectedGeneralAffairs, status: '回覧待ち', comments: [] } }),
+            ...(currentRoute.showPostDecisionCirculation && { [currentRoute.postDecisionCirculationLabel]: { approvers: selectedPostDecisionCirculation, status: '回覧待ち', comments: [] } })
           } : {},
           circulations: selectedCirculation, confirmedBy: []
         },
@@ -534,7 +616,8 @@ export default function CreatePage() {
                     {currentRoute.showDeptHead && <AccordItem title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>{renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}</AccordItem>}
                     {currentRoute.showGM && <AccordItem title="本部長 (承認)" count={selectedGM.length} isActive={activeAccord === '本部長（承認）'} onClick={() => setActiveAccord(activeAccord === '本部長（承認）' ? '' : '本部長（承認）')}>{renderMemberSelector(selectedGM, setSelectedGM, '本部長')}</AccordItem>}
                     {currentRoute.showExec && <AccordItem title="社長 (最終決裁)" count={selectedExec.length} isActive={activeAccord === '社長'} onClick={() => setActiveAccord(activeAccord === '社長' ? '' : '社長')}>{renderMemberSelector(selectedExec, setSelectedExec, '社長')}</AccordItem>}
-                    {currentRoute.showGeneralAffairs && <AccordItem title="総務管理本部" count={selectedGeneralAffairs.length} isActive={activeAccord === '総務管理本部'} onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}>{renderMemberSelector(selectedGeneralAffairs, setSelectedGeneralAffairs, '総務')}</AccordItem>}
+                    {currentRoute.showGeneralAffairs && <AccordItem title="総務管理本部（回覧・確認）" count={selectedGeneralAffairs.length} isActive={activeAccord === '総務管理本部'} onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}>{renderMemberSelector(selectedGeneralAffairs, setSelectedGeneralAffairs, '総務')}</AccordItem>}
+                    {currentRoute.showPostDecisionCirculation && <AccordItem title={currentRoute.postDecisionCirculationLabel} count={selectedPostDecisionCirculation.length} isActive={activeAccord === '決裁後回覧'} onClick={() => setActiveAccord(activeAccord === '決裁後回覧' ? '' : '決裁後回覧')}>{renderMemberSelector(selectedPostDecisionCirculation, setSelectedPostDecisionCirculation, '本部長')}</AccordItem>}
                   </>
                 )}
                 <AccordItem title="回覧先 (共有するメンバー)" count={selectedCirculation.length} isActive={activeAccord === '回覧先'} onClick={() => setActiveAccord(activeAccord === '回覧先' ? '' : '回覧先')}>{renderMemberSelector(selectedCirculation, setSelectedCirculation, '回覧')}</AccordItem>
