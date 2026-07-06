@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock } from 'lucide-react'
@@ -281,11 +281,13 @@ export default function CreatePage() {
 
     try {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
+      let fileIndex = 0
       for (const file of files) {
-        const storageRef = ref(storage, `applications/${Date.now()}_${file.name}`)
+        const storageRef = ref(storage, `applications/${fileIndex}_${file.name}`)
         await uploadBytes(storageRef, file)
         const downloadURL = await getDownloadURL(storageRef)
         uploadedAttachments.push({ name: file.name, url: downloadURL, type: file.type })
+        fileIndex++
       }
 
       let formDetails: any = { description, remarks }
@@ -338,9 +340,66 @@ export default function CreatePage() {
         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       }
 
-      await addDoc(collection(db, 'applications'), applicationData)
+      const docRef = await addDoc(collection(db, 'applications'), applicationData)
+      
+      // 新規申請時に最初のステップの承認者にメールを送信
+      if (mode === 'approval' && initialApprovers.length > 0) {
+        await sendNewApplicationNotification(applicationData, initialApprovers)
+      }
+      
       router.push('/dashboard')
     } catch (err: any) { setError('失敗しました: ' + err.message) } finally { setLoading(false) }
+  }
+
+  const sendNewApplicationNotification = async (applicationData: any, initialApprovers: string[]) => {
+    try {
+      if (!initialApprovers || initialApprovers.length === 0) return
+
+      // 承認者のメールアドレスを取得
+      const approverEmails = await getApproversEmails(initialApprovers)
+
+      // 各メールアドレスへ通知を送信
+      for (const email of approverEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `新規承認依頼: ${applicationData.title}`,
+            text: `「${applicationData.title}」の新規承認依頼が届きました。あなたの確認・承認をお願いします。`,
+            html: `
+              <h2>新規承認依頼</h2>
+              <p>「${applicationData.title}」の新規承認依頼が届きました。</p>
+              <p>あなたの確認・承認をお願いします。</p>
+              <p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Email notification error:', error)
+    }
+  }
+
+  const getApproversEmails = async (approverNames: string[]) => {
+    if (!approverNames || approverNames.length === 0) return []
+    const emails: string[] = []
+    
+    try {
+      const usersQuery = query(collection(db, 'users'), where('name', 'in', approverNames))
+      const usersSnapshot = await getDocs(usersQuery)
+      
+      usersSnapshot.docs.forEach((doc: any) => {
+        const userData = doc.data()
+        if (userData.email) {
+          emails.push(userData.email)
+        }
+      })
+    } catch (err) {
+      console.error('Error fetching filtered user emails:', err)
+    }
+    
+    return emails
   }
 
   const renderMemberSelector = (selectedList: string[], setSelectedList: (list: string[]) => void, filterType: string) => {
