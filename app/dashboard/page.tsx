@@ -72,7 +72,7 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     })
 
-    // 2. 承認待ち一覧（過去データ救済対応：limit(50)を維持しつつ新旧両対応でフィルター）
+    // 2. 承認待ち一覧
     const allAppsQuery = query(
       collection(db, 'applications'),
       where('workflow.status', '==', '承認待ち'),
@@ -87,11 +87,9 @@ export default function DashboardPage() {
       } as Application))
       
       const filtered = apps.filter(app => {
-        // 新しい目印(currentApprovers)がある場合はそれを使用
         if (app.workflow.currentApprovers && app.workflow.currentApprovers.length > 0) {
           return app.workflow.currentApprovers.includes(user.name)
         }
-        // 過去の古いデータ用のフォールバック処理
         const currentStep = app.workflow.currentStep
         const steps = app.workflow.steps || {}
         const currentStepData = steps[currentStep]
@@ -104,7 +102,7 @@ export default function DashboardPage() {
       console.error('Error fetching pending approvals:', error)
     })
 
-    // 3. 回覧一覧（過去データ救済対応：最重要・全件取得を阻止しつつ、新旧両方のデータをクッキリ復活）
+    // 3. 回覧一覧
     const circulationQuery = query(
       collection(db, 'applications'),
       orderBy('createdAt', 'desc'),
@@ -118,11 +116,9 @@ export default function DashboardPage() {
       } as Application))
 
       const filtered = apps.filter(app => {
-        // 新しい目印(allCirculators)がある場合はそれを使用
         if (app.workflow.allCirculators && app.workflow.allCirculators.length > 0) {
           return app.workflow.allCirculators.includes(user.name)
         }
-        // 過去の古いデータ用のフォールバック処理
         const steps = app.workflow.steps || {}
         const circulations = app.workflow.circulations || []
         for (const [stepName, stepData] of Object.entries(steps)) {
@@ -169,13 +165,50 @@ export default function DashboardPage() {
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
     if (!selectedApplication || !user) return
     try {
-      const newStatus = action === 'approve' ? '承認済み' : '却下'
-      await updateDoc(doc(db, 'applications', selectedApplication.id), {
-        'workflow.status': newStatus,
-        'workflow.currentStep': action === 'approve' ? '次のステップ' : '却下',
-        'workflow.currentApprovers': [],
+      const workflow = selectedApplication.workflow
+      const steps = workflow.steps || {}
+      const stepNames = Object.keys(steps)
+      const currentIndex = stepNames.indexOf(workflow.currentStep)
+
+      let nextStepName = ''
+      let nextApprovers: string[] = []
+      let nextStatus = workflow.status
+
+      if (action === 'approve') {
+        // 【修正】固定文字列ではなく、定義されたステップ順序から次のステップを正しく自動計算
+        if (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
+          nextStepName = stepNames[currentIndex + 1]
+          nextApprovers = steps[nextStepName]?.approvers || []
+          // 次のステップが回覧目的の場合はステータスを合わせて変更
+          nextStatus = steps[nextStepName]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+        } else {
+          // 次のステップがなければ最終承認完了
+          nextStepName = '完了'
+          nextStatus = '承認済み'
+          nextApprovers = []
+        }
+      } else {
+        // 却下の場合
+        nextStepName = '却下'
+        nextStatus = '却下'
+        nextApprovers = []
+      }
+
+      // Firestore更新オブジェクトの作成
+      const updateData: any = {
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStepName,
+        'workflow.currentApprovers': nextApprovers,
         updatedAt: serverTimestamp()
-      })
+      }
+
+      // 通過した現在のステップの内部ステータスを更新
+      if (workflow.currentStep && steps[workflow.currentStep]) {
+        updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '却下'
+      }
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+      
       await addDoc(collection(db, 'approvals'), {
         applicationId: selectedApplication.id,
         stepName: selectedApplication.workflow.currentStep,
@@ -186,9 +219,9 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      // 承認時に次の承認者にメールを送信
-      if (action === 'approve') {
-        await sendApprovalNotification(selectedApplication, user.name)
+      // 【修正】次の承認者が存在する場合のみ、計算された正しい配列を渡してメール送信
+      if (action === 'approve' && nextApprovers.length > 0) {
+        await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
       }
 
       setShowDetailModal(false)
@@ -199,17 +232,14 @@ export default function DashboardPage() {
     }
   }
 
-  const sendApprovalNotification = async (application: any, approverName: string) => {
+  const sendApprovalNotification = async (application: any, approverName: string, nextApprovers: string[]) => {
     try {
-      // 次のステップの承認者を特定
-      const nextStepApprovers = getNextStepApprovers(application)
-      
-      if (nextStepApprovers.length === 0) return
+      if (!nextApprovers || nextApprovers.length === 0) return
 
       // 承認者のメールアドレスを取得
-      const approverEmails = await getApproversEmails(nextStepApprovers)
+      const approverEmails = await getApproversEmails(nextApprovers)
 
-      // メールを送信
+      // 各メールアドレスへ通知を送信
       for (const email of approverEmails) {
         await fetch('/api/send-email', {
           method: 'POST',
@@ -217,11 +247,11 @@ export default function DashboardPage() {
           body: JSON.stringify({
             to: email,
             subject: `承認依頼: ${application.title}`,
-            text: `${approverName}さんが「${application.title}」を承認しました。あなたの承認をお願いします。`,
+            text: `${approverName}さんが「${application.title}」を承認しました。あなたの確認・承認をお願いします。`,
             html: `
               <h2>承認依頼</h2>
               <p>${approverName}さんが「${application.title}」を承認しました。</p>
-              <p>あなたの承認をお願いします。</p>
+              <p>あなたの確認・承認をお願いします。</p>
               <p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>
             `
           })
@@ -232,31 +262,24 @@ export default function DashboardPage() {
     }
   }
 
-  const getNextStepApprovers = (application: any) => {
-    const workflow = application.workflow
-    const steps = workflow.steps || {}
-    const stepNames = Object.keys(steps)
-    const currentIndex = stepNames.indexOf(workflow.currentStep)
-    
-    if (currentIndex === -1 || currentIndex >= stepNames.length - 1) {
-      return []
-    }
-    
-    const nextStepName = stepNames[currentIndex + 1]
-    const nextStep = steps[nextStepName]
-    return nextStep?.approvers || []
-  }
-
+  // 【修正】無駄な全件取得を廃止し、必要なメンバーの名前だけで狙い撃ちクエリを投げる（超低コスト化）
   const getApproversEmails = async (approverNames: string[]) => {
+    if (!approverNames || approverNames.length === 0) return []
     const emails: string[] = []
-    const usersSnapshot = await getDocs(collection(db, 'users'))
     
-    usersSnapshot.docs.forEach((doc: any) => {
-      const userData = doc.data()
-      if (approverNames.includes(userData.name)) {
-        emails.push(userData.email)
-      }
-    })
+    try {
+      const usersQuery = query(collection(db, 'users'), where('name', 'in', approverNames))
+      const usersSnapshot = await getDocs(usersQuery)
+      
+      usersSnapshot.docs.forEach((doc: any) => {
+        const userData = doc.data()
+        if (userData.email) {
+          emails.push(userData.email)
+        }
+      })
+    } catch (err) {
+      console.error('Error fetching filtered user emails:', err)
+    }
     
     return emails
   }
@@ -293,7 +316,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
-      {/* ヘッダー */}
       <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
@@ -322,14 +344,9 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        
-        {/* ==================== ① トップ画面 ==================== */}
         {view === 'top' && (
           <div className="space-y-12">
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              
-              {/* ボタンカード1 */}
               <div 
                 onClick={() => setView('approvals')}
                 className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
@@ -357,7 +374,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ボタンカード2 */}
               <div 
                 onClick={() => router.push('/create')}
                 className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
@@ -380,10 +396,8 @@ export default function DashboardPage() {
                   <span className="text-emerald-400 group-hover:translate-x-1.5 transition-transform font-bold text-lg inline-block">GO →</span>
                 </div>
               </div>
-
             </div>
 
-            {/* 下部：送信一覧 */}
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
@@ -433,14 +447,11 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
           </div>
         )}
 
-        {/* ==================== ② 承認・回覧専用画面 ==================== */}
         {view === 'approvals' && (
           <div className="space-y-6 animate-fadeIn">
-            
             <div className="flex items-center">
               <button 
                 onClick={() => setView('top')}
@@ -451,8 +462,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* 承認依頼一覧 */}
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
                 <div>
                   <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
@@ -487,7 +496,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 回覧報告一覧 */}
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
                 <div>
                   <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
@@ -522,7 +530,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 経費申請 */}
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:border-slate-700/60 transition-all duration-300 flex flex-col justify-between h-fit">
                 <div>
                   <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
@@ -539,14 +546,11 @@ export default function DashboardPage() {
                   経費申請一覧
                 </button>
               </div>
-
             </div>
           </div>
         )}
-
       </main>
 
-      {/* 申請詳細モーダル */}
       {showDetailModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
           <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
