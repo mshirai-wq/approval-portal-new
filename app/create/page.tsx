@@ -92,10 +92,14 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
     },
     '求人稟議（パート・アルバイト採用）': { 
-      showDeptHead: false, showGM: false, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      showDeptHead: false, 
+      showGM: true,                      // 常駐管理本部長を通すためON
+      showGMForCirculation: false, 
+      showExec: false, 
+      showGeneralAffairs: true, 
       decisionMaker: '常駐管理本部長', 
-      defaultGM: [], 
-      defaultGeneralAffairs: [tanabe], 
+      defaultGM: residentGM ? [residentGM.name] : [], // 常駐管理本部長をデフォルト選択
+      defaultGeneralAffairs: [tanabe, kaneda],       // 金田麻里江さんを選択済みに追加
       defaultGMForCirculation: [],
       showPostDecisionCirculation: false
     },
@@ -105,9 +109,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe, kaneda], 
       defaultGMForCirculation: [],
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe, kaneda]
+      showPostDecisionCirculation: false  // 重複を消すため一律でfalseへ
     },
     '代表者印捺印申請': { 
       showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
@@ -115,20 +117,20 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, mori].filter(Boolean) : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name] : [],
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: generalAffairsGM ? [generalAffairsGM.name] : []
+      showPostDecisionCirculation: false  // 重複を消すため一律でfalseへ
     },
     '営業統括本部長決裁見積申請（300万円未満）': { 
-      showDeptHead: !isDeptHead, showGM: false, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
+      showDeptHead: !isDeptHead, 
+      showGM: true,                      // 営業管理本部長の決裁を挟むためtrueに変更
+      showGMForCirculation: false, 
+      showExec: false, 
+      showGeneralAffairs: true, 
       decisionMaker: '営業管理本部長', 
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: salesGM ? [salesGM.name] : [], 
       defaultGeneralAffairs: [tanabe], 
       defaultGMForCirculation: [],
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe]
+      showPostDecisionCirculation: false  // 重複させないようfalseに統一
     },
     '社長決裁見積書申請（300万円以上）': { 
       showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
@@ -136,9 +138,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultGM: salesGM ? [salesGM.name] : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], 
       defaultGMForCirculation: [],
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori]
+      showPostDecisionCirculation: false  // 重複を消すため一律でfalseへ
     },
     '協力会社登録': { 
       showDeptHead: !isDeptHead, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
@@ -300,7 +300,7 @@ export default function CreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
-    setLoading(true)
+    setLoading(true) // 【修正】loading(true) から setLoading(true) へ修正
 
     try {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
@@ -407,13 +407,11 @@ export default function CreatePage() {
       <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button type="button" onClick={() => router.push('/dashboard')} className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"><ArrowLeft size={20} /></button>
-          {/* 💡【修正】タイトルを「新規申請・回覧作成」へ確実に変更 */}
           <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">新規申請・回覧作成</h1>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* モード切り替えタブ */}
         <div className="flex p-1.5 bg-slate-900/80 border border-slate-800 rounded-2xl mb-8 max-w-md mx-auto shadow-2xl">
           <button type="button" onClick={() => handleModeChange('approval')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'approval' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><FileText size={18}/> 稟議申請</button>
           <button type="button" onClick={() => handleModeChange('report')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'report' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Share2 size={18}/> 回覧報告</button>
@@ -459,7 +457,6 @@ export default function CreatePage() {
                 </div>
               </div>
               
-              {/* 入札結果報告 専用フォーム */}
               {mode === 'report' && subType === '入札結果報告' && (
                 <div className="space-y-8 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
                   <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
@@ -482,7 +479,6 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* 落札業者セクション */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/40 p-4 rounded-xl border border-indigo-500/20 shadow-lg">
                     <div className="md:col-span-1">
                       <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-2">落札業者名</label>
@@ -498,7 +494,6 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* 自社（ヤマダユニア）セクション */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
                     <div className="flex items-center text-sm font-bold text-emerald-400 px-2">ヤマダユニア株式会社</div>
                     <div>
@@ -511,7 +506,6 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* 参加業者リスト */}
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">入札参加業者（①〜⑥）</label>
                     {biddingDetails.participants.map((p, idx) => (
@@ -544,7 +538,6 @@ export default function CreatePage() {
                     ))}
                   </div>
 
-                  {/* 前年度実績セクション */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-amber-500/5 p-5 rounded-2xl border border-amber-500/20 mt-8">
                     <div className="md:col-span-2 flex items-center gap-2 mb-2">
                       <Clock size={16} className="text-amber-400" />
