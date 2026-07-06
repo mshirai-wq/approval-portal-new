@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 // 型定義
@@ -185,12 +185,80 @@ export default function DashboardPage() {
         comment,
         createdAt: serverTimestamp()
       })
+
+      // 承認時に次の承認者にメールを送信
+      if (action === 'approve') {
+        await sendApprovalNotification(selectedApplication, user.name)
+      }
+
       setShowDetailModal(false)
       setSelectedApplication(null)
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
     }
+  }
+
+  const sendApprovalNotification = async (application: any, approverName: string) => {
+    try {
+      // 次のステップの承認者を特定
+      const nextStepApprovers = getNextStepApprovers(application)
+      
+      if (nextStepApprovers.length === 0) return
+
+      // 承認者のメールアドレスを取得
+      const approverEmails = await getApproversEmails(nextStepApprovers)
+
+      // メールを送信
+      for (const email of approverEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `承認依頼: ${application.title}`,
+            text: `${approverName}さんが「${application.title}」を承認しました。あなたの承認をお願いします。`,
+            html: `
+              <h2>承認依頼</h2>
+              <p>${approverName}さんが「${application.title}」を承認しました。</p>
+              <p>あなたの承認をお願いします。</p>
+              <p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Email notification error:', error)
+    }
+  }
+
+  const getNextStepApprovers = (application: any) => {
+    const workflow = application.workflow
+    const steps = workflow.steps || {}
+    const stepNames = Object.keys(steps)
+    const currentIndex = stepNames.indexOf(workflow.currentStep)
+    
+    if (currentIndex === -1 || currentIndex >= stepNames.length - 1) {
+      return []
+    }
+    
+    const nextStepName = stepNames[currentIndex + 1]
+    const nextStep = steps[nextStepName]
+    return nextStep?.approvers || []
+  }
+
+  const getApproversEmails = async (approverNames: string[]) => {
+    const emails: string[] = []
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    
+    usersSnapshot.docs.forEach((doc: any) => {
+      const userData = doc.data()
+      if (approverNames.includes(userData.name)) {
+        emails.push(userData.email)
+      }
+    })
+    
+    return emails
   }
 
   const handleCirculation = async () => {

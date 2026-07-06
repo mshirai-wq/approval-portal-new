@@ -91,6 +91,10 @@ export default function ExpenseDetailPage() {
       setSubmitting(true)
       // 💡 user.name が undefined だった場合を想定してフォールバックを追加
       await approveExpense(id, user.name || '', comment)
+      
+      // 承認後にメールを送信
+      await sendExpenseApprovalNotification(expense, user.name || '')
+      
       await fetchExpense()
       setComment('')
     } catch (err: any) {
@@ -98,6 +102,32 @@ export default function ExpenseDetailPage() {
       setError('承認に失敗しました: ' + (err.message || '不明なエラー'))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const sendExpenseApprovalNotification = async (expenseData: any, approverName: string) => {
+    try {
+      // 経費申請の次の承認者を特定（経費申請はGAS経由なので、ここでは申請者に通知）
+      const applicantEmail = expenseData.申請者メール || expenseData.applicantEmail
+      
+      if (!applicantEmail) return
+
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: applicantEmail,
+          subject: `経費申請承認: ${expenseData.件名 || expenseData.title}`,
+          text: `${approverName}さんが経費申請「${expenseData.件名 || expenseData.title}」を承認しました。`,
+          html: `
+            <h2>経費申請承認</h2>
+            <p>${approverName}さんが経費申請「${expenseData.件名 || expenseData.title}」を承認しました。</p>
+            <p><a href="${window.location.origin}/expenses/${id}">詳細を確認する</a></p>
+          `
+        })
+      })
+    } catch (error) {
+      console.error('Email notification error:', error)
     }
   }
 
