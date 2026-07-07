@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useParams } from 'next/navigation'
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 interface Application {
@@ -35,6 +35,7 @@ export default function ApplicationDetailPage() {
   const [comment, setComment] = useState('')
   const [action, setAction] = useState<'approve' | 'reject' | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [approvalHistory, setApprovalHistory] = useState<any[]>([])
 
   useEffect(() => {
     const fetchApplication = async () => {
@@ -54,6 +55,26 @@ export default function ApplicationDetailPage() {
     fetchApplication()
   }, [id])
 
+  useEffect(() => {
+    const approvalsQuery = query(
+      collection(db, 'approvals'),
+      where('applicationId', '==', id),
+      orderBy('createdAt', 'asc')
+    )
+
+    const unsubscribe = onSnapshot(approvalsQuery, (snapshot) => {
+      const history = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setApprovalHistory(history)
+    }, (error) => {
+      console.error('Error fetching approval history:', error)
+    })
+
+    return () => unsubscribe()
+  }, [id])
+
   const handleAction = async (actionType: 'approve' | 'reject') => {
     if (!application || !user) return
 
@@ -62,10 +83,10 @@ export default function ApplicationDetailPage() {
 
     try {
       // Update application status
-      const newStatus = actionType === 'approve' ? '承認済み' : '却下'
+      const newStatus = actionType === 'approve' ? '承認済み' : '差し戻し'
       await updateDoc(doc(db, 'applications', application.id), {
         'workflow.status': newStatus,
-        'workflow.currentStep': actionType === 'approve' ? '次のステップ' : '却下',
+        'workflow.currentStep': actionType === 'approve' ? '次のステップ' : '差し戻し',
         updatedAt: serverTimestamp()
       })
 
@@ -131,6 +152,7 @@ export default function ApplicationDetailPage() {
               <span className={`px-2 py-1 rounded text-xs ${
                 application.workflow.status === '承認待ち' ? 'bg-yellow-100 text-yellow-800' :
                 application.workflow.status === '承認済み' ? 'bg-green-100 text-green-800' :
+                application.workflow.status === '差し戻し' ? 'bg-orange-100 text-orange-800' :
                 'bg-red-100 text-red-800'
               }`}>
                 {application.workflow.status}
@@ -180,6 +202,39 @@ export default function ApplicationDetailPage() {
             <div className="text-sm text-gray-500">
               作成日: {application.createdAt ? new Date(application.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
             </div>
+
+            {approvalHistory.length > 0 && (
+              <div>
+                <h3 className="font-medium text-gray-700 mb-3">承認進捗状況</h3>
+                <div className="space-y-3">
+                  {approvalHistory.map((history, index) => (
+                    <div key={history.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          {history.stepName}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          history.action === 'approve' ? 'bg-green-100 text-green-800' :
+                          history.action === 'reject' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {history.action === 'approve' ? '承認' : '差し戻し'}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <p>承認者: {history.approverName}</p>
+                        {history.comment && (
+                          <p className="mt-1 text-gray-500">コメント: {history.comment}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">
+                          {history.createdAt ? new Date(history.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {application.workflow.status === '承認待ち' && (
@@ -195,7 +250,7 @@ export default function ApplicationDetailPage() {
                     onChange={(e) => setComment(e.target.value)}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="承認/却下のコメントを入力してください"
+                    placeholder="承認/差し戻しのコメントを入力してください"
                   />
                 </div>
                 <div className="flex gap-4">
@@ -209,9 +264,9 @@ export default function ApplicationDetailPage() {
                   <button
                     onClick={() => handleAction('reject')}
                     disabled={processing}
-                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {processing && action === 'reject' ? '処理中...' : '却下'}
+                    {processing && action === 'reject' ? '処理中...' : '差し戻し'}
                   </button>
                 </div>
               </div>

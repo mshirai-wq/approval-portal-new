@@ -29,6 +29,9 @@ export default function AdminUsersPage() {
   })
   const [processing, setProcessing] = useState(false)
 
+  // 管理者権限チェック
+  const isAdmin = user?.email === 'm.shirai@yunia.co.jp'
+
   // 1. 先に関数を作る
   // Firebaseからデータを取ってくる処理を完成させる
   const fetchUsers = async () => {
@@ -46,6 +49,12 @@ export default function AdminUsersPage() {
   }
 
   // 2. 作ったあとに呼び出す
+  useEffect(() => {
+    if (!loading && user && !isAdmin) {
+      router.push('/dashboard')
+    }
+  }, [user, loading, isAdmin, router])
+
   useEffect(() => {
     fetchUsers()
   }, [])
@@ -124,6 +133,14 @@ export default function AdminUsersPage() {
     return null
   }
 
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">アクセス権限がありません</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
@@ -142,12 +159,14 @@ export default function AdminUsersPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">社員一覧</h2>
-            <button
-              onClick={handleAddUser}
-              className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              社員を追加
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleAddUser}
+                className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                社員を追加
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -193,18 +212,22 @@ export default function AdminUsersPage() {
                       {user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleEdit(user)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
-                      >
-                        編集
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        削除
-                      </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => handleEdit(user)}
+                            className="text-blue-600 hover:text-blue-900 mr-4"
+                          >
+                            編集
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            削除
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

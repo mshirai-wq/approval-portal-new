@@ -56,6 +56,8 @@ export default function DashboardPage() {
   const [myApplications, setMyApplications] = useState<Application[]>([])
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | null>(null)
+  const [approvalHistory, setApprovalHistory] = useState<any[]>([])
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
@@ -66,6 +68,32 @@ export default function DashboardPage() {
       router.push('/login')
     }
   }, [user, loading, router])
+
+  // 承認履歴を取得
+  useEffect(() => {
+    if (!selectedApplication) {
+      setApprovalHistory([])
+      return
+    }
+
+    const approvalsQuery = query(
+      collection(db, 'approvals'),
+      where('applicationId', '==', selectedApplication.id),
+      orderBy('createdAt', 'asc')
+    )
+
+    const unsubscribe = onSnapshot(approvalsQuery, (snapshot) => {
+      const history = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setApprovalHistory(history)
+    }, (error) => {
+      console.error('Error fetching approval history:', error)
+    })
+
+    return () => unsubscribe()
+  }, [selectedApplication])
 
   useEffect(() => {
     if (!user) return
@@ -187,9 +215,10 @@ export default function DashboardPage() {
     router.push('/admin/users')
   }
 
-  const handleApplicationClick = (app: Application) => {
+  const handleApplicationClick = (app: Application, source: 'pending' | 'circulation' | 'sent') => {
     setSelectedApplication(app)
     setShowDetailModal(true)
+    setModalSource(source)
   }
 
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
@@ -215,8 +244,8 @@ export default function DashboardPage() {
           nextApprovers = []
         }
       } else {
-        nextStepName = '却下'
-        nextStatus = '却下'
+        nextStepName = '差し戻し'
+        nextStatus = '差し戻し'
         nextApprovers = []
       }
 
@@ -228,7 +257,7 @@ export default function DashboardPage() {
       }
 
       if (workflow.currentStep && steps[workflow.currentStep]) {
-        updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '却下'
+        updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '差し戻し'
       }
 
       await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
@@ -249,6 +278,7 @@ export default function DashboardPage() {
 
       setShowDetailModal(false)
       setSelectedApplication(null)
+      setModalSource(null)
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
@@ -310,6 +340,7 @@ export default function DashboardPage() {
       alert('回覧を確認しました')
       setShowDetailModal(false)
       setSelectedApplication(null)
+      setModalSource(null)
     } catch (error) {
       console.error('Circulation error:', error)
       alert('処理に失敗しました')
@@ -466,7 +497,7 @@ export default function DashboardPage() {
                         <tr 
                           key={app.id} 
                           className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                          onClick={() => handleApplicationClick(app)}
+                          onClick={() => handleApplicationClick(app, 'sent')}
                         >
                           <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
                           <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
@@ -474,6 +505,7 @@ export default function DashboardPage() {
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
                               app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                               app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                               'bg-slate-800 text-slate-400 border-slate-700'
                             }`}>
                               {app.workflow.status}
@@ -524,7 +556,7 @@ export default function DashboardPage() {
                         <div 
                           key={app.id} 
                           className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
-                          onClick={() => handleApplicationClick(app)}
+                          onClick={() => handleApplicationClick(app, 'pending')}
                         >
                           <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
                           <div className="text-xs text-slate-400 mt-1 flex justify-between">
@@ -558,7 +590,7 @@ export default function DashboardPage() {
                         <div 
                           key={app.id} 
                           className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
-                          onClick={() => handleApplicationClick(app)}
+                          onClick={() => handleApplicationClick(app, 'circulation')}
                         >
                           <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
                           <div className="text-xs text-slate-400 mt-1 flex justify-between">
@@ -613,9 +645,10 @@ export default function DashboardPage() {
                   <span className="text-slate-700">•</span>
                   <span>{selectedApplication.subType}</span>
                   <span className="text-slate-700">•</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] tracking-wider uppercase border ${
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
                     selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                     selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                    selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                     'bg-rose-500/10 text-rose-400 border-rose-500/20'
                   }`}>
                     {selectedApplication.workflow.status}
@@ -687,15 +720,50 @@ export default function DashboardPage() {
                   作成日: {selectedApplication.createdAt ? new Date(selectedApplication.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
                 </div>
 
-                {selectedApplication.workflow.status === '承認待ち' && (
+                {approvalHistory.length > 0 && (
+                  <div className="border-t border-slate-800 pt-4">
+                    <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認進捗状況</h3>
+                    <div className="space-y-3">
+                      {approvalHistory.map((history) => (
+                        <div key={history.id} className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-slate-200">
+                              {history.stepName}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              history.action === 'approve' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              history.action === 'reject' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                              'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {history.action === 'approve' ? '承認' : '差し戻し'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-slate-400">
+                            <p>承認者: {history.approverName}</p>
+                            {history.comment && (
+                              <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">
+                              {history.createdAt ? new Date(history.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
                   <div className="border-t border-slate-800 pt-4">
                     <ApplicationApprovalForm
+                      application={selectedApplication}
+                      user={user}
                       onApprove={handleApproval}
                     />
                   </div>
                 )}
 
-                {selectedApplication.workflow.status !== '承認待ち' && (
+                {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && (
                   <div className="border-t border-slate-800 pt-4">
                     <button
                       onClick={handleCirculation}
@@ -703,6 +771,14 @@ export default function DashboardPage() {
                     >
                       回覧を確認
                     </button>
+                  </div>
+                )}
+
+                {modalSource === 'sent' && (
+                  <div className="border-t border-slate-800 pt-4">
+                    <div className="text-sm text-slate-400 text-center py-4">
+                      送信一覧からは承認・回覧の操作ができません
+                    </div>
                   </div>
                 )}
               </div>
@@ -715,19 +791,46 @@ export default function DashboardPage() {
 }
 
 function ApplicationApprovalForm({ 
+  application,
+  user,
   onApprove, 
 }: { 
-  application?: Application
+  application: Application
+  user: any
   onApprove: (action: 'approve' | 'reject', comment: string) => void
   onClose?: () => void
 }) {
   const [comment, setComment] = useState('')
   const [processing, setProcessing] = useState(false)
 
+  // 現在のユーザーが承認経路に含まれているかチェック
+  const isCurrentApprover = useMemo(() => {
+    if (!application || !user) return false
+    
+    const currentApprovers = application.workflow.currentApprovers || []
+    const currentStep = application.workflow.currentStep
+    const steps = application.workflow.steps || {}
+    const currentStepData = steps[currentStep]
+    const stepApprovers = currentStepData?.approvers || []
+    
+    return currentApprovers.includes(user.name) || stepApprovers.includes(user.name)
+  }, [application, user])
+
   const handleAction = async (action: 'approve' | 'reject') => {
     setProcessing(true)
     await onApprove(action, comment)
     setProcessing(false)
+  }
+
+  if (!isCurrentApprover) {
+    return (
+      <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
+        <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
+        <div className="text-sm text-slate-400 text-center py-4">
+          あなたはこの申請の承認者ではありません
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -743,7 +846,7 @@ function ApplicationApprovalForm({
             onChange={(e) => setComment(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all"
-            placeholder="承認/却下のコメントを入力してください"
+            placeholder="承認/差し戻しのコメントを入力してください"
           />
         </div>
         <div className="flex gap-4">
@@ -759,9 +862,9 @@ function ApplicationApprovalForm({
             type="button"
             onClick={() => handleAction('reject')}
             disabled={processing}
-            className="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
-            {processing ? '処理中...' : '却下'}
+            {processing ? '処理中...' : '差し戻し'}
           </button>
         </div>
       </div>
