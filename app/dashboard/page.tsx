@@ -2,11 +2,11 @@
 
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-// 型定義
+// 型定義の拡張（申請画面の attachments 構造に完全準拠）
 interface Application {
   id: string
   appName: string
@@ -17,10 +17,20 @@ interface Application {
   applicantDept: string
   applicantTitle: string
   remarks?: string
+  // 申請画面の保存データ構造に一致させる
+  attachments?: {
+    name: string
+    url: string
+    type: string
+  }[]
+  imageUrl?: string       
+  imageUrls?: string[]    
   formDetails?: {
     amount?: number
     paymentDate?: string
     payee?: string
+    imageUrl?: string     
+    imageUrls?: string[]  
   }
   workflow: {
     currentStep: string
@@ -40,10 +50,16 @@ export default function DashboardPage() {
   const [view, setView] = useState<'top' | 'approvals'>('top')
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
-  const [circulations, setCirculations] = useState<Application[]>([])
+  const [rawCirculations, setRawCirculations] = useState<Application[]>([])
+  const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
+  
   const [myApplications, setMyApplications] = useState<Application[]>([])
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+
+  const circulations = useMemo(() => {
+    return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
+  }, [rawCirculations, confirmedAppIds])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -54,7 +70,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    // 1. 自分の申請一覧（直近30件制限）
+    // 1. 自分の申請一覧
     const myAppsQuery = query(
       collection(db, 'applications'),
       where('applicantId', '==', user.id),
@@ -120,27 +136,41 @@ export default function DashboardPage() {
           return app.workflow.allCirculators.includes(user.name)
         }
         const steps = app.workflow.steps || {}
-        const circulations = app.workflow.circulations || []
+        const circulationsList = app.workflow.circulations || []
         for (const [stepName, stepData] of Object.entries(steps)) {
           const step = stepData as any
           if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
             return true
           }
         }
-        if (circulations.includes(user.name)) {
+        if (circulationsList.includes(user.name)) {
           return true
         }
         return false
       })
-      setCirculations(filtered)
+      setRawCirculations(filtered)
     }, (error) => {
       console.error('Error fetching circulations:', error)
+    })
+
+    // 4. 自分が確認済みの回覧レコード
+    const confirmedQuery = query(
+      collection(db, 'circulations'),
+      where('userId', '==', user.id)
+    )
+
+    const unsubscribeConfirmed = onSnapshot(confirmedQuery, (snapshot) => {
+      const ids = snapshot.docs.map(doc => doc.data().applicationId as string)
+      setConfirmedAppIds(ids)
+    }, (error) => {
+      console.error('Error fetching confirmed circulation IDs:', error)
     })
 
     return () => {
       unsubscribeMyApps()
       unsubscribePending()
       unsubscribeCirculation()
+      unsubscribeConfirmed()
     }
   }, [user])
 
@@ -175,26 +205,21 @@ export default function DashboardPage() {
       let nextStatus = workflow.status
 
       if (action === 'approve') {
-        // 【修正】固定文字列ではなく、定義されたステップ順序から次のステップを正しく自動計算
         if (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
           nextStepName = stepNames[currentIndex + 1]
           nextApprovers = steps[nextStepName]?.approvers || []
-          // 次のステップが回覧目的の場合はステータスを合わせて変更
           nextStatus = steps[nextStepName]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
         } else {
-          // 次のステップがなければ最終承認完了
           nextStepName = '完了'
           nextStatus = '承認済み'
           nextApprovers = []
         }
       } else {
-        // 却下の場合
         nextStepName = '却下'
         nextStatus = '却下'
         nextApprovers = []
       }
 
-      // Firestore更新オブジェクトの作成
       const updateData: any = {
         'workflow.status': nextStatus,
         'workflow.currentStep': nextStepName,
@@ -202,7 +227,6 @@ export default function DashboardPage() {
         updatedAt: serverTimestamp()
       }
 
-      // 通過した現在のステップの内部ステータスを更新
       if (workflow.currentStep && steps[workflow.currentStep]) {
         updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '却下'
       }
@@ -219,7 +243,6 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      // 【修正】次の承認者が存在する場合のみ、計算された正しい配列を渡してメール送信
       if (action === 'approve' && nextApprovers.length > 0) {
         await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
       }
@@ -235,11 +258,8 @@ export default function DashboardPage() {
   const sendApprovalNotification = async (application: any, approverName: string, nextApprovers: string[]) => {
     try {
       if (!nextApprovers || nextApprovers.length === 0) return
-
-      // 承認者のメールアドレスを取得
       const approverEmails = await getApproversEmails(nextApprovers)
 
-      // 各メールアドレスへ通知を送信
       for (const email of approverEmails) {
         await fetch('/api/send-email', {
           method: 'POST',
@@ -262,25 +282,19 @@ export default function DashboardPage() {
     }
   }
 
-  // 【修正】無駄な全件取得を廃止し、必要なメンバーの名前だけで狙い撃ちクエリを投げる（超低コスト化）
   const getApproversEmails = async (approverNames: string[]) => {
     if (!approverNames || approverNames.length === 0) return []
     const emails: string[] = []
-    
     try {
       const usersQuery = query(collection(db, 'users'), where('name', 'in', approverNames))
       const usersSnapshot = await getDocs(usersQuery)
-      
       usersSnapshot.docs.forEach((doc: any) => {
         const userData = doc.data()
-        if (userData.email) {
-          emails.push(userData.email)
-        }
+        if (userData.email) emails.push(userData.email)
       })
     } catch (err) {
       console.error('Error fetching filtered user emails:', err)
     }
-    
     return emails
   }
 
@@ -301,6 +315,34 @@ export default function DashboardPage() {
       alert('処理に失敗しました')
     }
   }
+
+  // 【最重要修正】申請画面の `attachments` 配列構造から、画像ファイルを完璧に抽出
+  const attachedImages = useMemo(() => {
+    if (!selectedApplication) return []
+    const urls: string[] = []
+    
+    // 1. attachments配列から画像URLを抽出する（申請画面のデータに完全対応）
+    if (Array.isArray(selectedApplication.attachments)) {
+      selectedApplication.attachments.forEach(file => {
+        if (file.url) {
+          // typeが "image/" で始まっている、またはファイル名が画像拡張子の場合に抽出
+          const isImageMime = file.type && file.type.startsWith('image/')
+          const isImageExt = file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
+          if (isImageMime || isImageExt) {
+            urls.push(file.url)
+          }
+        }
+      })
+    }
+    
+    // 2. 過去のデータ構造やその他のフォールバック処理も維持（念のための安全策）
+    if (selectedApplication.imageUrl) urls.push(selectedApplication.imageUrl)
+    if (Array.isArray(selectedApplication.imageUrls)) urls.push(...selectedApplication.imageUrls)
+    if (selectedApplication.formDetails?.imageUrl) urls.push(selectedApplication.formDetails.imageUrl)
+    if (Array.isArray(selectedApplication.formDetails?.imageUrls)) urls.push(...selectedApplication.formDetails.imageUrls)
+    
+    return Array.from(new Set(urls.filter(url => typeof url === 'string' && url.trim() !== '')))
+  }, [selectedApplication])
 
   if (loading) {
     return (
@@ -389,7 +431,7 @@ export default function DashboardPage() {
                     </h2>
                   </div>
                   <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
-                    各種ワークフローの起票、稟議書、新規の回覧・報告書類を新しく作成して送信します。
+                    画像付き各種ワークフローの起票、稟議書、新規の回覧・報告書類を新しく作成して送信します。
                   </p>
                 </div>
                 <div className="text-right mt-4">
@@ -505,10 +547,10 @@ export default function DashboardPage() {
                       {circulations.length}件
                     </span>
                   </h2>
-                  <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている申請</p>
+                  <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている未確認の申請</p>
                   {circulations.length === 0 ? (
                     <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
-                      回覧待ちの申請はありません
+                      未確認の回覧はありません
                     </div>
                   ) : (
                     <div className="space-y-2.5">
@@ -607,6 +649,29 @@ export default function DashboardPage() {
                       {selectedApplication.formDetails.payee && (
                         <p><span className="text-slate-500 mr-2 w-16 inline-block">支払先:</span>{selectedApplication.formDetails.payee}</p>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 添付写真表示エリア（attachments に完全連動して綺麗にグリッド表示） */}
+                {attachedImages.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                      {attachedImages.map((url, index) => (
+                        <div key={index} className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={url} 
+                            alt={`添付画像-${index + 1}`} 
+                            className="max-w-full max-h-48 object-contain rounded transition-transform duration-200 group-hover:scale-[1.02]"
+                            loading="lazy"
+                          />
+                          <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
+                            画像 {index + 1}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -70,7 +70,6 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   
-  // 各種担当者マスタ抽出
   const tanabe = generalAffairsDept.find(m => m.name.includes('田邉'))?.name || '田邉洋'
   const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
   const mori = generalAffairsDept.find(m => m.name.includes('森'))?.name || '森雅代'
@@ -168,6 +167,67 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
     }
   }
   return routes[subType] || routes['通常申請']
+}
+
+// 【追加】ブラウザ標準機能(Canvas)を用いた超安全・高性能な画像自動圧縮・リサイズロジック
+const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
+  return new Promise((resolve) => {
+    // 画像ファイル以外（PDFなど）が紛れ込んだ場合は無処理でそのまま返す安全弁
+    if (!file.type.startsWith('image/')) {
+      return resolve(file)
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        // アスペ刻比を完全に維持したまま縮小計算
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+        } else {
+          if (height > maxWidth) {
+            width = Math.round((width * maxWidth) / height)
+            height = maxWidth
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return resolve(file)
+
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // 業務上最も軽くて扱いやすい image/jpeg 形式に変換し指定クオリティで圧縮
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return resolve(file)
+            
+            // 元のファイル名を維持したまま、拡張子を.jpgへ安全に書き換え
+            const newFileName = file.name.replace(/\.[^/.]+$/, "") + ".jpg"
+            const compressedFile = new File([blob], newFileName, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            })
+            resolve(compressedFile)
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+      img.onerror = () => resolve(file)
+      img.src = event.target?.result as string
+    }
+    reader.onerror = () => resolve(file)
+    reader.readAsDataURL(file)
+  })
 }
 
 export default function CreatePage() {
@@ -275,11 +335,18 @@ export default function CreatePage() {
     try {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       let fileIndex = 0
+      
       for (const file of files) {
-        const storageRef = ref(storage, `applications/${fileIndex}_${file.name}`)
-        await uploadBytes(storageRef, file)
+        // 【重要修正】ここで画像ファイルをバックグラウンドで安全に自動圧縮・リサイズ処理
+        let targetFile = file
+        if (file.type.startsWith('image/')) {
+          targetFile = await compressImageFile(file, 1200, 0.8)
+        }
+
+        const storageRef = ref(storage, `applications/${fileIndex}_${targetFile.name}`)
+        await uploadBytes(storageRef, targetFile)
         const downloadURL = await getDownloadURL(storageRef)
-        uploadedAttachments.push({ name: file.name, url: downloadURL, type: file.type })
+        uploadedAttachments.push({ name: targetFile.name, url: downloadURL, type: targetFile.type })
         fileIndex++
       }
 
@@ -293,7 +360,6 @@ export default function CreatePage() {
       
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
 
-      // 動的ステップ順序に従って初期承認者とステップ構築を完全自動化
       const stepsObj: any = {}
       let firstStepKey = mode === 'report' ? '回覧先' : currentRoute.stepOrder[0]
       let initialApprovers: string[] = []
@@ -625,7 +691,6 @@ export default function CreatePage() {
               <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
                 {mode === 'approval' ? (
                   <>
-                    {/* ご指示通りの並び順でアコーディオンを動的にループ生成 */}
                     {currentRoute.stepOrder.map((stepKey: string) => {
                       if (stepKey === '部長') {
                         return (
