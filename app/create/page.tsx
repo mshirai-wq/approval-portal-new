@@ -57,7 +57,7 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
 )
 
 // ==========================================
-// 2. 承認ルート計算ロジック
+// 2. 承認ルート計算ロジック（最新の業務フロー）
 // ==========================================
 function getRelatedGM(dept: string, generalManagers: any[]) {
   if (!dept) return null
@@ -69,100 +69,102 @@ function getRelatedGM(dept: string, generalManagers: any[]) {
 function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[]) {
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
-  const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
+  
+  // 各種担当者マスタ抽出
   const tanabe = generalAffairsDept.find(m => m.name.includes('田邉'))?.name || '田邉洋'
+  const kaneda = generalAffairsDept.find(m => m.name.includes('金田'))?.name || '金田麻里江'
   const mori = generalAffairsDept.find(m => m.name.includes('森'))?.name || '森雅代'
+  const tsuboi = generalAffairsDept.find(m => m.name.includes('坪井'))?.name || '坪井美須夫'
+  const takahashi = generalAffairsDept.find(m => m.name.includes('高橋'))?.name || '高橋広道'
+  const miura = generalAffairsDept.find(m => m.name.includes('三浦'))?.name || '三浦暢子'
+  const asakura = generalAffairsDept.find(m => m.name.includes('朝倉'))?.name || '朝倉千晶'
+  const kawakami = generalAffairsDept.find(m => m.name.includes('川上'))?.name || '川上沙織'
+
   const residentGM = generalManagers.find(m => m.dept === '常駐管理本部')
   const salesGM = generalManagers.find(m => m.dept === '営業管理本部')
   const generalAffairsGM = generalManagers.find(m => m.dept === '総務管理本部')
   
   const applicantDeptMembers = employeeMaster[applicantDept] || []
   const applicantDeptHead = applicantDeptMembers.find(m => m.title === '部長')
-  
-  // 【修正】すべての申請種別で 「showDeptHead: true」 に固定し、自動スキップを完全排除
+
   const routes: any = {
     '通常申請': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, decisionMaker: '社長', 
+      decisionMaker: '社長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: relatedGM ? [relatedGM.name] : [], 
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
       defaultGeneralAffairs: [tanabe, kaneda],
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '本部長（回覧・確認）',
-      defaultPostDecisionCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name)
+      stepOrder: ['部長', '本部長', '社長', '本部長回覧', '総務管理本部']
     },
     '求人稟議（パート・アルバイト採用）': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
       decisionMaker: '常駐管理本部長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: residentGM ? [residentGM.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda],
-      showPostDecisionCirculation: false
+      stepOrder: ['部長', '本部長', '総務管理本部']
     },
     '求人稟議（キャリア・新卒採用）': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe, kaneda], 
-      showPostDecisionCirculation: false
+      stepOrder: ['部長', '本部長', '社長', '総務管理本部']
     },
     '代表者印捺印申請': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
-      defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, mori].filter(Boolean) : [], 
-      defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name] : [],
+      generalAffairsLabel: '総務管理本部（森雅代）',
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
+      defaultGeneralAffairs: [mori],
+      defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name].filter(Boolean) : [], 
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
-      showPostDecisionCirculation: false
+      stepOrder: ['部長', '総務管理本部', '本部長', '社長', '本部長回覧']
     },
     '営業統括本部長決裁見積申請（300万円未満）': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: false, showGeneralAffairs: true, 
       decisionMaker: '営業管理本部長', 
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: salesGM ? [salesGM.name] : [], 
-      defaultGeneralAffairs: [tanabe], 
-      showPostDecisionCirculation: false
+      defaultGeneralAffairs: [tanabe, mori], 
+      stepOrder: ['部長', '本部長', '総務管理本部']
     },
     '社長決裁見積書申請（300万円以上）': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: salesGM ? [salesGM.name] : [], 
       defaultGeneralAffairs: generalAffairsGM ? [generalAffairsGM.name, mori] : [mori], 
-      showPostDecisionCirculation: false
+      stepOrder: ['部長', '本部長', '社長', '総務管理本部']
     },
     '協力会社登録': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
+      generalAffairsLabel: '総務管理本部（田邉洋）',
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: generalManagers.map(m => m.name), 
       defaultGeneralAffairs: [tanabe], 
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe]
+      defaultPostDecisionCirculation: [tsuboi, takahashi],
+      stepOrder: ['部長', '本部長', '総務管理本部', '社長', '決裁後回覧']
     },
     '出張旅費申請': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
-      defaultGM: generalManagers.map(m => m.name), 
+      postDecisionCirculationLabel: '本部長全員（回覧・確認）',
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda], 
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe, kaneda]
+      defaultPostDecisionCirculation: generalManagers.map(m => m.name),
+      stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧']
     },
     '車両リース決裁': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: true, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
-      defaultGM: relatedGM ? [relatedGM.name] : [], 
-      defaultGeneralAffairs: [tanabe],
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (relatedGM?.name)).map(m => m.name),
-      showPostDecisionCirculation: true,
       postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe]
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
+      defaultGM: generalAffairsGM ? [generalAffairsGM.name] : [], 
+      defaultPostDecisionCirculation: [takahashi],
+      stepOrder: ['部長', '本部長', '社長', '決裁後回覧']
     },
     '給与情報変更申請': { 
-      showDeptHead: true, showGM: true, showGMForCirculation: false, showExec: true, showGeneralAffairs: true, 
       decisionMaker: '社長', 
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: generalManagers.map(m => m.name), 
-      defaultGeneralAffairs: [tanabe], 
-      showPostDecisionCirculation: true,
-      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
-      defaultPostDecisionCirculation: [tanabe]
+      defaultGeneralAffairs: [miura, asakura, kawakami], 
+      stepOrder: ['部長', '本部長', '社長', '総務管理本部']
     }
   }
   return routes[subType] || routes['通常申請']
@@ -197,16 +199,8 @@ export default function CreatePage() {
   const [payee, setPayee] = useState('')
 
   const [biddingDetails, setBiddingDetails] = useState({
-    location: '',
-    date: '',
-    time: '',
-    winnerName: '',
-    winnerBid1: '',
-    winnerBid2: '',
-    ourBid1: '',
-    ourBid2: '',
-    prevWinnerName: '',
-    prevWinnerAmount: '',
+    location: '', date: '', time: '', winnerName: '', winnerBid1: '', winnerBid2: '',
+    ourBid1: '', ourBid2: '', prevWinnerName: '', prevWinnerAmount: '',
     participants: Array(6).fill({ name: '', bid1: '', bid2: '' })
   })
 
@@ -252,6 +246,7 @@ export default function CreatePage() {
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
       setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
+      setActiveAccord('所属長')
     }
   }, [subType, user, employeeMaster, currentRoute, mode])
 
@@ -259,9 +254,7 @@ export default function CreatePage() {
     if (employeeMaster && Object.keys(employeeMaster).length > 0) {
       const presidentList: string[] = []
       Object.entries(employeeMaster).forEach(([dept, members]) => {
-        members.forEach(m => {
-          if (m.title === '社長') { presidentList.push(m.name) }
-        })
+        members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
       })
       if (presidentList.length > 0) { setSelectedExec(presidentList) }
     }
@@ -277,7 +270,7 @@ export default function CreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
-    setLoading(true) // 【修正】余計な loading = true を消去しました
+    setLoading(true)
 
     try {
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
@@ -294,53 +287,75 @@ export default function CreatePage() {
       if (mode === 'approval' && subType === '通常申請') {
         formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
       }
-      
       if (mode === 'report' && subType === '入札結果報告') {
         formDetails = { ...formDetails, ...biddingDetails }
       }
       
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
 
-      const gmStepName = currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker;
+      // 動的ステップ順序に従って初期承認者とステップ構築を完全自動化
+      const stepsObj: any = {}
+      let firstStepKey = mode === 'report' ? '回覧先' : currentRoute.stepOrder[0]
+      let initialApprovers: string[] = []
 
-      const initialApprovers = mode === 'report' ? [] : (
-        currentRoute.showDeptHead ? selectedDeptHead :
-        currentRoute.showGM ? selectedGM :
-        currentRoute.showExec ? selectedExec : selectedGeneralAffairs
-      );
+      if (mode === 'approval') {
+        currentRoute.stepOrder.forEach((stepKey: string, index: number) => {
+          let approvers: string[] = []
+          let dbKey = stepKey
+
+          if (stepKey === '部長') approvers = selectedDeptHead
+          else if (stepKey === '本部長') {
+            approvers = selectedGM
+            dbKey = currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
+          }
+          else if (stepKey === '社長') approvers = selectedExec
+          else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
+          else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
+          else if (stepKey === '決裁後回覧') {
+            approvers = selectedPostDecisionCirculation
+            dbKey = currentRoute.postDecisionCirculationLabel
+          }
+
+          if (index === 0) {
+            initialApprovers = approvers
+            firstStepKey = dbKey
+          }
+
+          const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
+          stepsObj[dbKey] = {
+            approvers,
+            status: isCirculation ? '回覧待ち' : '承認待ち',
+            comments: []
+          }
+        })
+      }
 
       const allCirculators = Array.from(new Set([
         ...selectedCirculation,
         ...(mode === 'approval' ? selectedGeneralAffairs : []),
         ...(mode === 'approval' ? selectedGMForCirculation : []),
         ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
-      ]));
+      ]))
       
       const applicationData = {
         appName, subType, title, description, remarks,
         applicantId: user?.id || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
         formDetails,
         workflow: {
-          currentStep: mode === 'report' ? '回覧先' : (currentRoute.showDeptHead ? '部長' : (currentRoute.showGM ? gmStepName : (currentRoute.showExec ? '社長' : '常駐管理本部長'))),
+          currentStep: firstStepKey,
           status: mode === 'report' ? '承認済み' : '承認待ち',
           currentApprovers: initialApprovers, 
           allCirculators: allCirculators,     
           decisionMaker: currentRoute.decisionMaker,
-          steps: mode === 'approval' ? {
-            ...(currentRoute.showDeptHead && { '部長': { approvers: selectedDeptHead, status: '承認待ち', comments: [] } }),
-            ...(currentRoute.showGM && { [gmStepName]: { approvers: selectedGM, status: '承認待ち', comments: [] } }),
-            ...(currentRoute.showGMForCirculation && { '本部長回覧': { approvers: selectedGMForCirculation, status: '回覧待ち', comments: [] } }),
-            ...(currentRoute.showExec && { '社長': { approvers: selectedExec, status: '承認待ち', comments: [] } }),
-            ...(currentRoute.showGeneralAffairs && { '総務管理本部': { approvers: selectedGeneralAffairs, status: '回覧待ち', comments: [] } }),
-            ...(currentRoute.showPostDecisionCirculation && { [currentRoute.postDecisionCirculationLabel]: { approvers: selectedPostDecisionCirculation, status: '回覧待ち', comments: [] } })
-          } : {},
+          stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => k === '本部長' ? (currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker) : k === '決裁後回覧' ? currentRoute.postDecisionCirculationLabel : k) : ['回覧先'],
+          steps: stepsObj,
           circulations: selectedCirculation, confirmedBy: []
         },
         attachments: uploadedAttachments,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       }
 
-      const docRef = await addDoc(collection(db, 'applications'), applicationData)
+      await addDoc(collection(db, 'applications'), applicationData)
       
       if (mode === 'approval' && initialApprovers.length > 0) {
         await sendNewApplicationNotification(applicationData, initialApprovers)
@@ -362,39 +377,25 @@ export default function CreatePage() {
           body: JSON.stringify({
             to: email,
             subject: `新規承認依頼: ${applicationData.title}`,
-            text: `「${applicationData.title}」の新規承認依頼が届きました。あなたの確認・承認をお願いします。`,
-            html: `
-              <h2>新規承認依頼</h2>
-              <p>「${applicationData.title}」の新規承認依頼が届きました。</p>
-              <p>あなたの確認・承認をお願いします。</p>
-              <p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>
-            `
+            text: `「${applicationData.title}」の新規承認依頼が届きました。確認・承認をお願いします。`,
+            html: `<h2>新規承認依頼</h2><p>「${applicationData.title}」の新規承認依頼が届きました。</p><p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>`
           })
         })
       }
-    } catch (error) {
-      console.error('Email notification error:', error)
-    }
+    } catch (error) { console.error('Email notification error:', error) }
   }
 
   const getApproversEmails = async (approverNames: string[]) => {
     if (!approverNames || approverNames.length === 0) return []
     const emails: string[] = []
-    
     try {
       const usersQuery = query(collection(db, 'users'), where('name', 'in', approverNames))
       const usersSnapshot = await getDocs(usersQuery)
-      
       usersSnapshot.docs.forEach((doc: any) => {
         const userData = doc.data()
-        if (userData.email) {
-          emails.push(userData.email)
-        }
+        if (userData.email) emails.push(userData.email)
       })
-    } catch (err) {
-      console.error('Error fetching filtered user emails:', err)
-    }
-    
+    } catch (err) { console.error('Error fetching filtered user emails:', err) }
     return emails
   }
 
@@ -487,7 +488,7 @@ export default function CreatePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">件名 <span className="text-rose-500">*</span></label>
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="例: 入札結果報告（〇〇案件）" className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="件名を入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
                 </div>
               </div>
               
@@ -500,7 +501,7 @@ export default function CreatePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札執行場所</label>
-                      <input type="text" value={biddingDetails.location} onChange={(e) => setBiddingDetails({...biddingDetails, location: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" placeholder="支店名等を入力してください" />
+                      <input type="text" value={biddingDetails.location} onChange={(e) => setBiddingDetails({...biddingDetails, location: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札執行日</label>
@@ -508,11 +509,11 @@ export default function CreatePage() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札時間</label>
-                      <input type="text" value={biddingDetails.time} onChange={(e) => setBiddingDetails({...biddingDetails, time: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" placeholder="入札時間を記入" />
+                      <input type="text" value={biddingDetails.time} onChange={(e) => setBiddingDetails({...biddingDetails, time: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/40 p-4 rounded-xl border border-indigo-500/20 shadow-lg">
-                    <div className="md:col-span-1">
+                    <div>
                       <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-2">落札業者名</label>
                       <input type="text" value={biddingDetails.winnerName} onChange={(e) => setBiddingDetails({...biddingDetails, winnerName: e.target.value})} className="w-full bg-slate-950 border border-indigo-500/30 rounded-xl px-4 py-3 text-indigo-100 outline-none" />
                     </div>
@@ -537,50 +538,39 @@ export default function CreatePage() {
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">入札参加業者（①〜⑥）</label>
                     {biddingDetails.participants.map((p, idx) => (
                       <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                         <div className="flex items-center gap-3">
                           <span className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-full text-[10px] font-bold text-slate-400">{(idx + 1).toString()}</span>
                           <input type="text" value={p.name} onChange={(e) => {
-                            const newP = [...biddingDetails.participants];
-                            newP[idx] = {...newP[idx], name: e.target.value};
-                            setBiddingDetails({...biddingDetails, participants: newP});
+                            const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], name: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
                           }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-300 outline-none" placeholder="参加業者名" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-600 whitespace-nowrap font-bold uppercase">1回</span>
                           <input type="number" value={p.bid1} onChange={(e) => {
-                            const newP = [...biddingDetails.participants];
-                            newP[idx] = {...newP[idx], bid1: e.target.value};
-                            setBiddingDetails({...biddingDetails, participants: newP});
-                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" placeholder="0" />
+                            const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], bid1: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
+                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-600 whitespace-nowrap font-bold uppercase">2回</span>
                           <input type="number" value={p.bid2} onChange={(e) => {
-                            const newP = [...biddingDetails.participants];
-                            newP[idx] = {...newP[idx], bid2: e.target.value};
-                            setBiddingDetails({...biddingDetails, participants: newP});
-                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" placeholder="0" />
+                            const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], bid2: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
+                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
                         </div>
                       </div>
                     ))}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-amber-500/5 p-5 rounded-2xl border border-amber-500/20 mt-8">
-                    <div className="md:col-span-2 flex items-center gap-2 mb-2">
-                      <Clock size={16} className="text-amber-400" />
-                      <h4 className="text-sm font-bold text-amber-400 uppercase tracking-widest">前年度実績比較</h4>
-                    </div>
+                    <div className="md:col-span-2 flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-400" /><h4 className="text-sm font-bold text-amber-400 uppercase tracking-widest">前年度実績比較</h4></div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 px-1">前年度落札業者</label>
-                      <input type="text" value={biddingDetails.prevWinnerName} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" placeholder="前年度の落札業者名" />
+                      <input type="text" value={biddingDetails.prevWinnerName} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 px-1">前年度落札金額</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 font-bold">¥</span>
-                        <input type="number" value={biddingDetails.prevWinnerAmount} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerAmount: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-lg font-bold text-amber-200 outline-none text-right" placeholder="0" />
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 font-bold">¥</span>
+                        <input type="number" value={biddingDetails.prevWinnerAmount} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerAmount: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-lg font-bold text-amber-200 outline-none text-right" />
                       </div>
                     </div>
                   </div>
@@ -633,27 +623,57 @@ export default function CreatePage() {
             <section className="space-y-4">
               <h3 className="text-sm font-black text-slate-300 uppercase tracking-[0.2em] flex items-center gap-3 mb-6"><Users size={18} className="text-indigo-500" /> {mode === 'approval' ? '承認・回覧経路の設定' : '回覧先の選択'}</h3>
               <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
-                {mode === 'approval' && (
+                {mode === 'approval' ? (
                   <>
-                    {/* 【修正】常に表示されるようになり、スキップ判定を完全に無くしました */}
-                    {currentRoute.showDeptHead && <AccordItem title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>{renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}</AccordItem>}
-                    
-                    {currentRoute.showGM && (
-                      <AccordItem 
-                        title={currentRoute.decisionMaker === '社長' ? "本部長 (承認)" : `${currentRoute.decisionMaker} (最終決裁)`} 
-                        count={selectedGM.length} 
-                        isActive={activeAccord === '本部長（承認）'} 
-                        onClick={() => setActiveAccord(activeAccord === '本部長（承認）' ? '' : '本部長（承認）')}
-                      >
-                        {renderMemberSelector(selectedGM, setSelectedGM, '本部長')}
-                      </AccordItem>
-                    )}
-                    
-                    {currentRoute.showExec && <AccordItem title="社長 (最終決裁)" count={selectedExec.length} isActive={activeAccord === '社長'} onClick={() => setActiveAccord(activeAccord === '社長' ? '' : '社長')}>{renderMemberSelector(selectedExec, setSelectedExec, '社長')}</AccordItem>}
-                    {currentRoute.showGeneralAffairs && <AccordItem title="総務管理本部（回覧・確認）" count={selectedGeneralAffairs.length} isActive={activeAccord === '総務管理本部'} onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}>{renderMemberSelector(selectedGeneralAffairs, setSelectedGeneralAffairs, '総務')}</AccordItem>}
-                    {currentRoute.showPostDecisionCirculation && <AccordItem title={currentRoute.postDecisionCirculationLabel} count={selectedPostDecisionCirculation.length} isActive={activeAccord === '決裁後回覧'} onClick={() => setActiveAccord(activeAccord === '決裁後回覧' ? '' : '決裁後回覧')}>{renderMemberSelector(selectedPostDecisionCirculation, setSelectedPostDecisionCirculation, '本部長')}</AccordItem>}
+                    {/* ご指示通りの並び順でアコーディオンを動的にループ生成 */}
+                    {currentRoute.stepOrder.map((stepKey: string) => {
+                      if (stepKey === '部長') {
+                        return (
+                          <AccordItem key={stepKey} title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>
+                            {renderMemberSelector(selectedDeptHead, setSelectedDeptHead, '部長')}
+                          </AccordItem>
+                        )
+                      }
+                      if (stepKey === '本部長') {
+                        const label = currentRoute.decisionMaker === '社長' ? "本部長 (承認)" : `${currentRoute.decisionMaker} (最終決裁)`
+                        return (
+                          <AccordItem key={stepKey} title={label} count={selectedGM.length} isActive={activeAccord === '本部長'} onClick={() => setActiveAccord(activeAccord === '本部長' ? '' : '本部長')}>
+                            {renderMemberSelector(selectedGM, setSelectedGM, '本部長')}
+                          </AccordItem>
+                        )
+                      }
+                      if (stepKey === '社長') {
+                        return (
+                          <AccordItem key={stepKey} title="社長 (最終決裁)" count={selectedExec.length} isActive={activeAccord === '社長'} onClick={() => setActiveAccord(activeAccord === '社長' ? '' : '社長')}>
+                            {renderMemberSelector(selectedExec, setSelectedExec, '社長')}
+                          </AccordItem>
+                        )
+                      }
+                      if (stepKey === '総務管理本部') {
+                        return (
+                          <AccordItem key={stepKey} title={currentRoute.generalAffairsLabel || "総務管理本部"} count={selectedGeneralAffairs.length} isActive={activeAccord === '総務管理本部'} onClick={() => setActiveAccord(activeAccord === '総務管理本部' ? '' : '総務管理本部')}>
+                            {renderMemberSelector(selectedGeneralAffairs, setSelectedGeneralAffairs, '総務')}
+                          </AccordItem>
+                        )
+                      }
+                      if (stepKey === '本部長回覧') {
+                        return (
+                          <AccordItem key={stepKey} title="本部長回覧" count={selectedGMForCirculation.length} isActive={activeAccord === '本部長回覧'} onClick={() => setActiveAccord(activeAccord === '本部長回覧' ? '' : '本部長回覧')}>
+                            {renderMemberSelector(selectedGMForCirculation, setSelectedGMForCirculation, '本部長')}
+                          </AccordItem>
+                        )
+                      }
+                      if (stepKey === '決裁後回覧') {
+                        return (
+                          <AccordItem key={stepKey} title={currentRoute.postDecisionCirculationLabel} count={selectedPostDecisionCirculation.length} isActive={activeAccord === '決裁後回覧'} onClick={() => setActiveAccord(activeAccord === '決裁後回覧' ? '' : '決裁後回覧')}>
+                            {renderMemberSelector(selectedPostDecisionCirculation, setSelectedPostDecisionCirculation, currentRoute.postDecisionCirculationLabel.includes('総務') ? '総務' : '本部長')}
+                          </AccordItem>
+                        )
+                      }
+                      return null
+                    })}
                   </>
-                )}
+                ) : null}
                 <AccordItem title="回覧先 (共有するメンバー)" count={selectedCirculation.length} isActive={activeAccord === '回覧先'} onClick={() => setActiveAccord(activeAccord === '回覧先' ? '' : '回覧先')}>{renderMemberSelector(selectedCirculation, setSelectedCirculation, '回覧')}</AccordItem>
               </div>
             </section>
