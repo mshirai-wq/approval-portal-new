@@ -169,10 +169,9 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   return routes[subType] || routes['通常申請']
 }
 
-// 【追加】ブラウザ標準機能(Canvas)を用いた超安全・高性能な画像自動圧縮・リサイズロジック
+// 【維持】白井さんが追加した高性能な画像自動圧縮・リサイズロジック
 const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
   return new Promise((resolve) => {
-    // 画像ファイル以外（PDFなど）が紛れ込んだ場合は無処理でそのまま返す安全弁
     if (!file.type.startsWith('image/')) {
       return resolve(file)
     }
@@ -185,7 +184,6 @@ const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<
         let width = img.width
         let height = img.height
 
-        // アスペ刻比を完全に維持したまま縮小計算
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width)
@@ -205,12 +203,9 @@ const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<
 
         ctx.drawImage(img, 0, 0, width, height)
         
-        // 業務上最も軽くて扱いやすい image/jpeg 形式に変換し指定クオリティで圧縮
         canvas.toBlob(
           (blob) => {
             if (!blob) return resolve(file)
-            
-            // 元のファイル名を維持したまま、拡張子を.jpgへ安全に書き換え
             const newFileName = file.name.replace(/\.[^/.]+$/, "") + ".jpg"
             const compressedFile = new File([blob], newFileName, {
               type: 'image/jpeg',
@@ -337,7 +332,6 @@ export default function CreatePage() {
       let fileIndex = 0
       
       for (const file of files) {
-        // 【重要修正】ここで画像ファイルをバックグラウンドで安全に自動圧縮・リサイズ処理
         let targetFile = file
         if (file.type.startsWith('image/')) {
           targetFile = await compressImageFile(file, 1200, 0.8)
@@ -423,8 +417,11 @@ export default function CreatePage() {
 
       await addDoc(collection(db, 'applications'), applicationData)
       
+      // 【マージ成功】稟議申請と回覧報告それぞれで、適切な通知メールを一斉送信する
       if (mode === 'approval' && initialApprovers.length > 0) {
         await sendNewApplicationNotification(applicationData, initialApprovers)
+      } else if (mode === 'report' && selectedCirculation.length > 0) {
+        await sendNewReportNotification(applicationData, selectedCirculation)
       }
       
       router.push('/dashboard')
@@ -449,6 +446,27 @@ export default function CreatePage() {
         })
       }
     } catch (error) { console.error('Email notification error:', error) }
+  }
+
+  // 【新規融合】回覧報告が作成された際、回覧先に指定されたメンバー全員に一斉メールを送信する
+  const sendNewReportNotification = async (applicationData: any, circulators: string[]) => {
+    try {
+      if (!circulators || circulators.length === 0) return
+      const circulatorEmails = await getApproversEmails(circulators)
+
+      for (const email of circulatorEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `新規回覧報告: ${applicationData.title}`,
+            text: `「${applicationData.title}」の新しい回覧報告が共有されました。内容の確認をお願いします。`,
+            html: `<h2>新規回覧報告</h2><p>「${applicationData.title}」の新しい回覧報告が共有されました。</p><p>内容の確認をお願いします。</p><p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>`
+          })
+        })
+      }
+    } catch (error) { console.error('Report email notification error:', error) }
   }
 
   const getApproversEmails = async (approverNames: string[]) => {
