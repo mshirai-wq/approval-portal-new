@@ -773,14 +773,6 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 )}
-
-                {modalSource === 'sent' && (
-                  <div className="border-t border-slate-800 pt-4">
-                    <div className="text-sm text-slate-400 text-center py-4">
-                      送信一覧からは承認・回覧の操作ができません
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
