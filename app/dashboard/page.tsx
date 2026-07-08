@@ -6,14 +6,14 @@ import { useEffect, useState, useMemo } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-// 型定義の拡張（applicantIdを確実に追加して型エラーを完全撃破）
+// 型定義の拡張
 interface Application {
   id: string
   appName: string
   subType: string
   title: string
   description: string
-  applicantId: string // ★【修正補完】型定義の漏れを100%解消
+  applicantId: string
   applicantName: string
   applicantDept: string
   applicantTitle: string
@@ -259,7 +259,6 @@ export default function DashboardPage() {
           nextApprovers = []
         }
       } else {
-        // 差し戻しの場合
         nextStepName = workflow.currentStep
         nextStatus = '差し戻し'
         nextApprovers = [] 
@@ -309,7 +308,6 @@ export default function DashboardPage() {
     }
   }
 
-  // 申請者が差し戻しデータをその場で微修正して「ピンポイント再申請」する処理
   const handleResubmit = async (newDescription: string, newAmount: number, newPaymentDate: string, newPayee: string, newRemarks: string) => {
     if (!selectedApplication || !user) return
     try {
@@ -769,6 +767,51 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック（ご要望を100%形にしました） */}
+                <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                  <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
+                  <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
+                    {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey) => {
+                      const stepData = selectedApplication.workflow.steps?.[stepKey]
+                      const approverNames = stepData?.approvers || []
+                      const stepStatus = stepData?.status || '未着手'
+
+                      return (
+                        <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                          {/* 各ステップごとの状態インジケーターアイコン（線の上に綺麗に配置） */}
+                          <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
+                            stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
+                            stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
+                            stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
+                            stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
+                            'border-slate-800'
+                          }`} />
+                          
+                          <div>
+                            <span className="font-bold text-slate-200">{stepKey}</span>
+                            <span className="text-xs text-slate-500 ml-2">メンバー:</span>
+                            <span className="text-slate-400 font-semibold ml-1">
+                              {approverNames.length > 0 ? approverNames.join(', ') : '（指定なし）'}
+                            </span>
+                          </div>
+
+                          <div className="sm:text-right">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                              stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
+                              stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                              stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                              'bg-slate-900 text-slate-600 border-slate-800/50'
+                            }`}>
+                              {stepStatus}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div>
                   <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
                   <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
@@ -830,7 +873,7 @@ export default function DashboardPage() {
 
                 {approvalHistory.length > 0 && (
                   <div className="border-t border-slate-800 pt-4">
-                    <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認進捗状況</h3>
+                    <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認アクション履歴</h3>
                     <div className="space-y-3">
                       {approvalHistory.map((history) => (
                         <div key={history.id} className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-3">
@@ -993,7 +1036,7 @@ function ApplicationApprovalForm({
             type="button"
             onClick={() => handleAction('reject')}
             disabled={processing}
-            className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {processing ? '処理中...' : '差し戻し'}
           </button>
