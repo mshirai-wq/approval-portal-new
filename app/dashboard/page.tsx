@@ -6,13 +6,14 @@ import { useEffect, useState, useMemo } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-// 型定義の拡張（申請画面の attachments 構造に完全準拠）
+// 型定義の拡張（applicantIdを確実に追加して型エラーを完全撃破）
 interface Application {
   id: string
   appName: string
   subType: string
   title: string
   description: string
+  applicantId: string // ★【修正補完】型定義の漏れを100%解消
   applicantName: string
   applicantDept: string
   applicantTitle: string
@@ -58,8 +59,6 @@ export default function DashboardPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
-  
-  // 【警告解消＆復活】画像拡大プレビュー用のモーダルState
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const circulations = useMemo(() => {
@@ -168,8 +167,6 @@ export default function DashboardPage() {
         }
         const steps = app.workflow.steps || {}
         const circulationsList = app.workflow.circulations || []
-        
-        // 【警告解消】使用されていなかった第一引数を省き、ESLintエラーを防止
         for (const [, stepData] of Object.entries(steps)) {
           const step = stepData as any
           if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
@@ -238,7 +235,6 @@ export default function DashboardPage() {
       let nextStepName = ''
       let nextApprovers: string[] = []
       let nextStatus = workflow.status
-      // 【致命的バグ解消】letからconstへ変更し、Firebaseデプロイエラーを完全に撃破
       const skippedSteps: string[] = []
 
       if (action === 'approve') {
@@ -264,9 +260,9 @@ export default function DashboardPage() {
         }
       } else {
         // 差し戻しの場合
-        nextStepName = '差し戻し'
+        nextStepName = workflow.currentStep
         nextStatus = '差し戻し'
-        nextApprovers = []
+        nextApprovers = [] 
       }
 
       const updateData: any = {
@@ -300,6 +296,8 @@ export default function DashboardPage() {
 
       if (action === 'approve' && nextApprovers.length > 0) {
         await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
+      } else if (action === 'reject') {
+        await sendRejectNotification(selectedApplication, user.name, comment)
       }
 
       setShowDetailModal(false)
@@ -308,6 +306,56 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
+    }
+  }
+
+  // 申請者が差し戻しデータをその場で微修正して「ピンポイント再申請」する処理
+  const handleResubmit = async (newDescription: string, newAmount: number, newPaymentDate: string, newPayee: string, newRemarks: string) => {
+    if (!selectedApplication || !user) return
+    try {
+      const workflow = selectedApplication.workflow
+      const currentStep = workflow.currentStep
+      const steps = workflow.steps || {}
+      const originalApprovers = steps[currentStep]?.approvers || []
+
+      const updateData: any = {
+        'workflow.status': '承認待ち',
+        'workflow.currentApprovers': originalApprovers,
+        [`workflow.steps.${currentStep}.status`]: '承認待ち',
+        'description': newDescription,
+        'remarks': newRemarks,
+        updatedAt: serverTimestamp()
+      }
+
+      if (selectedApplication.formDetails) {
+        updateData['formDetails.amount'] = newAmount
+        updateData['formDetails.paymentDate'] = newPaymentDate
+        updateData['formDetails.payee'] = newPayee
+      }
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+
+      await addDoc(collection(db, 'approvals'), {
+        applicationId: selectedApplication.id,
+        stepName: `${currentStep}(再申請)`,
+        approverId: user.id,
+        approverName: user.name,
+        action: 'approve', 
+        comment: '内容を修正して再申請しました（前段の承認は維持）。',
+        createdAt: serverTimestamp()
+      })
+
+      if (originalApprovers.length > 0) {
+        await sendApprovalNotification(selectedApplication, user.name, originalApprovers)
+      }
+
+      alert('修正して再申請しました。差し戻し元から処理を再開します。')
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+      setModalSource(null)
+    } catch (error) {
+      console.error('Resubmit error:', error)
+      alert('再申請に失敗しました')
     }
   }
 
@@ -335,6 +383,38 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Email notification error:', error)
+    }
+  }
+
+  const sendRejectNotification = async (application: any, rejectorName: string, comment: string) => {
+    try {
+      const applicantEmails = await getApproversEmails([application.applicantName])
+
+      for (const email of applicantEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `【要対応】差し戻しのお知らせ: ${application.title}`,
+            text: `${rejectorName}さんが「${application.title}」を差し戻しました。\n\nコメント: ${comment || 'なし'}\n\nダッシュボードの送信一覧から確認し、修正・再申請を行ってください。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #e63946;">差し戻しのお知らせ</h2>
+                <p><strong>${rejectorName}</strong>さんが「<strong>${application.title}</strong>」を差し戻しました。</p>
+                <div style="background-color: #fff3f3; padding: 15px; margin: 15px 0; border-left: 4px solid #e63946; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">差し戻し理由（コメント）:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">${comment ? comment.replace(/\n/g, '<br/>') : 'コメントなし'}</p>
+                </div>
+                <p>ダッシュボードの「送信一覧」から詳細を開き、内容を修正してその場で再申請してください。</p>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Reject email notification error:', error)
     }
   }
 
@@ -711,7 +791,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* 【補完復活】タップ拡大用に関数を onClick に追加して完全に機能化 */}
                 {attachedImages.length > 0 && (
                   <div>
                     <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
@@ -768,7 +847,7 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           <div className="text-sm text-slate-400">
-                            <p>承認者: {history.approverName}</p>
+                            <p>担当者: {history.approverName}</p>
                             {history.comment && (
                               <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
                             )}
@@ -782,6 +861,15 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
+                  <div className="border-t border-slate-800 pt-4">
+                    <ApplicationResubmitForm
+                      application={selectedApplication}
+                      onResubmit={handleResubmit}
+                    />
+                  </div>
+                )}
+
                 {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
                   <div className="border-t border-slate-800 pt-4">
                     <ApplicationApprovalForm
@@ -792,7 +880,7 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && (
+                {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
                   <div className="border-t border-slate-800 pt-4">
                     <button
                       onClick={handleCirculation}
@@ -808,7 +896,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 【補完復活】画像拡大フルスクリーンモーダル */}
       {previewImageUrl && (
         <div 
           className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] animate-in fade-in duration-200 cursor-zoom-out"
@@ -913,5 +1000,96 @@ function ApplicationApprovalForm({
         </div>
       </div>
     </div>
+  )
+}
+
+function ApplicationResubmitForm({
+  application,
+  onResubmit,
+}: {
+  application: Application
+  onResubmit: (description: string, amount: number, paymentDate: string, payee: string, remarks: string) => Promise<void>
+}) {
+  const [description, setDescription] = useState(application.description || '')
+  const [remarks, setRemarks] = useState(application.remarks || '')
+  const [amount, setAmount] = useState(application.formDetails?.amount?.toString() || '')
+  const [paymentDate, setPaymentDate] = useState(application.formDetails?.paymentDate || '')
+  const [payee, setPayee] = useState(application.formDetails?.payee || '')
+  const [processing, setProcessing] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setProcessing(true)
+    await onResubmit(description, Number(amount) || 0, paymentDate, payee, remarks)
+    setProcessing(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-slate-950/50 border border-amber-500/20 p-4 rounded-xl space-y-4 shadow-xl">
+      <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-2">
+        <span>⚠️</span> 差し戻し箇所の修正・再申請フォーム（前段の承認は維持されます）
+      </div>
+      
+      <div>
+        <label className="block text-[10px] font-semibold text-slate-400 mb-1">内容説明の修正</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+        />
+      </div>
+
+      {application.formDetails && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-400 mb-1">金額 (¥)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/50 rounded text-sm text-cyan-400 font-bold"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-400 mb-1">支払日</label>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/50 rounded text-sm text-slate-200"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-400 mb-1">支払先</label>
+            <input
+              type="text"
+              value={payee}
+              onChange={(e) => setPayee(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700/50 rounded text-sm text-slate-200"
+            />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-[10px] font-semibold text-slate-400 mb-1">備考の追加</label>
+        <input
+          type="text"
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700/60 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={processing}
+        className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg text-sm tracking-wide transition-all disabled:opacity-50"
+      >
+        {processing ? '再申請処理中...' : '修正を完了して、差し戻し位置から再申請する'}
+      </button>
+    </form>
   )
 }
