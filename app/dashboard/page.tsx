@@ -38,7 +38,7 @@ interface Application {
     allCirculators?: string[]
     steps?: Record<string, any>
     circulations?: string[]
-    stepOrder?: string[] // 【追加補完】順序保証用の型定義
+    stepOrder?: string[]
   }
   createdAt: any
 }
@@ -59,7 +59,7 @@ export default function DashboardPage() {
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   
-  // 【補完】画像拡大プレビュー用のState
+  // 【警告解消＆復活】画像拡大プレビュー用のモーダルState
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const circulations = useMemo(() => {
@@ -168,7 +168,9 @@ export default function DashboardPage() {
         }
         const steps = app.workflow.steps || {}
         const circulationsList = app.workflow.circulations || []
-        for (const [stepName, stepData] of Object.entries(steps)) {
+        
+        // 【警告解消】使用されていなかった第一引数を省き、ESLintエラーを防止
+        for (const [, stepData] of Object.entries(steps)) {
           const step = stepData as any
           if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
             return true
@@ -230,17 +232,16 @@ export default function DashboardPage() {
       const workflow = selectedApplication.workflow
       const steps = workflow.steps || {}
       
-      // 【補完修正】空欄スキップ対応：確定されたstepOrderを最優先で使用
       const stepNames = workflow.stepOrder || Object.keys(steps)
       let currentIndex = stepNames.indexOf(workflow.currentStep)
 
       let nextStepName = ''
       let nextApprovers: string[] = []
       let nextStatus = workflow.status
-      let skippedSteps: string[] = [] // 空欄ステップを保持する配列
+      // 【致命的バグ解消】letからconstへ変更し、Firebaseデプロイエラーを完全に撃破
+      const skippedSteps: string[] = []
 
       if (action === 'approve') {
-        // 【補完ロジック】空欄のステップを自動で飛び越えて次の承認者がいるステップを探す
         while (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
           currentIndex++
           const candidateStep = stepNames[currentIndex]
@@ -252,7 +253,6 @@ export default function DashboardPage() {
             nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
             break
           } else {
-            // 承認者が設定されていなければスキップリストに格納
             skippedSteps.push(candidateStep)
           }
         }
@@ -280,7 +280,6 @@ export default function DashboardPage() {
         updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '差し戻し'
       }
 
-      // 【補完】スキップされたステップの内部ステータスを自動更新
       if (action === 'approve' && skippedSteps.length > 0) {
         skippedSteps.forEach(step => {
           updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
@@ -458,7 +457,7 @@ export default function DashboardPage() {
                     </h2>
                   </div>
                   <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
-                    あなた宛てに届いている承認依頼의確認や、回覧報告、その他経費申請の一覧ページへ移動します。
+                    あなた宛てに届いている承認依頼の確認や、回覧報告、その他経費申請の一覧ページへ移動します。
                   </p>
                 </div>
                 <div className="flex items-center justify-between mt-4">
@@ -671,7 +670,7 @@ export default function DashboardPage() {
                   <span className="text-slate-700">•</span>
                   <span>{selectedApplication.subType}</span>
                   <span className="text-slate-700">•</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
                     selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                     selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                     selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
@@ -712,12 +711,17 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                {/* 【補完復活】タップ拡大用に関数を onClick に追加して完全に機能化 */}
                 {attachedImages.length > 0 && (
                   <div>
                     <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
                       {attachedImages.map((url, index) => (
-                        <div key={index} className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px]">
+                        <div 
+                          key={index} 
+                          onClick={() => setPreviewImageUrl(url)}
+                          className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px] cursor-pointer hover:border-indigo-500/50 transition-all duration-200"
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img 
                             src={url} 
@@ -726,7 +730,7 @@ export default function DashboardPage() {
                             loading="lazy"
                           />
                           <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
-                            画像 {index + 1}
+                            画像 {index + 1} (拡大可)
                           </div>
                         </div>
                       ))}
@@ -803,6 +807,30 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* 【補完復活】画像拡大フルスクリーンモーダル */}
+      {previewImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] animate-in fade-in duration-200 cursor-zoom-out"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <button
+            onClick={() => setPreviewImageUrl(null)}
+            className="absolute top-6 right-6 text-slate-400 hover:text-white bg-slate-900/80 p-2.5 rounded-full border border-slate-800 hover:border-slate-600 transition-all text-sm z-10 font-bold shadow-2xl"
+          >
+            ✕ 閉じる
+          </button>
+          <div className="relative max-w-[95vw] max-h-[90vh] flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={previewImageUrl} 
+              alt="拡大プレビュー" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -820,7 +848,6 @@ function ApplicationApprovalForm({
   const [comment, setComment] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  // 現在のユーザーが承認経路に含まれているかチェック
   const isCurrentApprover = useMemo(() => {
     if (!application || !user) return false
     
