@@ -17,7 +17,6 @@ interface Application {
   applicantDept: string
   applicantTitle: string
   remarks?: string
-  // 申請画面の保存データ構造に一致させる
   attachments?: {
     name: string
     url: string
@@ -39,6 +38,7 @@ interface Application {
     allCirculators?: string[]
     steps?: Record<string, any>
     circulations?: string[]
+    stepOrder?: string[] // 【追加補完】順序保証用の型定義
   }
   createdAt: any
 }
@@ -58,6 +58,9 @@ export default function DashboardPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
+  
+  // 【補完】画像拡大プレビュー用のState
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
@@ -226,24 +229,41 @@ export default function DashboardPage() {
     try {
       const workflow = selectedApplication.workflow
       const steps = workflow.steps || {}
-      const stepNames = Object.keys(steps)
-      const currentIndex = stepNames.indexOf(workflow.currentStep)
+      
+      // 【補完修正】空欄スキップ対応：確定されたstepOrderを最優先で使用
+      const stepNames = workflow.stepOrder || Object.keys(steps)
+      let currentIndex = stepNames.indexOf(workflow.currentStep)
 
       let nextStepName = ''
       let nextApprovers: string[] = []
       let nextStatus = workflow.status
+      let skippedSteps: string[] = [] // 空欄ステップを保持する配列
 
       if (action === 'approve') {
-        if (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
-          nextStepName = stepNames[currentIndex + 1]
-          nextApprovers = steps[nextStepName]?.approvers || []
-          nextStatus = steps[nextStepName]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
-        } else {
+        // 【補完ロジック】空欄のステップを自動で飛び越えて次の承認者がいるステップを探す
+        while (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
+          currentIndex++
+          const candidateStep = stepNames[currentIndex]
+          const candidateApprovers = steps[candidateStep]?.approvers || []
+          
+          if (candidateApprovers.length > 0) {
+            nextStepName = candidateStep
+            nextApprovers = candidateApprovers
+            nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            break
+          } else {
+            // 承認者が設定されていなければスキップリストに格納
+            skippedSteps.push(candidateStep)
+          }
+        }
+
+        if (!nextStepName) {
           nextStepName = '完了'
           nextStatus = '承認済み'
           nextApprovers = []
         }
       } else {
+        // 差し戻しの場合
         nextStepName = '差し戻し'
         nextStatus = '差し戻し'
         nextApprovers = []
@@ -258,6 +278,13 @@ export default function DashboardPage() {
 
       if (workflow.currentStep && steps[workflow.currentStep]) {
         updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '差し戻し'
+      }
+
+      // 【補完】スキップされたステップの内部ステータスを自動更新
+      if (action === 'approve' && skippedSteps.length > 0) {
+        skippedSteps.forEach(step => {
+          updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
+        })
       }
 
       await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
@@ -347,16 +374,13 @@ export default function DashboardPage() {
     }
   }
 
-  // 【最重要修正】申請画面の `attachments` 配列構造から、画像ファイルを完璧に抽出
   const attachedImages = useMemo(() => {
     if (!selectedApplication) return []
     const urls: string[] = []
     
-    // 1. attachments配列から画像URLを抽出する（申請画面のデータに完全対応）
     if (Array.isArray(selectedApplication.attachments)) {
       selectedApplication.attachments.forEach(file => {
         if (file.url) {
-          // typeが "image/" で始まっている、またはファイル名が画像拡張子の場合に抽出
           const isImageMime = file.type && file.type.startsWith('image/')
           const isImageExt = file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
           if (isImageMime || isImageExt) {
@@ -366,7 +390,6 @@ export default function DashboardPage() {
       })
     }
     
-    // 2. 過去のデータ構造やその他のフォールバック処理も維持（念のための安全策）
     if (selectedApplication.imageUrl) urls.push(selectedApplication.imageUrl)
     if (Array.isArray(selectedApplication.imageUrls)) urls.push(...selectedApplication.imageUrls)
     if (selectedApplication.formDetails?.imageUrl) urls.push(selectedApplication.formDetails.imageUrl)
@@ -435,7 +458,7 @@ export default function DashboardPage() {
                     </h2>
                   </div>
                   <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
-                    あなた宛てに届いている承認依頼の確認や、回覧報告、その他経費申請の一覧ページへ移動します。
+                    あなた宛てに届いている承認依頼의確認や、回覧報告、その他経費申請の一覧ページへ移動します。
                   </p>
                 </div>
                 <div className="flex items-center justify-between mt-4">
@@ -632,7 +655,10 @@ export default function DashboardPage() {
               <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
                 <button
-                  onClick={() => setShowDetailModal(false)}
+                  onClick={() => {
+                    setShowDetailModal(false)
+                    setModalSource(null)
+                  }}
                   className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                 >
                   ✕
@@ -645,7 +671,7 @@ export default function DashboardPage() {
                   <span className="text-slate-700">•</span>
                   <span>{selectedApplication.subType}</span>
                   <span className="text-slate-700">•</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
                     selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                     selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                     selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
@@ -686,7 +712,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* 添付写真表示エリア（attachments に完全連動して綺麗にグリッド表示） */}
                 {attachedImages.length > 0 && (
                   <div>
                     <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
