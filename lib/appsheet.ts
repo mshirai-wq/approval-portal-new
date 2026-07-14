@@ -32,9 +32,41 @@ export interface Expense {
   [key: string]: any
 }
 
+export interface Information {
+  id: string
+  件名: string
+  内容: string
+  確認担当者: string[]
+  ステータス: '未確認' | '確認完了'
+  行番号: number
+  作成日時: string
+  ID?: string
+  日時?: string
+  情報入手日?: string
+  担当者所属?: string
+  担当者氏名?: string
+  相手先氏名?: string
+  滞在時間?: string
+  コメント?: string
+  顧客名?: string
+  現場名?: string
+  確認者1?: string
+  確認者2?: string
+  確認者3?: string
+  [key: string]: any
+}
+
 export interface ExpenseResponse {
   expenses?: Expense[]
   expense?: Expense
+  error?: string
+  success?: boolean
+  status?: string
+}
+
+export interface InformationResponse {
+  informations?: Information[]
+  information?: Information
   error?: string
   success?: boolean
   status?: string
@@ -144,6 +176,37 @@ export async function rejectExpense(
     id,
     approverName,
     approverComment,
+  })
+
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response
+}
+
+// ==========================================
+// 情報収集データ取得
+// ==========================================
+
+export async function getInformations(): Promise<Information[]> {
+  const response = await callAppsScript('getInformations')
+  
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response.informations || []
+}
+
+export async function confirmInformation(
+  id: string,
+  approverName: string
+): Promise<InformationResponse> {
+  const response = await postAppsScript({
+    action: 'confirmInformation',
+    id,
+    approverName,
   })
 
   if (response.error) {

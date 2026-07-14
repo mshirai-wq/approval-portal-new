@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { getInformations, confirmInformation, Information as AppSheetInformation } from '@/lib/appsheet'
 
 // 型定義の拡張
 interface Application {
@@ -53,11 +54,12 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
   const [rawCirculations, setRawCirculations] = useState<Application[]>([])
   const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
+  const [informations, setInformations] = useState<AppSheetInformation[]>([])
   
   const [myApplications, setMyApplications] = useState<Application[]>([])
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
+  const [selectedApplication, setSelectedApplication] = useState<Application | AppSheetInformation | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | null>(null)
+  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
@@ -196,6 +198,22 @@ export default function DashboardPage() {
       console.error('Error fetching confirmed circulation IDs:', error)
     })
 
+    // 5. 情報収集データ（GAS経由で取得）
+    const fetchInformations = async () => {
+      try {
+        const infos = await getInformations()
+        const filtered = infos.filter(info => {
+          if (info.ステータス !== '未確認') return false
+          return info.確認担当者.includes(user.name)
+        })
+        setInformations(filtered)
+      } catch (error) {
+        console.error('Error fetching informations:', error)
+      }
+    }
+
+    fetchInformations()
+
     return () => {
       unsubscribeMyApps()
       unsubscribePending()
@@ -221,6 +239,12 @@ export default function DashboardPage() {
     setSelectedApplication(app)
     setShowDetailModal(true)
     setModalSource(source)
+  }
+
+  const handleInformationClick = (info: AppSheetInformation) => {
+    setSelectedApplication(info)
+    setShowDetailModal(true)
+    setModalSource('information')
   }
 
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
@@ -451,6 +475,30 @@ export default function DashboardPage() {
     }
   }
 
+  const handleInformationConfirm = async () => {
+    if (!selectedApplication || !user) return
+    const info = selectedApplication as AppSheetInformation
+    try {
+      await confirmInformation(info.id, user.name)
+
+      alert('内容を確認しました')
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+      setModalSource(null)
+
+      // データを再取得
+      const infos = await getInformations()
+      const filtered = infos.filter(i => {
+        if (i.ステータス !== '未確認') return false
+        return i.確認担当者.includes(user.name)
+      })
+      setInformations(filtered)
+    } catch (error) {
+      console.error('Information confirm error:', error)
+      alert('処理に失敗しました')
+    }
+  }
+
   const attachedImages = useMemo(() => {
     if (!selectedApplication) return []
     const urls: string[] = []
@@ -635,7 +683,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
                 <div>
                   <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
@@ -704,6 +752,39 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-teal-500 rounded-full shadow-[0_0_10px_#14b8a6]"></span>
+                    情報収集確認一覧
+                    <span className="ml-auto text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full">
+                      {informations.length}件
+                    </span>
+                  </h2>
+                  <p className="text-slate-400 text-xs mb-4">自分が確認担当者に設定されている未確認の情報</p>
+                  {informations.length === 0 ? (
+                    <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                      未確認の情報はありません
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {informations.map(info => (
+                        <div 
+                          key={info.id} 
+                          className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                          onClick={() => handleInformationClick(info)}
+                        >
+                          <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{info.title}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            確認担当者: {info.reviewers.join(', ')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:border-slate-700/60 transition-all duration-300 flex flex-col justify-between h-fit">
                 <div>
                   <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
@@ -743,195 +824,235 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-6">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
-                  <span>{selectedApplication.appName}</span>
-                  <span className="text-slate-700">•</span>
-                  <span>{selectedApplication.subType}</span>
-                  <span className="text-slate-700">•</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                    selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                    selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                    selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                    'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                  }`}>
-                    {selectedApplication.workflow.status}
-                  </span>
-                </div>
-
-                <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
-                  <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">申請者情報</h3>
-                  <div className="text-sm text-slate-400 space-y-1.5">
-                    <p><span className="text-slate-500 mr-2">氏名:</span>{selectedApplication.applicantName}</p>
-                    <p><span className="text-slate-500 mr-2">所属:</span>{selectedApplication.applicantDept}</p>
-                    <p><span className="text-slate-500 mr-2">役職:</span>{selectedApplication.applicantTitle}</p>
-                  </div>
-                </div>
-
-                {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック（ご要望を100%形にしました） */}
-                <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
-                  <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
-                  <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
-                    {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey) => {
-                      const stepData = selectedApplication.workflow.steps?.[stepKey]
-                      const approverNames = stepData?.approvers || []
-                      const stepStatus = stepData?.status || '未着手'
-
-                      return (
-                        <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                          {/* 各ステップごとの状態インジケーターアイコン（線の上に綺麗に配置） */}
-                          <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
-                            stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
-                            stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
-                            stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
-                            stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
-                            'border-slate-800'
-                          }`} />
-                          
-                          <div>
-                            <span className="font-bold text-slate-200">{stepKey}</span>
-                            <span className="text-xs text-slate-500 ml-2">メンバー:</span>
-                            <span className="text-slate-400 font-semibold ml-1">
-                              {approverNames.length > 0 ? approverNames.join(', ') : '（指定なし）'}
-                            </span>
-                          </div>
-
-                          <div className="sm:text-right">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
-                              stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                              stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
-                              stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                              'bg-slate-900 text-slate-600 border-slate-800/50'
-                            }`}>
-                              {stepStatus}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
-                  <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
-                </div>
-
-                {selectedApplication.formDetails && (
-                  <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
-                    <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
-                    <div className="text-sm text-slate-400 space-y-2">
-                      {selectedApplication.formDetails.amount && (
-                        <p className="flex items-baseline"><span className="text-slate-500 mr-2 w-16">金額:</span><span className="text-xl font-bold text-cyan-400">¥{selectedApplication.formDetails.amount.toLocaleString()}</span></p>
-                      )}
-                      {selectedApplication.formDetails.paymentDate && (
-                        <p><span className="text-slate-500 mr-2 w-16 inline-block">支払日:</span>{selectedApplication.formDetails.paymentDate}</p>
-                      )}
-                      {selectedApplication.formDetails.payee && (
-                        <p><span className="text-slate-500 mr-2 w-16 inline-block">支払先:</span>{selectedApplication.formDetails.payee}</p>
-                      )}
+                {modalSource === 'information' ? (
+                  <>
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
+                      <span>情報収集データ</span>
+                      <span className="text-slate-700">•</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                        (selectedApplication as AppSheetInformation).ステータス === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}>
+                        {(selectedApplication as AppSheetInformation).ステータス}
+                      </span>
                     </div>
-                  </div>
-                )}
 
-                {attachedImages.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
-                      {attachedImages.map((url, index) => (
-                        <div 
-                          key={index} 
-                          onClick={() => setPreviewImageUrl(url)}
-                          className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px] cursor-pointer hover:border-indigo-500/50 transition-all duration-200"
+                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                      <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">確認担当者</h3>
+                      <div className="text-sm text-slate-400">
+                        <p>{(selectedApplication as AppSheetInformation).確認担当者.join(', ')}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">内容</h3>
+                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{(selectedApplication as AppSheetInformation).内容}</p>
+                    </div>
+
+                    <div className="text-xs text-slate-500 text-right border-t border-slate-800 pt-4">
+                      作成日: {(selectedApplication as AppSheetInformation).作成日時 ? new Date((selectedApplication as AppSheetInformation).作成日時).toLocaleString('ja-JP') : '-'}
+                    </div>
+
+                    <div className="border-t border-slate-800 pt-4">
+                      <InformationConfirmForm
+                        information={selectedApplication as AppSheetInformation}
+                        onConfirm={handleInformationConfirm}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
+                      <span>{selectedApplication.appName}</span>
+                      <span className="text-slate-700">•</span>
+                      <span>{selectedApplication.subType}</span>
+                      <span className="text-slate-700">•</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                        selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                        selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                        'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}>
+                        {selectedApplication.workflow.status}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                      <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">申請者情報</h3>
+                      <div className="text-sm text-slate-400 space-y-1.5">
+                        <p><span className="text-slate-500 mr-2">氏名:</span>{selectedApplication.applicantName}</p>
+                        <p><span className="text-slate-500 mr-2">所属:</span>{selectedApplication.applicantDept}</p>
+                        <p><span className="text-slate-500 mr-2">役職:</span>{selectedApplication.applicantTitle}</p>
+                      </div>
+                    </div>
+
+                    {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック（ご要望を100%形にしました） */}
+                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                      <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
+                      <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
+                        {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey) => {
+                          const stepData = selectedApplication.workflow.steps?.[stepKey]
+                          const approverNames = stepData?.approvers || []
+                          const stepStatus = stepData?.status || '未着手'
+
+                          return (
+                            <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                              {/* 各ステップごとの状態インジケーターアイコン（線の上に綺麗に配置） */}
+                              <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
+                                stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
+                                stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
+                                stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
+                                stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
+                                'border-slate-800'
+                              }`} />
+                              
+                              <div>
+                                <span className="font-bold text-slate-200">{stepKey}</span>
+                                <span className="text-xs text-slate-500 ml-2">メンバー:</span>
+                                <span className="text-slate-400 font-semibold ml-1">
+                                  {approverNames.length > 0 ? approverNames.join(', ') : '（指定なし）'}
+                                </span>
+                              </div>
+
+                              <div className="sm:text-right">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                                  stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                  stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
+                                  stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                  stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                  'bg-slate-900 text-slate-600 border-slate-800/50'
+                                }`}>
+                                  {stepStatus}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
+                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
+                    </div>
+
+                    {selectedApplication.formDetails && (
+                      <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
+                        <div className="text-sm text-slate-400 space-y-2">
+                          {selectedApplication.formDetails.amount && (
+                            <p className="flex items-baseline"><span className="text-slate-500 mr-2 w-16">金額:</span><span className="text-xl font-bold text-cyan-400">¥{selectedApplication.formDetails.amount.toLocaleString()}</span></p>
+                          )}
+                          {selectedApplication.formDetails.paymentDate && (
+                            <p><span className="text-slate-500 mr-2 w-16 inline-block">支払日:</span>{selectedApplication.formDetails.paymentDate}</p>
+                          )}
+                          {selectedApplication.formDetails.payee && (
+                            <p><span className="text-slate-500 mr-2 w-16 inline-block">支払先:</span>{selectedApplication.formDetails.payee}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {attachedImages.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                          {attachedImages.map((url, index) => (
+                            <div 
+                              key={index} 
+                              onClick={() => setPreviewImageUrl(url)}
+                              className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px] cursor-pointer hover:border-indigo-500/50 transition-all duration-200"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img 
+                                src={url} 
+                                alt={`添付画像-${index + 1}`} 
+                                className="max-w-full max-h-48 object-contain rounded transition-transform duration-200 group-hover:scale-[1.02]"
+                                loading="lazy"
+                              />
+                              <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
+                                画像 {index + 1} (拡大可)
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedApplication.remarks && (
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">備考</h3>
+                        <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{selectedApplication.remarks}</p>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-slate-500 text-right border-t border-slate-800 pt-4">
+                      作成日: {selectedApplication.createdAt ? new Date(selectedApplication.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
+                    </div>
+
+                    {approvalHistory.length > 0 && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認アクション履歴</h3>
+                        <div className="space-y-3">
+                          {approvalHistory.map((history) => (
+                            <div key={history.id} className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-slate-200">
+                                  {history.stepName}
+                                </span>
+                                <span className={`text-xs px-2 py-1 rounded ${
+                                  history.action === 'approve' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                  history.action === 'reject' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                  'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
+                                  {history.action === 'approve' ? '承認' : '差し戻し'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-slate-400">
+                                <p>担当者: {history.approverName}</p>
+                                {history.comment && (
+                                  <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {history.createdAt ? new Date(history.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <ApplicationResubmitForm
+                          application={selectedApplication}
+                          onResubmit={handleResubmit}
+                        />
+                      </div>
+                    )}
+
+                    {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <ApplicationApprovalForm
+                          application={selectedApplication}
+                          user={user}
+                          onApprove={handleApproval}
+                        />
+                      </div>
+                    )}
+
+                    {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <button
+                          onClick={handleCirculation}
+                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={url} 
-                            alt={`添付画像-${index + 1}`} 
-                            className="max-w-full max-h-48 object-contain rounded transition-transform duration-200 group-hover:scale-[1.02]"
-                            loading="lazy"
-                          />
-                          <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
-                            画像 {index + 1} (拡大可)
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedApplication.remarks && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">備考</h3>
-                    <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{selectedApplication.remarks}</p>
-                  </div>
-                )}
-
-                <div className="text-xs text-slate-500 text-right border-t border-slate-800 pt-4">
-                  作成日: {selectedApplication.createdAt ? new Date(selectedApplication.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
-                </div>
-
-                {approvalHistory.length > 0 && (
-                  <div className="border-t border-slate-800 pt-4">
-                    <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認アクション履歴</h3>
-                    <div className="space-y-3">
-                      {approvalHistory.map((history) => (
-                        <div key={history.id} className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-slate-200">
-                              {history.stepName}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              history.action === 'approve' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                              history.action === 'reject' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                              'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}>
-                              {history.action === 'approve' ? '承認' : '差し戻し'}
-                            </span>
-                          </div>
-                          <div className="text-sm text-slate-400">
-                            <p>担当者: {history.approverName}</p>
-                            {history.comment && (
-                              <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
-                            )}
-                            <p className="text-xs text-slate-500 mt-1">
-                              {history.createdAt ? new Date(history.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
-                  <div className="border-t border-slate-800 pt-4">
-                    <ApplicationResubmitForm
-                      application={selectedApplication}
-                      onResubmit={handleResubmit}
-                    />
-                  </div>
-                )}
-
-                {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
-                  <div className="border-t border-slate-800 pt-4">
-                    <ApplicationApprovalForm
-                      application={selectedApplication}
-                      user={user}
-                      onApprove={handleApproval}
-                    />
-                  </div>
-                )}
-
-                {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
-                  <div className="border-t border-slate-800 pt-4">
-                    <button
-                      onClick={handleCirculation}
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
-                    >
-                      回覧を確認
-                    </button>
-                  </div>
+                          回覧を確認
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1134,5 +1255,40 @@ function ApplicationResubmitForm({
         {processing ? '再申請処理中...' : '修正を完了して、差し戻し位置から再申請する'}
       </button>
     </form>
+  )
+}
+
+function InformationConfirmForm({
+  information,
+  onConfirm,
+}: {
+  information: AppSheetInformation
+  onConfirm: () => void
+}) {
+  const [processing, setProcessing] = useState(false)
+
+  const handleConfirm = async () => {
+    setProcessing(true)
+    await onConfirm()
+    setProcessing(false)
+  }
+
+  return (
+    <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
+      <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">確認処理</h3>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-400">
+          この情報の内容を確認しました。確認すると、スプレッドシートのステータスも「確認完了」に更新されます。
+        </p>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={processing}
+          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          {processing ? '処理中...' : '内容を確認しました'}
+        </button>
+      </div>
+    </div>
   )
 }
