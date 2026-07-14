@@ -45,6 +45,11 @@ interface Application {
   createdAt: any
 }
 
+// selectedApplicationの型を判定するための型ガード関数
+function isApplication(app: Application | AppSheetInformation | null): app is Application {
+  return app !== null && 'workflow' in app;
+}
+
 export default function DashboardPage() {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
@@ -248,7 +253,7 @@ export default function DashboardPage() {
   }
 
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
-    if (!selectedApplication || !user) return
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
       const workflow = selectedApplication.workflow
       const steps = workflow.steps || {}
@@ -333,7 +338,7 @@ export default function DashboardPage() {
   }
 
   const handleResubmit = async (newDescription: string, newAmount: number, newPaymentDate: string, newPayee: string, newRemarks: string) => {
-    if (!selectedApplication || !user) return
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
       const workflow = selectedApplication.workflow
       const currentStep = workflow.currentStep
@@ -457,7 +462,7 @@ export default function DashboardPage() {
   }
 
   const handleCirculation = async () => {
-    if (!selectedApplication || !user) return
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
       await addDoc(collection(db, 'circulations'), {
         applicationId: selectedApplication.id,
@@ -503,22 +508,24 @@ export default function DashboardPage() {
     if (!selectedApplication) return []
     const urls: string[] = []
     
-    if (Array.isArray(selectedApplication.attachments)) {
-      selectedApplication.attachments.forEach(file => {
-        if (file.url) {
-          const isImageMime = file.type && file.type.startsWith('image/')
-          const isImageExt = file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
-          if (isImageMime || isImageExt) {
-            urls.push(file.url)
+    if (isApplication(selectedApplication)) {
+      if (Array.isArray(selectedApplication.attachments)) {
+        selectedApplication.attachments.forEach(file => {
+          if (file.url) {
+            const isImageMime = file.type && file.type.startsWith('image/')
+            const isImageExt = file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
+            if (isImageMime || isImageExt) {
+              urls.push(file.url)
+            }
           }
-        }
-      })
+        })
+      }
+      
+      if (selectedApplication.imageUrl) urls.push(selectedApplication.imageUrl)
+      if (Array.isArray(selectedApplication.imageUrls)) urls.push(...selectedApplication.imageUrls)
+      if (selectedApplication.formDetails?.imageUrl) urls.push(selectedApplication.formDetails.imageUrl)
+      if (Array.isArray(selectedApplication.formDetails?.imageUrls)) urls.push(...selectedApplication.formDetails.imageUrls)
     }
-    
-    if (selectedApplication.imageUrl) urls.push(selectedApplication.imageUrl)
-    if (Array.isArray(selectedApplication.imageUrls)) urls.push(...selectedApplication.imageUrls)
-    if (selectedApplication.formDetails?.imageUrl) urls.push(selectedApplication.formDetails.imageUrl)
-    if (Array.isArray(selectedApplication.formDetails?.imageUrls)) urls.push(...selectedApplication.formDetails.imageUrls)
     
     return Array.from(new Set(urls.filter(url => typeof url === 'string' && url.trim() !== '')))
   }, [selectedApplication])
@@ -860,7 +867,7 @@ export default function DashboardPage() {
                       />
                     </div>
                   </>
-                ) : (
+                ) : isApplication(selectedApplication) ? (
                   <>
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
                       <span>{selectedApplication.appName}</span>
@@ -886,7 +893,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック（ご要望を100%形にしました） */}
+                    {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック */}
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
                       <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
@@ -897,7 +904,7 @@ export default function DashboardPage() {
 
                           return (
                             <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                              {/* 各ステップごとの状態インジケーターアイコン（線の上に綺麗に配置） */}
+                              {/* 各ステップごとの状態インジケーターアイコン */}
                               <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
                                 stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
                                 stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
@@ -1053,7 +1060,7 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -1122,7 +1129,7 @@ function ApplicationApprovalForm({
       <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
         <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
         <div className="text-sm text-slate-400 text-center py-4">
-          あなたはこの申請の承認者ではありません
+          あなたはこの申請의 承認者ではありません
         </div>
       </div>
     )
