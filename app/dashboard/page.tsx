@@ -68,6 +68,9 @@ export default function DashboardPage() {
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
+  // 承認・回覧ページのタブ切り替え用 ('pending' = 承認待ち, 'circulation' = 回覧報告)
+  const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
+
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
   }, [rawCirculations, confirmedAppIds])
@@ -690,91 +693,117 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
+            {/* 4つから2つに整理されたカードエリア */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* カード1：社内用ポータル申請（承認待ち ＆ 回覧報告） */}
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
                 <div>
-                  <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_10px_#ef4444]"></span>
-                    承認依頼一覧
-                    <span className="ml-auto text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full">
-                      {pendingApprovals.length}件
-                    </span>
-                  </h2>
-                  <p className="text-slate-400 text-xs mb-4">自分が承認者として設定されている申請</p>
-                  {pendingApprovals.length === 0 ? (
-                    <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
-                      承認待ちの申請はありません
+                  {/* ヘッダー＆タブ切り替え */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-4">
+                    <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                      📥 ポータル申請タスク
+                    </h2>
+                    <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800/80 text-xs font-semibold">
+                      <button
+                        onClick={() => setApprovalTab('pending')}
+                        className={`px-3 py-1.5 rounded-md transition-all ${
+                          approvalTab === 'pending'
+                            ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30'
+                            : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                        }`}
+                      >
+                        承認待ち ({pendingApprovals.length})
+                      </button>
+                      <button
+                        onClick={() => setApprovalTab('circulation')}
+                        className={`px-3 py-1.5 rounded-md transition-all ${
+                          approvalTab === 'circulation'
+                            ? 'bg-blue-500/20 text-blue-400 shadow-sm border border-blue-500/30'
+                            : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                        }`}
+                      >
+                        回覧報告 ({circulations.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* タブ1: 承認待ち一覧 */}
+                  {approvalTab === 'pending' ? (
+                    <div>
+                      <p className="text-slate-400 text-xs mb-4">自分が承認者として設定されている申請</p>
+                      {pendingApprovals.length === 0 ? (
+                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                          承認待ちの申請はありません
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                          {pendingApprovals.map(app => (
+                            <div 
+                              key={app.id} 
+                              className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                              onClick={() => handleApplicationClick(app, 'pending')}
+                            >
+                              <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
+                              <div className="text-xs text-slate-400 mt-1 flex justify-between">
+                                <span>{app.applicantName}</span>
+                                <span className="text-slate-500">{app.subType}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
-                      {pendingApprovals.map(app => (
-                        <div 
-                          key={app.id} 
-                          className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
-                          onClick={() => handleApplicationClick(app, 'pending')}
-                        >
-                          <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
-                          <div className="text-xs text-slate-400 mt-1 flex justify-between">
-                            <span>{app.applicantName}</span>
-                            <span className="text-slate-500">{app.subType}</span>
-                          </div>
+                    /* タブ2: 回覧報告一覧 */
+                    <div>
+                      <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている未確認の申請</p>
+                      {circulations.length === 0 ? (
+                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                          未確認の回覧はありません
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                          {circulations.map(app => (
+                            <div 
+                              key={app.id} 
+                              className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                              onClick={() => handleApplicationClick(app, 'circulation')}
+                            >
+                              <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
+                              <div className="text-xs text-slate-400 mt-1 flex justify-between">
+                                <span>{app.applicantName}</span>
+                                <span className="text-slate-500">{app.subType}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
+              {/* カード2：AppSheet連携（情報収集 ＆ 経費申請） */}
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
                 <div>
-                  <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_10px_#3b82f6]"></span>
-                    回覧報告一覧
-                    <span className="ml-auto text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
-                      {circulations.length}件
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                    <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                      📊 AppSheet連携
+                    </h2>
+                    <span className="text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2.5 py-1 rounded-full">
+                      情報収集: {informations.length}件
                     </span>
-                  </h2>
-                  <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている未確認の申請</p>
-                  {circulations.length === 0 ? (
-                    <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
-                      未確認の回覧はありません
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {circulations.map(app => (
-                        <div 
-                          key={app.id} 
-                          className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
-                          onClick={() => handleApplicationClick(app, 'circulation')}
-                        >
-                          <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
-                          <div className="text-xs text-slate-400 mt-1 flex justify-between">
-                            <span>{app.applicantName}</span>
-                            <span className="text-slate-500">{app.subType}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-teal-500 rounded-full shadow-[0_0_10px_#14b8a6]"></span>
-                    情報収集確認一覧
-                    <span className="ml-auto text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full">
-                      {informations.length}件
-                    </span>
-                  </h2>
                   <p className="text-slate-400 text-xs mb-4">自分が確認担当者に設定されている未確認の情報</p>
+                  
                   {informations.length === 0 ? (
-                    <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 mb-6">
                       未確認の情報はありません
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 mb-6">
                       {informations.map(info => (
                         <div 
                           key={info.id} 
@@ -790,24 +819,22 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+
+                {/* 経費申請への導線ボタン（同じカード内にスマートに配置） */}
+                <div className="border-t border-slate-800/80 pt-6 mt-auto">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-semibold text-slate-500">経費精算の承認・確認はこちら</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/expenses')}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.25)] hover:shadow-[0_0_20px_rgba(147,51,234,0.35)] transition-all text-sm tracking-wide flex items-center justify-center gap-2"
+                  >
+                    <span>💸</span> AppSheet経費申請一覧を開く
+                  </button>
+                </div>
               </div>
 
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:border-slate-700/60 transition-all duration-300 flex flex-col justify-between h-fit">
-                <div>
-                  <h2 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_10px_#a855f7]"></span>
-                    経費申請
-                  </h2>
-                  <p className="text-slate-400 text-xs mb-6">AppSheet経費申請の承認・確認</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => router.push('/expenses')}
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all text-sm tracking-wide"
-                >
-                  経費申請一覧
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -893,7 +920,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* 【新仕様】承認ルート設定者全員の一覧と個人の進捗表示ブロック */}
+                    {/* 承認ルート設定者の進捗表示 */}
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
                       <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
@@ -904,7 +931,7 @@ export default function DashboardPage() {
 
                           return (
                             <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                              {/* 各ステップごとの状態インジケーターアイコン */}
+                              {/* インジケーター */}
                               <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
                                 stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
                                 stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
@@ -1129,7 +1156,7 @@ function ApplicationApprovalForm({
       <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
         <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
         <div className="text-sm text-slate-400 text-center py-4">
-          あなたはこの申請의 承認者ではありません
+          あなたはこの申請の承認者ではありません
         </div>
       </div>
     )
