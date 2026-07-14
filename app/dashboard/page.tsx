@@ -890,7 +890,7 @@ export default function DashboardPage() {
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
                       <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
-                        {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey) => {
+                        {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
                           const stepData = selectedApplication.workflow.steps?.[stepKey]
                           const approverNames = stepData?.approvers || []
                           const stepStatus = stepData?.status || '未着手'
