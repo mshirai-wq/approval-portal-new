@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
     const targetUrl = new URL(appsScriptUrl.trim())
     targetUrl.searchParams.set('action', action || '')
     targetUrl.searchParams.set('apiKey', appsScriptApiKey.trim())
-
+// 💡 日本語の文字化け・Edge Runtimeでのパラメータ消失を防ぐ安全対策
+    if (searchParams.has('userName')) {
+      targetUrl.searchParams.set('userName', decodeURIComponent(searchParams.get('userName') || ''));
+    }
     searchParams.forEach((value, key) => {
       if (key !== 'action') {
         targetUrl.searchParams.set(key, value)
