@@ -73,17 +73,22 @@ export default function DashboardPage() {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
   }, [rawCirculations, confirmedAppIds])
 
-  // 💡 【最適化】情報収集データを取得・フィルターする処理を共通化
+  // 💡 【修正】必須だった「自分宛てかどうかのフィルター」を復活させました！
   const loadInformations = useCallback(async () => {
     if (!user?.name) return
     try {
       const infos = await getInformations(user.name)
-      const filtered = infos.filter(info => info && info.ステータス === '未確認')
+      const filtered = infos.filter(info => {
+        if (!info || info.ステータス !== '未確認') return false
+        if (!info.確認担当者) return false
+        // 🚨 削ってはいけない必須フィルターを復活
+        return info.確認担当者.includes(user.name)
+      })
       setInformations(filtered)
     } catch (error) {
       console.error('Error fetching informations:', error)
     }
-  }, [user]) // React Compilerの要求通り [user?.name] から [user] に変更
+  }, [user])
 
   useEffect(() => {
     if (!loading && !user) {
