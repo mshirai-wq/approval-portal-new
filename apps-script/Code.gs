@@ -362,21 +362,22 @@ function getInformations(e) {
     const reportId = row[idIndex] || `info_${index + 2}`
     const reviewers = []
     
-    // 社員IDを氏名に変換
-    if (confirmer1Index !== -1 && row[confirmer1Index]) {
-      const empId = String(row[confirmer1Index])
-      reviewers.push(employeeMap[empId] || empId)
-    }
-    if (confirmer2Index !== -1 && row[confirmer2Index]) {
-      const empId = String(row[confirmer2Index])
-      reviewers.push(employeeMap[empId] || empId)
-    }
-    if (confirmer3Index !== -1 && row[confirmer3Index]) {
-      const empId = String(row[confirmer3Index])
-      reviewers.push(employeeMap[empId] || empId)
-    }
+    // 確認履歴シートから未確認の確認担当者を抽出
+    reviewRows.forEach(reviewRow => {
+      const reviewReportId = reviewRow[reviewReportIdIndex]
+      const reviewerId = String(reviewRow[reviewReviewerIdIndex])
+      const status = reviewRow[reviewStatusIndex]
+      
+      if (String(reviewReportId) === String(reportId) && status === '未確認') {
+        // 社員IDを氏名に変換して追加
+        const reviewerName = employeeMap[reviewerId] || reviewerId
+        if (!reviewers.includes(reviewerName)) {
+          reviewers.push(reviewerName)
+        }
+      }
+    })
     
-    // 確認履歴からステータスを判定
+    // 確認履歴からステータスを判定（自分が確認済みかどうか）
     const isConfirmed = reviewMap[String(reportId)]
     const status = isConfirmed ? '確認済' : '未確認'
     
