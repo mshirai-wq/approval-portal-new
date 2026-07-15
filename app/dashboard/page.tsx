@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, Information as AppSheetInformation } from '@/lib/appsheet'
@@ -45,7 +45,6 @@ interface Application {
   createdAt: any
 }
 
-// selectedApplicationの型を判定するための型ガード関数
 function isApplication(app: Application | AppSheetInformation | null): app is Application {
   return app !== null && 'workflow' in app;
 }
@@ -68,12 +67,24 @@ export default function DashboardPage() {
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
-  // 承認・回覧ページのタブ切り替え用 ('pending' = 承認待ち, 'circulation' = 回覧報告)
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
   }, [rawCirculations, confirmedAppIds])
+
+  // 💡 【最適化】情報収集データを取得・フィルターする処理を共通化
+  const loadInformations = useCallback(async () => {
+    if (!user?.name) return
+    try {
+      const infos = await getInformations(user.name)
+      // GAS側からクリーンなデータが届くため、最低限の安全性の担保のみでフィルターを軽量化
+      const filtered = infos.filter(info => info && info.ステータス === '未確認')
+      setInformations(filtered)
+    } catch (error) {
+      console.error('Error fetching informations:', error)
+    }
+  }, [user?.name])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -175,9 +186,9 @@ export default function DashboardPage() {
         if (app.workflow.allCirculators && app.workflow.allCirculators.length > 0) {
           return app.workflow.allCirculators.includes(user.name)
         }
-        const steps = app.workflow.steps || {}
+        const MathSteps = app.workflow.steps || {}
         const circulationsList = app.workflow.circulations || []
-        for (const [, stepData] of Object.entries(steps)) {
+        for (const [, stepData] of Object.entries(MathSteps)) {
           const step = stepData as any
           if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
             return true
@@ -207,20 +218,7 @@ export default function DashboardPage() {
     })
 
     // 5. 情報収集データ（GAS経由で取得）
-    const fetchInformations = async () => {
-      try {
-        const infos = await getInformations(user.name)
-        const filtered = infos.filter(info => {
-          if (info.ステータス !== '未確認') return false
-          return info.確認担当者.includes(user.name)
-        })
-        setInformations(filtered)
-      } catch (error) {
-        console.error('Error fetching informations:', error)
-      }
-    }
-
-    fetchInformations()
+    loadInformations()
 
     return () => {
       unsubscribeMyApps()
@@ -228,7 +226,7 @@ export default function DashboardPage() {
       unsubscribeCirculation()
       unsubscribeConfirmed()
     }
-  }, [user])
+  }, [user, loadInformations])
 
   const handleSignOut = async () => {
     try {
@@ -494,13 +492,8 @@ export default function DashboardPage() {
       setSelectedApplication(null)
       setModalSource(null)
 
-      // データを再取得
-      const infos = await getInformations()
-      const filtered = infos.filter(i => {
-        if (i.ステータス !== '未確認') return false
-        return i.確認担当者.includes(user.name)
-      })
-      setInformations(filtered)
+      // 💡 【最適化】重複処理を削り、共通化した関数で安全に再取得
+      await loadInformations()
     } catch (error) {
       console.error('Information confirm error:', error)
       alert('処理に失敗しました')
@@ -820,7 +813,7 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* 経費申請への導線ボタン（同じカード内にスマートに配置） */}
+                {/* 経費申請への導線ボタン */}
                 <div className="border-t border-slate-800/80 pt-6 mt-auto">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-slate-500">経費精算の承認・確認はこちら</span>
@@ -874,7 +867,7 @@ export default function DashboardPage() {
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">確認担当者</h3>
                       <div className="text-sm text-slate-400">
-                        <p>{((selectedApplication as AppSheetInformation).確認担当者 || []).join(', ')}</p>
+                        <p>{((selectedApplication as AppSheetInformation).確認担当者 || []).join(', ') || (selectedApplication as AppSheetInformation).reviewers?.join?.(', ') || '未設定'}</p>
                       </div>
                     </div>
 
@@ -944,7 +937,7 @@ export default function DashboardPage() {
                                 <span className="font-bold text-slate-200">{stepKey}</span>
                                 <span className="text-xs text-slate-500 ml-2">メンバー:</span>
                                 <span className="text-slate-400 font-semibold ml-1">
-                                  {approverNames.length > 0 ? approverNames.join(', ') : '（指定なし）'}
+                                  {Array.isArray(approverNames) ? approverNames.join(', ') : '（指定なし）'}
                                 </span>
                               </div>
 
