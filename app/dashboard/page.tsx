@@ -78,13 +78,12 @@ export default function DashboardPage() {
     if (!user?.name) return
     try {
       const infos = await getInformations(user.name)
-      // GAS側からクリーンなデータが届くため、最低限の安全性の担保のみでフィルターを軽量化
       const filtered = infos.filter(info => info && info.ステータス === '未確認')
       setInformations(filtered)
     } catch (error) {
       console.error('Error fetching informations:', error)
     }
-  }, [user?.name])
+  }, [user]) // React Compilerの要求通り [user?.name] から [user] に変更
 
   useEffect(() => {
     if (!loading && !user) {
@@ -186,9 +185,9 @@ export default function DashboardPage() {
         if (app.workflow.allCirculators && app.workflow.allCirculators.length > 0) {
           return app.workflow.allCirculators.includes(user.name)
         }
-        const MathSteps = app.workflow.steps || {}
+        const steps = app.workflow.steps || {}
         const circulationsList = app.workflow.circulations || []
-        for (const [, stepData] of Object.entries(MathSteps)) {
+        for (const [, stepData] of Object.entries(steps)) {
           const step = stepData as any
           if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
             return true
@@ -483,16 +482,14 @@ export default function DashboardPage() {
 
   const handleInformationConfirm = async () => {
     if (!selectedApplication || !user) return
-    const info = selectedApplication as AppSheetInformation
     try {
-      await confirmInformation(info.id, user.name)
+      await confirmInformation(selectedApplication.id, user.name)
 
       alert('内容を確認しました')
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
 
-      // 💡 【最適化】重複処理を削り、共通化した関数で安全に再取得
       await loadInformations()
     } catch (error) {
       console.error('Information confirm error:', error)
@@ -686,13 +683,11 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* 4つから2つに整理されたカードエリア */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
               {/* カード1：社内用ポータル申請（承認待ち ＆ 回覧報告） */}
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
                 <div>
-                  {/* ヘッダー＆タブ切り替え */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-4">
                     <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
                       📥 ポータル申請タスク
@@ -721,7 +716,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* タブ1: 承認待ち一覧 */}
                   {approvalTab === 'pending' ? (
                     <div>
                       <p className="text-slate-400 text-xs mb-4">自分が承認者として設定されている申請</p>
@@ -748,7 +742,6 @@ export default function DashboardPage() {
                       )}
                     </div>
                   ) : (
-                    /* タブ2: 回覧報告一覧 */
                     <div>
                       <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている未確認の申請</p>
                       {circulations.length === 0 ? (
@@ -813,7 +806,6 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* 経費申請への導線ボタン */}
                 <div className="border-t border-slate-800/80 pt-6 mt-auto">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-slate-500">経費精算の承認・確認はこちら</span>
@@ -913,7 +905,6 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* 承認ルート設定者の進捗表示 */}
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
                       <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
@@ -924,7 +915,6 @@ export default function DashboardPage() {
 
                           return (
                             <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                              {/* インジケーター */}
                               <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
                                 stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
                                 stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
