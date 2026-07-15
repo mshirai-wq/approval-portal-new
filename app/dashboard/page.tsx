@@ -812,7 +812,7 @@ export default function DashboardPage() {
                         >
                           <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{info.title}</div>
                           <div className="text-xs text-slate-400 mt-1">
-                            確認担当者: {info.reviewers.join(', ')}
+                            確認担当者: {(info.reviewers || []).join(', ')}
                           </div>
                         </div>
                       ))}
@@ -874,7 +874,7 @@ export default function DashboardPage() {
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">確認担当者</h3>
                       <div className="text-sm text-slate-400">
-                        <p>{(selectedApplication as AppSheetInformation).確認担当者.join(', ')}</p>
+                        <p>{((selectedApplication as AppSheetInformation).確認担当者 || []).join(', ')}</p>
                       </div>
                     </div>
 
