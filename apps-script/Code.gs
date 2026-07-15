@@ -13,7 +13,9 @@ const CONFIG = {
   
   // 情報収集データ用の設定
   INFORMATION_SPREADSHEET_ID: '1GyatBLtrU9o7KP8XTbm-d45vv1LYvmUg4N0eJgW6v2g', // 情報収集データのスプレッドシートID
-  INFORMATION_SHEET_NAME: 'お客様の声' // 情報収集データのシート名
+  INFORMATION_SHEET_NAME: 'お客様の声', // 情報収集データのシート名
+  EMPLOYEE_MASTER_SHEET_NAME: '社員マスタ', // 社員マスタのシート名
+  REVIEW_SHEET_NAME: '確認履歴' // 確認履歴のシート名
 }
 
 // ==========================================
@@ -226,45 +228,168 @@ function rejectExpense(data) {
 }
 
 // ==========================================
+// ユーティリティ関数（情報収集用）
+// ==========================================
+
+// スプレッドシートを共通でオープンする関数
+function openInformationSpreadsheet() {
+  return SpreadsheetApp.openById(CONFIG.INFORMATION_SPREADSHEET_ID)
+}
+
+// 社員マスタから社員ID→氏名のマッピングを作成
+function createEmployeeIdToNameMap() {
+  const employeeMap = {}
+  try {
+    const sheet = openInformationSpreadsheet().getSheetByName(CONFIG.EMPLOYEE_MASTER_SHEET_NAME)
+    if (sheet) {
+      const data = sheet.getDataRange().getValues()
+      const headers = data[0]
+      const rows = data.slice(1)
+      
+      const idIndex = headers.indexOf('社員ID')
+      const nameIndex = headers.indexOf('氏名')
+      
+      if (idIndex !== -1 && nameIndex !== -1) {
+        rows.forEach(row => {
+          const empId = row[idIndex]
+          const empName = row[nameIndex]
+          if (empId && empName) {
+            employeeMap[String(empId)] = empName
+          }
+        })
+      }
+    }
+  } catch (err) {
+    console.error('社員マスタの読み込みに失敗しました: ', err)
+  }
+  return employeeMap
+}
+
+// 社員マスタから氏名→社員IDの逆マッピングを作成
+function createEmployeeNameToIdMap() {
+  const nameToIdMap = {}
+  try {
+    const sheet = openInformationSpreadsheet().getSheetByName(CONFIG.EMPLOYEE_MASTER_SHEET_NAME)
+    if (sheet) {
+      const data = sheet.getDataRange().getValues()
+      const headers = data[0]
+      const rows = data.slice(1)
+      
+      const idIndex = headers.indexOf('社員ID')
+      const nameIndex = headers.indexOf('氏名')
+      
+      if (idIndex !== -1 && nameIndex !== -1) {
+        rows.forEach(row => {
+          const empId = row[idIndex]
+          const empName = row[nameIndex]
+          if (empId && empName) {
+            nameToIdMap[String(empName)] = String(empId)
+          }
+        })
+      }
+    }
+  } catch (err) {
+    console.error('社員マスタの読み込みに失敗しました: ', err)
+  }
+  return nameToIdMap
+}
+
+// ==========================================
 // 情報収集データ取得関数
 // ==========================================
 
 function getInformations(e) {
-  const sheet = SpreadsheetApp.openById(CONFIG.INFORMATION_SPREADSHEET_ID).getSheetByName(CONFIG.INFORMATION_SHEET_NAME)
-  const data = sheet.getDataRange().getValues()
+  const userName = e.parameter.userName // フロントエンドからユーザー名を受け取る
   
-  // ヘッダー行をスキップ
-  const headers = data[0]
-  const rows = data.slice(1)
+  // スプレッドシートをオープン
+  const spreadsheet = openInformationSpreadsheet()
+  
+  // 社員マスタを読み込んで社員ID→氏名のマッピングを作成
+  const employeeMap = createEmployeeIdToNameMap()
+  
+  // ユーザー名から社員IDを特定
+  const nameToIdMap = createEmployeeNameToIdMap()
+  const userEmployeeId = userName ? nameToIdMap[userName] : null
+  
+  // 「お客様の声」シートを読み込み
+  const infoSheet = spreadsheet.getSheetByName(CONFIG.INFORMATION_SHEET_NAME)
+  const infoData = infoSheet.getDataRange().getValues()
+  const infoHeaders = infoData[0]
+  const infoRows = infoData.slice(1)
+  
+  // 「確認履歴」シートを読み込み
+  const reviewSheet = spreadsheet.getSheetByName(CONFIG.REVIEW_SHEET_NAME)
+  const reviewData = reviewSheet.getDataRange().getValues()
+  const reviewHeaders = reviewData[0]
+  const reviewRows = reviewData.slice(1)
+  
+  // 確認履歴のインデックス
+  const reviewReportIdIndex = reviewHeaders.indexOf('報告ID')
+  const reviewReviewerIdIndex = reviewHeaders.indexOf('確認上司')
+  const reviewStatusIndex = reviewHeaders.indexOf('ステータス')
+  
+  // 確認履歴をマップ化（報告ID → 該当ユーザーの確認済みレコード）
+  const reviewMap = {}
+  if (userEmployeeId && reviewReportIdIndex !== -1 && reviewReviewerIdIndex !== -1 && reviewStatusIndex !== -1) {
+    reviewRows.forEach(row => {
+      const reportId = row[reviewReportIdIndex]
+      const reviewerId = String(row[reviewReviewerIdIndex])
+      const status = row[reviewStatusIndex]
+      
+      if (reviewerId === userEmployeeId && status === '確認済') {
+        reviewMap[String(reportId)] = true
+      }
+    })
+  }
   
   // カラムインデックス（F列=顧客ID, G列=現場IDは除外）
-  const idIndex = headers.indexOf('ID')
-  const datetimeIndex = headers.indexOf('日時')
-  const infoDateIndex = headers.indexOf('情報入手日')
-  const deptIndex = headers.indexOf('担当者所属')
-  const nameIndex = headers.indexOf('担当者氏名')
-  const partnerNameIndex = headers.indexOf('相手先氏名')
-  const stayTimeIndex = headers.indexOf('滞在時間')
-  const commentIndex = headers.indexOf('コメント')
-  const customerNameIndex = headers.indexOf('顧客名')
-  const siteNameIndex = headers.indexOf('現場名')
-  const confirmer1Index = headers.indexOf('確認者1')
-  const confirmer2Index = headers.indexOf('確認者2')
-  const confirmer3Index = headers.indexOf('確認者3')
+  const idIndex = infoHeaders.indexOf('ID')
+  const datetimeIndex = infoHeaders.indexOf('日時')
+  const infoDateIndex = infoHeaders.indexOf('情報入手日')
+  const deptIndex = infoHeaders.indexOf('担当者所属')
+  const nameIndex = infoHeaders.indexOf('担当者氏名')
+  const partnerNameIndex = infoHeaders.indexOf('相手先氏名')
+  const stayTimeIndex = infoHeaders.indexOf('滞在時間')
+  const commentIndex = infoHeaders.indexOf('コメント')
+  const customerNameIndex = infoHeaders.indexOf('顧客名')
+  const siteNameIndex = infoHeaders.indexOf('現場名')
+  const confirmer1Index = infoHeaders.indexOf('確認者1')
+  const confirmer2Index = infoHeaders.indexOf('確認者2')
+  const confirmer3Index = infoHeaders.indexOf('確認者3')
   
   // データをオブジェクトに変換（F列、G列を除外）
-  const informations = rows.map((row, index) => {
+  const informations = infoRows.map((row, index) => {
+    const reportId = row[idIndex] || `info_${index + 2}`
     const reviewers = []
-    if (confirmer1Index !== -1 && row[confirmer1Index]) reviewers.push(row[confirmer1Index])
-    if (confirmer2Index !== -1 && row[confirmer2Index]) reviewers.push(row[confirmer2Index])
-    if (confirmer3Index !== -1 && row[confirmer3Index]) reviewers.push(row[confirmer3Index])
+    
+    // 社員IDを氏名に変換
+    if (confirmer1Index !== -1 && row[confirmer1Index]) {
+      const empId = String(row[confirmer1Index])
+      reviewers.push(employeeMap[empId] || empId)
+    }
+    if (confirmer2Index !== -1 && row[confirmer2Index]) {
+      const empId = String(row[confirmer2Index])
+      reviewers.push(employeeMap[empId] || empId)
+    }
+    if (confirmer3Index !== -1 && row[confirmer3Index]) {
+      const empId = String(row[confirmer3Index])
+      reviewers.push(employeeMap[empId] || empId)
+    }
+    
+    // 確認履歴からステータスを判定
+    const isConfirmed = reviewMap[String(reportId)]
+    const status = isConfirmed ? '確認済' : '未確認'
+    
+    const title = `${row[customerNameIndex] || ''} ${row[siteNameIndex] || ''} ${row[partnerNameIndex] || ''}`.trim()
     
     return {
-      id: row[idIndex] || `info_${index + 2}`,
-      件名: `${row[customerNameIndex] || ''} ${row[siteNameIndex] || ''} ${row[partnerNameIndex] || ''}`.trim(),
+      id: reportId,
+      title: title, // フロントエンドが期待するtitleキー
+      件名: title,
       内容: `担当者: ${row[nameIndex] || ''}\n所属: ${row[deptIndex] || ''}\n情報入手日: ${row[infoDateIndex] || ''}\n滞在時間: ${row[stayTimeIndex] || ''}\nコメント: ${row[commentIndex] || ''}`,
       確認担当者: reviewers,
-      ステータス: '未確認', // スプレッドシートにステータス列がない場合はデフォルト値
+      reviewers: reviewers, // フロントエンドが期待するreviewersキー
+      ステータス: status,
       行番号: index + 2,
       作成日時: row[datetimeIndex] || ''
     }
@@ -274,50 +399,64 @@ function getInformations(e) {
 }
 
 function confirmInformation(data) {
-  const { id, approverName } = data
+  const { id, approverName, comment } = data
   
-  const sheet = SpreadsheetApp.openById(CONFIG.INFORMATION_SPREADSHEET_ID).getSheetByName(CONFIG.INFORMATION_SHEET_NAME)
-  const dataRange = sheet.getDataRange()
-  const values = dataRange.getValues()
+  // スプレッドシートをオープン
+  const spreadsheet = openInformationSpreadsheet()
   
-  const headers = values[0]
-  const idIndex = headers.indexOf('ID')
+  // 氏名を社員IDに逆変換
+  const nameToIdMap = createEmployeeNameToIdMap()
+  const approverId = nameToIdMap[approverName] || approverName
   
-  // IDで検索
-  let rowIndex = -1
-  for (let i = 1; i < values.length; i++) {
-    if (values[i][idIndex] === id) {
-      rowIndex = i + 1 // 1-indexed
+  // 「確認履歴」シートを読み込み
+  const reviewSheet = spreadsheet.getSheetByName(CONFIG.REVIEW_SHEET_NAME)
+  const reviewData = reviewSheet.getDataRange().getValues()
+  const reviewHeaders = reviewData[0]
+  const reviewRows = reviewData.slice(1)
+  
+  // 確認履歴のインデックス
+  const reviewIdIndex = reviewHeaders.indexOf('確認ID')
+  const reviewReportIdIndex = reviewHeaders.indexOf('報告ID')
+  const reviewReviewerIdIndex = reviewHeaders.indexOf('確認上司')
+  const reviewStatusIndex = reviewHeaders.indexOf('ステータス')
+  const reviewCommentIndex = reviewHeaders.indexOf('上司コメント')
+  const reviewDateTimeIndex = reviewHeaders.indexOf('確認日時')
+  const reviewTransferIndex = reviewHeaders.indexOf('転送先')
+  
+  // 該当する行を検索（報告IDが一致、確認上司が自分の社員ID、ステータスが未確認）
+  let targetRowIndex = -1
+  for (let i = 0; i < reviewRows.length; i++) {
+    const row = reviewRows[i]
+    const reportId = row[reviewReportIdIndex]
+    const reviewerId = String(row[reviewReviewerIdIndex])
+    const status = row[reviewStatusIndex]
+    
+    if (String(reportId) === String(id) && reviewerId === approverId && status === '未確認') {
+      targetRowIndex = i + 2 // 1-indexed（ヘッダー行を考慮）
       break
     }
   }
   
-  if (rowIndex === -1) {
-    return { error: 'Information not found' }
+  if (targetRowIndex !== -1) {
+    // 該当行が存在する場合は更新
+    reviewSheet.getRange(targetRowIndex, reviewStatusIndex + 1).setValue('確認済')
+    reviewSheet.getRange(targetRowIndex, reviewCommentIndex + 1).setValue(comment || '')
+    reviewSheet.getRange(targetRowIndex, reviewDateTimeIndex + 1).setValue(new Date())
+  } else {
+    // 該当行が存在しない場合は新規追加
+    const newReviewId = `review_${id}_${approverId}_${Date.now()}`
+    reviewSheet.appendRow([
+      newReviewId,
+      id,
+      approverId,
+      '確認済',
+      comment || '',
+      new Date(),
+      ''
+    ])
   }
   
-  // スプレッドシートにステータス列がない場合は、確認者列に確認済みマークを追加
-  const confirmer1Index = headers.indexOf('確認者1')
-  const confirmer2Index = headers.indexOf('確認者2')
-  const confirmer3Index = headers.indexOf('確認者3')
-  
-  // 空いている確認者列に承認者名を追加
-  const currentConfirmers = []
-  if (confirmer1Index !== -1) currentConfirmers.push(values[rowIndex - 1][confirmer1Index])
-  if (confirmer2Index !== -1) currentConfirmers.push(values[rowIndex - 1][confirmer2Index])
-  if (confirmer3Index !== -1) currentConfirmers.push(values[rowIndex - 1][confirmer3Index])
-  
-  if (!currentConfirmers.includes(approverName)) {
-    if (confirmer1Index !== -1 && !values[rowIndex - 1][confirmer1Index]) {
-      sheet.getRange(rowIndex, confirmer1Index + 1).setValue(approverName)
-    } else if (confirmer2Index !== -1 && !values[rowIndex - 1][confirmer2Index]) {
-      sheet.getRange(rowIndex, confirmer2Index + 1).setValue(approverName)
-    } else if (confirmer3Index !== -1 && !values[rowIndex - 1][confirmer3Index]) {
-      sheet.getRange(rowIndex, confirmer3Index + 1).setValue(approverName)
-    }
-  }
-  
-  return { success: true, id, status: '確認完了' }
+  return { success: true, id, status: '確認済' }
 }
 
 // ==========================================

@@ -209,7 +209,7 @@ export default function DashboardPage() {
     // 5. 情報収集データ（GAS経由で取得）
     const fetchInformations = async () => {
       try {
-        const infos = await getInformations()
+        const infos = await getInformations(user.name)
         const filtered = infos.filter(info => {
           if (info.ステータス !== '未確認') return false
           return info.確認担当者.includes(user.name)

@@ -189,8 +189,9 @@ export async function rejectExpense(
 // 情報収集データ取得
 // ==========================================
 
-export async function getInformations(): Promise<Information[]> {
-  const response = await callAppsScript('getInformations')
+export async function getInformations(userName?: string): Promise<Information[]> {
+  const params = userName ? { userName } : undefined
+  const response = await callAppsScript('getInformations', params)
   
   if (response.error) {
     throw new Error(response.error)
@@ -201,12 +202,14 @@ export async function getInformations(): Promise<Information[]> {
 
 export async function confirmInformation(
   id: string,
-  approverName: string
+  approverName: string,
+  comment?: string
 ): Promise<InformationResponse> {
   const response = await postAppsScript({
     action: 'confirmInformation',
     id,
     approverName,
+    comment,
   })
 
   if (response.error) {
