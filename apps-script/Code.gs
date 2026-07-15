@@ -330,13 +330,14 @@ function getInformations(e) {
   
   // 確認履歴をマップ化（報告ID → 該当ユーザーの確認済みレコード）
   const reviewMap = {}
-  if (userEmployeeId && reviewReportIdIndex !== -1 && reviewReviewerIdIndex !== -1 && reviewStatusIndex !== -1) {
+  if (reviewReportIdIndex !== -1 && reviewReviewerIdIndex !== -1 && reviewStatusIndex !== -1) {
     reviewRows.forEach(row => {
       const reportId = row[reviewReportIdIndex]
       const reviewerId = String(row[reviewReviewerIdIndex])
       const status = row[reviewStatusIndex]
       
-      if (reviewerId === userEmployeeId && status === '確認済') {
+      // ハイブリッド判定：社員IDまたはユーザー名のどちらかと一致すればOK
+      if ((reviewerId === userEmployeeId || reviewerId === userName) && status === '確認済') {
         reviewMap[String(reportId)] = true
       }
     })
@@ -424,7 +425,7 @@ function confirmInformation(data) {
   const reviewDateTimeIndex = reviewHeaders.indexOf('確認日時')
   const reviewTransferIndex = reviewHeaders.indexOf('転送先')
   
-  // 該当する行を検索（報告IDが一致、確認上司が自分の社員ID、ステータスが未確認）
+  // 該当する行を検索（報告IDが一致、確認上司が自分の社員IDまたはユーザー名、ステータスが未確認）
   let targetRowIndex = -1
   for (let i = 0; i < reviewRows.length; i++) {
     const row = reviewRows[i]
@@ -432,7 +433,8 @@ function confirmInformation(data) {
     const reviewerId = String(row[reviewReviewerIdIndex])
     const status = row[reviewStatusIndex]
     
-    if (String(reportId) === String(id) && reviewerId === approverId && status === '未確認') {
+    // ハイブリッド判定：社員IDまたはユーザー名のどちらかと一致すればOK
+    if (String(reportId) === String(id) && (reviewerId === approverId || reviewerId === approverName) && status === '未確認') {
       targetRowIndex = i + 2 // 1-indexed（ヘッダー行を考慮）
       break
     }
