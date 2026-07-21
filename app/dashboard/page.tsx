@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const router = useRouter()
   
   const [view, setView] = useState<'top' | 'approvals'>('top')
+  const [sendHistoryOpen, setSendHistoryOpen] = useState(false)
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
   const [rawCirculations, setRawCirculations] = useState<Application[]>([])
@@ -648,52 +649,64 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-              <div className="flex justify-between items-center mb-4">
+              <button
+                type="button"
+                onClick={() => setSendHistoryOpen(prev => !prev)}
+                className="w-full flex justify-between items-center group"
+                aria-expanded={sendHistoryOpen}
+              >
                 <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
                   <span>📋</span> 送信一覧 <span className="text-sm font-normal text-slate-500">（自分の申請履歴）</span>
                 </h2>
-              </div>
-              {myApplications.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
-                  あなたが送信した申請はまだありません
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-800">
-                        <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
-                        <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
-                        <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
-                        <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {myApplications.map(app => (
-                        <tr 
-                          key={app.id} 
-                          className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                          onClick={() => handleApplicationClick(app, 'sent')}
-                        >
-                          <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
-                          <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
-                          <td className="py-3.5 px-4 text-sm">
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                              app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                              app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                              'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}>
-                              {app.workflow.status}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-sm text-slate-400">
-                            {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <span className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${sendHistoryOpen ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </button>
+              {sendHistoryOpen && (
+                <div className="mt-4">
+                  {myApplications.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                      あなたが送信した申請はまだありません
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                          {myApplications.map(app => (
+                            <tr 
+                              key={app.id} 
+                              className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
+                              onClick={() => handleApplicationClick(app, 'sent')}
+                            >
+                              <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
+                              <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
+                              <td className="py-3.5 px-4 text-sm">
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                                  app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                  app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                  app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                  'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
+                                  {app.workflow.status}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-sm text-slate-400">
+                                {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
