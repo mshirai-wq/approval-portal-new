@@ -229,8 +229,15 @@ export default function DashboardPage() {
     const loadExpenses = async () => {
       if (!user?.email) return
       try {
-        const exps = await getExpenses('承認待ち')
-        setExpenses(exps)
+        const exps = await getExpenses(undefined)
+        // フロントエンドで承認待ちかつ自分宛てのデータをフィルタリング
+        const filtered = exps.filter(exp => {
+          const status = (exp.承認ステータス || '').trim()
+          const approverEmail = (exp.承認者メールアドレス || '').trim().toLowerCase()
+          const myEmail = user.email.trim().toLowerCase()
+          return status === '承認待ち' && approverEmail === myEmail
+        })
+        setExpenses(filtered)
       } catch (error) {
         console.error('Error fetching expenses:', error)
       }
