@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { getInformations, confirmInformation, Information as AppSheetInformation } from '@/lib/appsheet'
+import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
 
 // 型定義の拡張
 interface Application {
@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [rawCirculations, setRawCirculations] = useState<Application[]>([])
   const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
   const [informations, setInformations] = useState<AppSheetInformation[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
   
   const [myApplications, setMyApplications] = useState<Application[]>([])
   const [selectedApplication, setSelectedApplication] = useState<Application | AppSheetInformation | null>(null)
@@ -223,6 +224,19 @@ export default function DashboardPage() {
 
     // 5. 情報収集データ（GAS経由で取得）
     loadInformations()
+
+    // 6. 経費申請データ（GAS経由で取得）
+    const loadExpenses = async () => {
+      if (!user?.email) return
+      try {
+        const exps = await getExpenses('承認待ち')
+        setExpenses(exps)
+      } catch (error) {
+        console.error('Error fetching expenses:', error)
+      }
+    }
+
+    loadExpenses()
 
     return () => {
       unsubscribeMyApps()
@@ -592,9 +606,11 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="flex items-center justify-between mt-4">
-                  <div className="flex gap-4 text-xs font-semibold">
+                  <div className="flex gap-2 text-xs font-semibold flex-wrap">
                     <span className="bg-red-500/10 text-red-400 px-2.5 py-1 rounded-md border border-red-500/20">承認待ち: {pendingApprovals.length}件</span>
                     <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-md border border-blue-500/20">回覧待ち: {circulations.length}件</span>
+                    <span className="bg-purple-500/10 text-purple-400 px-2.5 py-1 rounded-md border border-purple-500/20">情報収集: {informations.length}件</span>
+                    <span className="bg-green-500/10 text-green-400 px-2.5 py-1 rounded-md border border-green-500/20">経費申請: {expenses.length}件</span>
                   </div>
                   <span className="text-indigo-400 group-hover:translate-x-1.5 transition-transform font-bold text-lg">→</span>
                 </div>
@@ -782,9 +798,14 @@ export default function DashboardPage() {
                     <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
                       📊 AppSheet連携
                     </h2>
-                    <span className="text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2.5 py-1 rounded-full">
-                      情報収集: {informations.length}件
-                    </span>
+                    <div className="flex gap-2">
+                      <span className="text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2.5 py-1 rounded-full">
+                        情報収集: {informations.length}件
+                      </span>
+                      <span className="text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded-full">
+                        経費申請: {expenses.length}件
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-slate-400 text-xs mb-4">自分が確認担当者に設定されている未確認の情報</p>
