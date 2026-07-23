@@ -227,20 +227,28 @@ export default function DashboardPage() {
       } as Application))
 
       const filtered = apps.filter(app => {
-        if (app.workflow.allCirculators && app.workflow.allCirculators.length > 0) {
-          return app.workflow.allCirculators.includes(user.name)
-        }
+        const status = app.workflow.status
+        const currentStep = app.workflow.currentStep
         const steps = app.workflow.steps || {}
+        const stepData = currentStep ? steps[currentStep] : null
         const circulationsList = app.workflow.circulations || []
-        for (const [, stepData] of Object.entries(steps)) {
-          const step = stepData as any
-          if (step.status === '回覧待ち' && step.approvers?.includes(user.name)) {
-            return true
-          }
+        const allCirculators = app.workflow.allCirculators || []
+
+        // 承認段階（承認待ち）の申請は回覧一覧に出さない
+        // 自分が承認者の場合は承認待ち一覧で表示される
+        if (status === '承認待ち') return false
+
+        // 回覧段階： currentStep が回覧ステップで、自分がその回覧対象になっている場合
+        if (status === '回覧待ち') {
+          const currentApprovers = app.workflow.currentApprovers || (stepData?.approvers || [])
+          return currentApprovers.includes(user.name) || (stepData?.approvers || []).includes(user.name)
         }
-        if (circulationsList.includes(user.name)) {
-          return true
+
+        // 全承認完了後や回覧報告： circulations / allCirculators に自分が含まれる
+        if (status === '承認済み') {
+          return circulationsList.includes(user.name) || allCirculators.includes(user.name)
         }
+
         return false
       })
       setRawCirculations(filtered)
