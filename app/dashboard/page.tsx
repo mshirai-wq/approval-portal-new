@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, deleteDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
 
@@ -163,6 +163,7 @@ function ApplicationAccordion({
                           app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                           app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                           app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                          app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                           'bg-slate-800 text-slate-400 border-slate-700'
                         }`}>
                           {app.workflow.status}
@@ -849,12 +850,23 @@ export default function DashboardPage() {
       alert('承認済みの申請は取消できません')
       return
     }
-    if (!window.confirm('この申請を取り消しますか？\nこの操作は元に戻せません。')) return
+    if (!window.confirm('この申請を取り消しますか？')) return
 
     try {
-      await deleteDoc(doc(db, 'applications', selectedApplication.id))
-      setMyApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
-      setAllApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
+      const cancelledStatus = '取り消し'
+      await updateDoc(doc(db, 'applications', selectedApplication.id), {
+        'workflow.status': cancelledStatus,
+        'workflow.currentApprovers': [],
+        updatedAt: serverTimestamp()
+      })
+
+      const updateApp = (app: Application): Application => ({
+        ...app,
+        workflow: { ...app.workflow, status: cancelledStatus, currentApprovers: [] }
+      })
+
+      setMyApplications(prev => prev.map(app => app.id === selectedApplication.id ? updateApp(app) : app))
+      setAllApplications(prev => prev.map(app => app.id === selectedApplication.id ? updateApp(app) : app))
       setRejectedApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
       setCompletedApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
       setShowDetailModal(false)
@@ -1040,6 +1052,7 @@ export default function DashboardPage() {
                                   app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                   app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                   app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                  app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                   'bg-slate-800 text-slate-400 border-slate-700'
                                 }`}>
                                   {app.workflow.status}
@@ -1118,6 +1131,7 @@ export default function DashboardPage() {
                                     app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                     app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                     app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                     'bg-slate-800 text-slate-400 border-slate-700'
                                   }`}>
                                     {app.workflow.status}
@@ -1392,6 +1406,7 @@ export default function DashboardPage() {
                         selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                         selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                         selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                        selectedApplication.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                         'bg-rose-500/10 text-rose-400 border-rose-500/20'
                       }`}>
                         {selectedApplication.workflow.status}
