@@ -385,7 +385,8 @@ export default function CreatePage() {
           stepsObj[dbKey] = {
             approvers,
             status: isCirculation ? '回覧待ち' : '承認待ち',
-            comments: []
+            comments: [],
+            approvedBy: []
           }
         })
       }

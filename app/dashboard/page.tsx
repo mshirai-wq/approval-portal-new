@@ -198,15 +198,21 @@ export default function DashboardPage() {
       } as Application))
       
       const filtered = apps.filter(app => {
-        if (app.workflow.currentApprovers && app.workflow.currentApprovers.length > 0) {
-          return app.workflow.currentApprovers.includes(user.name)
-        }
         const currentStep = app.workflow.currentStep
         const steps = app.workflow.steps || {}
         const currentStepData = steps[currentStep]
         if (!currentStepData) return false
+        const approvedBy = currentStepData.approvedBy || []
+        // 自分が既にこのステップを承認済みなら承認待ち一覧に出さない
+        if (approvedBy.includes(user.name)) return false
+
         const approvers = currentStepData.approvers || []
-        return approvers.includes(user.name)
+        if (approvers.includes(user.name)) return true
+
+        if (app.workflow.currentApprovers && app.workflow.currentApprovers.length > 0) {
+          return app.workflow.currentApprovers.includes(user.name)
+        }
+        return false
       })
       setPendingApprovals(filtered)
     }, (error) => {
@@ -424,21 +430,31 @@ export default function DashboardPage() {
     try {
       const workflow = selectedApplication.workflow
       const steps = workflow.steps || {}
-      
       const stepNames = workflow.stepOrder || Object.keys(steps)
-      let currentIndex = stepNames.indexOf(workflow.currentStep)
 
-      let nextStepName = ''
-      let nextApprovers: string[] = []
+      const currentStepName = workflow.currentStep
+      const currentStepData = steps[currentStepName] || {}
+      const currentApprovers: string[] = currentStepData.approvers || []
+      const alreadyApprovedBy: string[] = currentStepData.approvedBy || []
+
+      const newApprovedBy = Array.from(new Set([...alreadyApprovedBy, user.name]))
+      const allCurrentApproved = currentApprovers.length > 0 && currentApprovers.every(name => newApprovedBy.includes(name))
+
+      let nextStepName = currentStepName
+      let nextApprovers: string[] = currentApprovers
       let nextStatus = workflow.status
+      let didAdvance = false
       const skippedSteps: string[] = []
 
-      if (action === 'approve') {
+      if (action === 'approve' && allCurrentApproved) {
+        didAdvance = true
+        let currentIndex = stepNames.indexOf(currentStepName)
+
         while (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
           currentIndex++
           const candidateStep = stepNames[currentIndex]
           const candidateApprovers = steps[candidateStep]?.approvers || []
-          
+
           if (candidateApprovers.length > 0) {
             nextStepName = candidateStep
             nextApprovers = candidateApprovers
@@ -449,15 +465,15 @@ export default function DashboardPage() {
           }
         }
 
-        if (!nextStepName) {
+        if (nextStepName === currentStepName) {
           nextStepName = '完了'
           nextStatus = '承認済み'
           nextApprovers = []
         }
-      } else {
-        nextStepName = workflow.currentStep
+      } else if (action === 'reject') {
+        nextStepName = currentStepName
         nextStatus = '差し戻し'
-        nextApprovers = [] 
+        nextApprovers = []
       }
 
       const updateData: any = {
@@ -467,21 +483,26 @@ export default function DashboardPage() {
         updatedAt: serverTimestamp()
       }
 
-      if (workflow.currentStep && steps[workflow.currentStep]) {
-        updateData[`workflow.steps.${workflow.currentStep}.status`] = action === 'approve' ? '承認済み' : '差し戻し'
+      if (currentStepName && steps[currentStepName]) {
+        updateData[`workflow.steps.${currentStepName}.approvedBy`] = newApprovedBy
+        if (action === 'approve' && allCurrentApproved) {
+          updateData[`workflow.steps.${currentStepName}.status`] = '承認済み'
+        } else if (action === 'reject') {
+          updateData[`workflow.steps.${currentStepName}.status`] = '差し戻し'
+        }
       }
 
-      if (action === 'approve' && skippedSteps.length > 0) {
+      if (action === 'approve' && allCurrentApproved && skippedSteps.length > 0) {
         skippedSteps.forEach(step => {
           updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
         })
       }
 
       await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
-      
+
       await addDoc(collection(db, 'approvals'), {
         applicationId: selectedApplication.id,
-        stepName: selectedApplication.workflow.currentStep,
+        stepName: currentStepName,
         approverId: user.id,
         approverName: user.name,
         action,
@@ -489,7 +510,7 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      if (action === 'approve' && nextApprovers.length > 0) {
+      if (action === 'approve' && didAdvance && nextApprovers.length > 0) {
         await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
       } else if (action === 'reject') {
         await sendRejectNotification(selectedApplication, user.name, comment)
@@ -516,6 +537,7 @@ export default function DashboardPage() {
         'workflow.status': '承認待ち',
         'workflow.currentApprovers': originalApprovers,
         [`workflow.steps.${currentStep}.status`]: '承認待ち',
+        [`workflow.steps.${currentStep}.approvedBy`]: [],
         'description': newDescription,
         'remarks': newRemarks,
         updatedAt: serverTimestamp()
