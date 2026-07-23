@@ -94,6 +94,95 @@ function PaginationControls({
   )
 }
 
+function ApplicationAccordion({
+  title,
+  subtitle,
+  isOpen,
+  onToggle,
+  loading,
+  applications,
+  onItemClick,
+  emptyMessage
+}: {
+  title: string
+  subtitle?: string
+  isOpen: boolean
+  onToggle: () => void
+  loading: boolean
+  applications: Application[]
+  onItemClick: (app: Application) => void
+  emptyMessage: string
+}) {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex justify-between items-center group"
+        aria-expanded={isOpen}
+      >
+        <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
+          {title} {subtitle && <span className="text-sm font-normal text-slate-500">{subtitle}</span>}
+        </h2>
+        <span className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isOpen && (
+        <div className="mt-4">
+          {loading ? (
+            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+              読み込み中...
+            </div>
+          ) : applications.length === 0 ? (
+            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+              {emptyMessage}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {applications.map(app => (
+                    <tr
+                      key={app.id}
+                      className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
+                      onClick={() => onItemClick(app)}
+                    >
+                      <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
+                      <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
+                      <td className="py-3.5 px-4 text-sm">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
+                          app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                          app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                          app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                          'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {app.workflow.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-sm text-slate-400">
+                        {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
@@ -115,6 +204,12 @@ export default function DashboardPage() {
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
   const [rawCirculations, setRawCirculations] = useState<Application[]>([])
+  const [rejectedApplications, setRejectedApplications] = useState<Application[]>([])
+  const [rejectedAppsOpen, setRejectedAppsOpen] = useState(false)
+  const [loadingRejectedApps, setLoadingRejectedApps] = useState(false)
+  const [completedApplications, setCompletedApplications] = useState<Application[]>([])
+  const [completedAppsOpen, setCompletedAppsOpen] = useState(false)
+  const [loadingCompletedApps, setLoadingCompletedApps] = useState(false)
   const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
   const [informations, setInformations] = useState<AppSheetInformation[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -407,6 +502,52 @@ export default function DashboardPage() {
     return allApplications.filter(app => app.applicantId !== user.id)
   }, [allApplications, user])
 
+  const fetchRejectedApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingRejectedApps(true)
+    try {
+      const q = query(
+        collection(db, 'applications'),
+        where('applicantId', '==', user.id),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      )
+      const snapshot = await getDocs(q)
+      const apps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setRejectedApplications(apps.filter(app => app.workflow.status === '差し戻し'))
+    } catch (error) {
+      console.error('Error fetching rejected applications:', error)
+    } finally {
+      setLoadingRejectedApps(false)
+    }
+  }, [user])
+
+  const fetchCompletedApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingCompletedApps(true)
+    try {
+      const q = query(
+        collection(db, 'applications'),
+        where('applicantId', '==', user.id),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      )
+      const snapshot = await getDocs(q)
+      const apps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setCompletedApplications(apps.filter(app => app.workflow.status === '承認済み'))
+    } catch (error) {
+      console.error('Error fetching completed applications:', error)
+    } finally {
+      setLoadingCompletedApps(false)
+    }
+  }, [user])
+
   // 送信一覧の遅延読み込み
   useEffect(() => {
     if (!sendHistoryOpen) return
@@ -418,6 +559,18 @@ export default function DashboardPage() {
     if (!allAppsOpen) return
     fetchAllApplications(allAppsPage)
   }, [allAppsOpen, allAppsPage, fetchAllApplications])
+
+  // 差し戻し申請の遅延読み込み
+  useEffect(() => {
+    if (!rejectedAppsOpen) return
+    fetchRejectedApplications()
+  }, [rejectedAppsOpen, fetchRejectedApplications])
+
+  // 完了済み申請の遅延読み込み
+  useEffect(() => {
+    if (!completedAppsOpen) return
+    fetchCompletedApplications()
+  }, [completedAppsOpen, fetchCompletedApplications])
 
   const handleInformationClick = (info: AppSheetInformation) => {
     setSelectedApplication(info)
@@ -702,6 +855,8 @@ export default function DashboardPage() {
       await deleteDoc(doc(db, 'applications', selectedApplication.id))
       setMyApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
       setAllApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
+      setRejectedApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
+      setCompletedApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
@@ -989,6 +1144,28 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
+
+            <ApplicationAccordion
+              title="差し戻しされた申請"
+              subtitle="（再申請が必要な自分の申請）"
+              isOpen={rejectedAppsOpen}
+              onToggle={() => setRejectedAppsOpen(prev => !prev)}
+              loading={loadingRejectedApps}
+              applications={rejectedApplications}
+              onItemClick={(app) => handleApplicationClick(app, 'sent')}
+              emptyMessage="差し戻しされた申請はありません"
+            />
+
+            <ApplicationAccordion
+              title="承認完了した申請"
+              subtitle="（すべての段階で承認済みの自分の申請）"
+              isOpen={completedAppsOpen}
+              onToggle={() => setCompletedAppsOpen(prev => !prev)}
+              loading={loadingCompletedApps}
+              applications={completedApplications}
+              onItemClick={(app) => handleApplicationClick(app, 'sent')}
+              emptyMessage="承認完了した申請はありません"
+            />
           </div>
         )}
 
