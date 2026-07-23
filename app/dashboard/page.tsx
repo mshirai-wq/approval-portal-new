@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, deleteDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
 
@@ -686,6 +686,32 @@ export default function DashboardPage() {
     }
   }
 
+  const handleDeleteApplication = async () => {
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
+    if (selectedApplication.applicantId !== user.id) {
+      alert('申請者のみ取消できます')
+      return
+    }
+    if (selectedApplication.workflow.status === '承認済み') {
+      alert('承認済みの申請は取消できません')
+      return
+    }
+    if (!window.confirm('この申請を取り消しますか？\nこの操作は元に戻せません。')) return
+
+    try {
+      await deleteDoc(doc(db, 'applications', selectedApplication.id))
+      setMyApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
+      setAllApplications(prev => prev.filter(app => app.id !== selectedApplication.id))
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+      setModalSource(null)
+      alert('申請を取り消しました')
+    } catch (error) {
+      console.error('Delete application error:', error)
+      alert('取消に失敗しました')
+    }
+  }
+
   const attachedImages = useMemo(() => {
     if (!selectedApplication) return []
     const urls: string[] = []
@@ -1365,6 +1391,17 @@ export default function DashboardPage() {
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           回覧を確認
+                        </button>
+                      </div>
+                    )}
+
+                    {modalSource === 'sent' && selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <button
+                          onClick={handleDeleteApplication}
+                          className="w-full bg-rose-950/30 border border-rose-500/30 hover:bg-rose-900/40 text-rose-400 font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 text-sm tracking-wide"
+                        >
+                          申請を取り消す
                         </button>
                       </div>
                     )}
