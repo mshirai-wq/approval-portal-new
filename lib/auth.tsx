@@ -19,6 +19,7 @@ interface User {
   email: string
   title: string
   department: string
+  canViewAllApplications?: boolean
 }
 
 interface AuthContextType {

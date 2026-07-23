@@ -12,6 +12,7 @@ interface User {
   email: string
   title: string
   department: string
+  canViewAllApplications?: boolean
   createdAt: any
 }
 
@@ -25,7 +26,8 @@ export default function AdminUsersPage() {
     name: '',
     email: '',
     title: '',
-    department: ''
+    department: '',
+    canViewAllApplications: false
   })
   const [processing, setProcessing] = useState(false)
 
@@ -82,7 +84,7 @@ export default function AdminUsersPage() {
 
       setShowModal(false)
       setEditingUser(null)
-      setFormData({ name: '', email: '', title: '', department: '' })
+      setFormData({ name: '', email: '', title: '', department: '', canViewAllApplications: false })
       fetchUsers()
     } catch (error) {
       console.error('Error saving user:', error)
@@ -98,7 +100,8 @@ export default function AdminUsersPage() {
       name: user.name,
       email: user.email,
       title: user.title,
-      department: user.department
+      department: user.department,
+      canViewAllApplications: user.canViewAllApplications || false
     })
     setShowModal(true)
   }
@@ -117,7 +120,7 @@ export default function AdminUsersPage() {
 
   const handleAddUser = () => {
     setEditingUser(null)
-    setFormData({ name: '', email: '', title: '', department: '' })
+    setFormData({ name: '', email: '', title: '', department: '', canViewAllApplications: false })
     setShowModal(true)
   }
 
@@ -303,6 +306,18 @@ export default function AdminUsersPage() {
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="canViewAllApplications"
+                    type="checkbox"
+                    checked={formData.canViewAllApplications}
+                    onChange={(e) => setFormData({ ...formData, canViewAllApplications: e.target.checked })}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="canViewAllApplications" className="text-sm font-medium text-gray-700">
+                    全社員の申請を閲覧可能にする
+                  </label>
                 </div>
                 <div className="flex gap-4 pt-4">
                   <button
