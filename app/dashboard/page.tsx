@@ -102,7 +102,8 @@ function ApplicationAccordion({
   loading,
   applications,
   onItemClick,
-  emptyMessage
+  emptyMessage,
+  showCount = false
 }: {
   title: string
   subtitle?: string
@@ -112,6 +113,7 @@ function ApplicationAccordion({
   applications: Application[]
   onItemClick: (app: Application) => void
   emptyMessage: string
+  showCount?: boolean
 }) {
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
@@ -122,7 +124,13 @@ function ApplicationAccordion({
         aria-expanded={isOpen}
       >
         <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
-          {title} {subtitle && <span className="text-sm font-normal text-slate-500">{subtitle}</span>}
+          {title}
+          {showCount && (
+            <span className="ml-1 px-2 py-0.5 text-xs font-semibold bg-slate-700 text-slate-300 rounded-full">
+              {applications.length}件
+            </span>
+          )}
+          {subtitle && <span className="text-sm font-normal text-slate-500">{subtitle}</span>}
         </h2>
         <span className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
           ▼
@@ -1168,6 +1176,7 @@ export default function DashboardPage() {
               applications={rejectedApplications}
               onItemClick={(app) => handleApplicationClick(app, 'sent')}
               emptyMessage="差し戻しされた申請はありません"
+              showCount={true}
             />
 
             <ApplicationAccordion
