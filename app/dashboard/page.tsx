@@ -2,8 +2,8 @@
 
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs } from 'firebase/firestore'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
 
@@ -49,14 +49,69 @@ function isApplication(app: Application | AppSheetInformation | null): app is Ap
   return app !== null && 'workflow' in app;
 }
 
+function PaginationControls({
+  page,
+  hasNext,
+  loading,
+  onPrev,
+  onNext,
+  onRefresh
+}: {
+  page: number
+  hasNext: boolean
+  loading: boolean
+  onPrev: () => void
+  onNext: () => void
+  onRefresh: () => void
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-800">
+      <button
+        onClick={onRefresh}
+        disabled={loading}
+        className="text-sm font-medium text-cyan-400 hover:text-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        🔄 最新情報に更新
+      </button>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onPrev}
+          disabled={page <= 1 || loading}
+          className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 text-sm hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          前へ
+        </button>
+        <span className="text-sm text-slate-400 min-w-[70px] text-center">Page {page}</span>
+        <button
+          onClick={onNext}
+          disabled={!hasNext || loading}
+          className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 text-sm hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          次へ
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
   
   const [view, setView] = useState<'top' | 'approvals'>('top')
   const [sendHistoryOpen, setSendHistoryOpen] = useState(false)
+  const [myApplications, setMyApplications] = useState<Application[]>([])
+  const [myAppsPage, setMyAppsPage] = useState(1)
+  const [loadingMyApps, setLoadingMyApps] = useState(false)
+  const [myAppsHasNext, setMyAppsHasNext] = useState(false)
+  const myAppsCursorsRef = useRef<any[]>([])
+
   const [allApplications, setAllApplications] = useState<Application[]>([])
   const [allAppsOpen, setAllAppsOpen] = useState(false)
+  const [allAppsPage, setAllAppsPage] = useState(1)
+  const [loadingAllApps, setLoadingAllApps] = useState(false)
+  const [allAppsHasNext, setAllAppsHasNext] = useState(false)
+  const allAppsCursorsRef = useRef<any[]>([])
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
   const [rawCirculations, setRawCirculations] = useState<Application[]>([])
@@ -64,7 +119,6 @@ export default function DashboardPage() {
   const [informations, setInformations] = useState<AppSheetInformation[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   
-  const [myApplications, setMyApplications] = useState<Application[]>([])
   const [selectedApplication, setSelectedApplication] = useState<Application | AppSheetInformation | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
@@ -128,47 +182,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
-
-    // 1. 自分の申請一覧
-    const myAppsQuery = query(
-      collection(db, 'applications'),
-      where('applicantId', '==', user.id),
-      orderBy('createdAt', 'desc'),
-      limit(30)
-    )
-
-    const unsubscribeMyApps = onSnapshot(myAppsQuery, (snapshot) => {
-      const apps = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Application))
-      setMyApplications(apps)
-    }, (error) => {
-      console.error('Error fetching my applications:', error)
-    })
-
-    // 1.5 全社員の申請一覧（閲覧権限があるユーザーのみ）
-    let unsubscribeAllApps: (() => void) | undefined
-
-    if (user?.canViewAllApplications) {
-      const allAppsQuery = query(
-        collection(db, 'applications'),
-        orderBy('createdAt', 'desc'),
-        limit(100)
-      )
-
-      unsubscribeAllApps = onSnapshot(allAppsQuery, (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Application))
-        setAllApplications(apps)
-      }, (error) => {
-        console.error('Error fetching all applications:', error)
-      })
-    } else {
-      setAllApplications([])
-    }
 
     // 2. 承認待ち一覧
     const allAppsQuery = query(
@@ -272,8 +285,6 @@ export default function DashboardPage() {
     loadExpenses()
 
     return () => {
-      unsubscribeMyApps()
-      if (unsubscribeAllApps) unsubscribeAllApps()
       unsubscribePending()
       unsubscribeCirculation()
       unsubscribeConfirmed()
@@ -298,6 +309,101 @@ export default function DashboardPage() {
     setShowDetailModal(true)
     setModalSource(source)
   }
+
+  const fetchMyApplications = useCallback(async (page: number) => {
+    if (!user) return
+    setLoadingMyApps(true)
+    try {
+      const cursor = page > 1 ? myAppsCursorsRef.current[page - 2] : undefined
+      let q
+      if (cursor) {
+        q = query(
+          collection(db, 'applications'),
+          where('applicantId', '==', user.id),
+          orderBy('createdAt', 'desc'),
+          startAfter(cursor),
+          limit(31)
+        )
+      } else {
+        q = query(
+          collection(db, 'applications'),
+          where('applicantId', '==', user.id),
+          orderBy('createdAt', 'desc'),
+          limit(31)
+        )
+      }
+      const snapshot = await getDocs(q)
+      const docs = snapshot.docs
+      const apps = docs.slice(0, 30).map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setMyApplications(apps)
+      if (docs.length >= 30) {
+        myAppsCursorsRef.current[page - 1] = docs[29]
+      }
+      setMyAppsHasNext(docs.length > 30)
+    } catch (error) {
+      console.error('Error fetching my applications:', error)
+    } finally {
+      setLoadingMyApps(false)
+    }
+  }, [user])
+
+  const fetchAllApplications = useCallback(async (page: number) => {
+    if (!user || !user.canViewAllApplications) return
+    setLoadingAllApps(true)
+    try {
+      const cursor = page > 1 ? allAppsCursorsRef.current[page - 2] : undefined
+      let q
+      if (cursor) {
+        q = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          startAfter(cursor),
+          limit(31)
+        )
+      } else {
+        q = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          limit(31)
+        )
+      }
+      const snapshot = await getDocs(q)
+      const docs = snapshot.docs
+      const apps = docs.slice(0, 30).map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setAllApplications(apps)
+      if (docs.length >= 30) {
+        allAppsCursorsRef.current[page - 1] = docs[29]
+      }
+      setAllAppsHasNext(docs.length > 30)
+    } catch (error) {
+      console.error('Error fetching all applications:', error)
+    } finally {
+      setLoadingAllApps(false)
+    }
+  }, [user])
+
+  const visibleAllApplications = useMemo(() => {
+    if (!user) return []
+    return allApplications.filter(app => app.applicantId !== user.id)
+  }, [allApplications, user])
+
+  // 送信一覧の遅延読み込み
+  useEffect(() => {
+    if (!sendHistoryOpen) return
+    fetchMyApplications(myAppsPage)
+  }, [sendHistoryOpen, myAppsPage, fetchMyApplications])
+
+  // 全社員申請一覧の遅延読み込み
+  useEffect(() => {
+    if (!allAppsOpen) return
+    fetchAllApplications(allAppsPage)
+  }, [allAppsOpen, allAppsPage, fetchAllApplications])
 
   const handleInformationClick = (info: AppSheetInformation) => {
     setSelectedApplication(info)
@@ -690,7 +796,11 @@ export default function DashboardPage() {
               </button>
               {sendHistoryOpen && (
                 <div className="mt-4">
-                  {myApplications.length === 0 ? (
+                  {loadingMyApps ? (
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+                      読み込み中...
+                    </div>
+                  ) : myApplications.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
                       あなたが送信した申請はまだありません
                     </div>
@@ -731,6 +841,14 @@ export default function DashboardPage() {
                           ))}
                         </tbody>
                       </table>
+                      <PaginationControls
+                        page={myAppsPage}
+                        hasNext={myAppsHasNext}
+                        loading={loadingMyApps}
+                        onPrev={() => setMyAppsPage(p => p - 1)}
+                        onNext={() => setMyAppsPage(p => p + 1)}
+                        onRefresh={() => fetchMyApplications(myAppsPage)}
+                      />
                     </div>
                   )}
                 </div>
@@ -754,7 +872,11 @@ export default function DashboardPage() {
                 </button>
                 {allAppsOpen && (
                   <div className="mt-4">
-                    {allApplications.filter(app => user ? app.applicantId !== user.id : false).length === 0 ? (
+                    {loadingAllApps ? (
+                      <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+                        読み込み中...
+                      </div>
+                    ) : visibleAllApplications.length === 0 ? (
                       <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
                         他の社員の申請はまだありません
                       </div>
@@ -771,7 +893,7 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/50">
-                            {allApplications.filter(app => user ? app.applicantId !== user.id : false).map(app => (
+                            {visibleAllApplications.map(app => (
                               <tr
                                 key={app.id}
                                 className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
@@ -797,6 +919,14 @@ export default function DashboardPage() {
                             ))}
                           </tbody>
                         </table>
+                        <PaginationControls
+                          page={allAppsPage}
+                          hasNext={allAppsHasNext}
+                          loading={loadingAllApps}
+                          onPrev={() => setAllAppsPage(p => p - 1)}
+                          onNext={() => setAllAppsPage(p => p + 1)}
+                          onRefresh={() => fetchAllApplications(allAppsPage)}
+                        />
                       </div>
                     )}
                   </div>
