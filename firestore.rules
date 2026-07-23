@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ユーザー認証チェック
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // 管理者チェック
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'm.shirai@yunia.co.jp';
+    }
+    
+    // ユーザーID一致チェック（コレクションごとのフィールド名に対応）
+    // アプリではユーザーのメールアドレスを id として扱っているため、uid または email で照合する
+    function isOwner(collectionName) {
+      return isAuthenticated() && (
+        // applications: applicantId
+        (collectionName == 'applications' && (request.auth.uid == resource.data.applicantId || request.auth.token.email == resource.data.applicantId)) ||
+        // approvals: approverId
+        (collectionName == 'approvals' && (request.auth.uid == resource.data.approverId || request.auth.token.email == resource.data.approverId)) ||
+        // circulations: userId
+        (collectionName == 'circulations' && (request.auth.uid == resource.data.userId || request.auth.token.email == resource.data.userId))
+      );
+    }
+    
+    // ユーザー作成・更新権限（管理者のみ全ユーザー編集可能）
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // 申請書コレクション
+    match /applications/{applicationId} {
+      // 読み取り: 認証済みユーザー全員
+      allow read: if isAuthenticated();
+      
+      // 作成: 認証済みユーザーのみ（applicantIdが自分のuidまたはメールアドレスであることを確認）
+      allow create: if isAuthenticated() && (
+        request.resource.data.applicantId == request.auth.uid ||
+        request.resource.data.applicantId == request.auth.token.email
+      );
+      
+      // 更新: 申請者本人、または現在の承認者（workflow.currentApproversに含まれるユーザー名またはuid）
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.applicantId ||
+        request.auth.token.email == resource.data.applicantId ||
+        request.auth.uid in resource.data.workflow.currentApprovers ||
+        (request.auth.token.name != null && request.auth.token.name in resource.data.workflow.currentApprovers)
+      );
+      
+      // 削除: 申請者本人のみ
+      allow delete: if isOwner('applications');
+    }
+    
+    // 承認履歴コレクション
+    match /approvals/{approvalId} {
+      // 読み取り: 認証済みユーザー全員
+      allow read: if isAuthenticated();
+      
+      // 作成: 認証済みユーザーのみ（approverIdが自分のuidまたはメールアドレスであることを確認）
+      allow create: if isAuthenticated() && (
+        request.resource.data.approverId == request.auth.uid ||
+        request.resource.data.approverId == request.auth.token.email
+      );
+      
+      // 更新: 承認者本人のみ
+      allow update: if isOwner('approvals');
+      
+      // 削除: 承認者本人のみ
+      allow delete: if isOwner('approvals');
+    }
+    
+    // 回覧コレクション
+    match /circulations/{circulationId} {
+      // 読み取り: 認証済みユーザー全員
+      allow read: if isAuthenticated();
+      
+      // 作成: 認証済みユーザーのみ（userIdが自分のuidまたはメールアドレスであることを確認）
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.token.email
+      );
+      
+      // 更新: 回覧者本人のみ
+      allow update: if isOwner('circulations');
+      
+      // 削除: 回覧者本人のみ
+      allow delete: if isOwner('circulations');
+    }
+  }
+}
