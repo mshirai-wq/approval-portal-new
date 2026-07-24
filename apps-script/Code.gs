@@ -139,7 +139,16 @@ function getExpense(e) {
           const subFolder = subFolders.next();
           const files = subFolder.getFilesByName(fileName);
           if (files.hasNext()) {
-            expense['driveFileId'] = files.next().getId(); // 詳細画面の裏側でのみIDを特定
+            const file = files.next();
+            try {
+              // 詳細プレビュー用にリンクを知っている全員が閲覧できるように設定
+              file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+            } catch (shareErr) {
+              console.error('共有設定に失敗しました: ', shareErr)
+            }
+            expense['driveFileId'] = file.getId()
+            expense['mimeType'] = file.getMimeType()
+            expense['fileName'] = file.getName()
           }
         }
       }

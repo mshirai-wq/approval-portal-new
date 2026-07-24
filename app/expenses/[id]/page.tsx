@@ -28,6 +28,8 @@ interface ExtendedExpense {
   承認日時?: string
   承認コメント?: string
   driveFileId?: string // GAS側から送られてくるドライブのファイルID
+  mimeType?: string // GAS側から送られてくるMIMEタイプ
+  fileName?: string // GAS側から送られてくるファイル名
 }
 
 export default function ExpenseDetailPage() {
@@ -41,6 +43,7 @@ export default function ExpenseDetailPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [comment, setComment] = useState('')
+  const [imageError, setImageError] = useState(false)
 
   const fetchExpense = async () => {
     try {
@@ -60,29 +63,57 @@ export default function ExpenseDetailPage() {
   }, [id])
 
   // Google DriveのプレビューURL生成ロジック
-  const driveUrls = useMemo(() => {
-    if (!expense) return null
+  const driveFile = useMemo(() => {
+    if (!expense || !expense.添付資料) return null
+
+    let fileId: string | null = null
+    let fileName = expense.fileName || ''
 
     if (expense.driveFileId && typeof expense.driveFileId === 'string' && expense.driveFileId.trim() !== '') {
-      return {
-        preview: `https://drive.google.com/file/d/${expense.driveFileId}/preview`,
-        view: `https://drive.google.com/file/d/${expense.driveFileId}/view`
-      }
+      fileId = expense.driveFileId
+    } else if (expense.添付資料.startsWith('http')) {
+      const dMatch = expense.添付資料.match(/\/d\/([a-zA-Z0-9-_]+)/)
+      const idMatch = expense.添付資料.match(/[?&]id=([a-zA-Z0-9-_]+)/)
+      fileId = dMatch ? dMatch[1] : (idMatch ? idMatch[1] : null)
+    } else if (expense.添付資料.indexOf('添付資料/') === 0) {
+      const parts = expense.添付資料.split('/')
+      fileName = parts[parts.length - 1] || ''
     }
-    
-    if (expense.添付資料 && expense.添付資料.startsWith('http')) {
-      const match = expense.添付資料.match(/\/d\/([a-zA-Z0-9-_]+)/)
-      const fileId = match ? match[1] : null
-      if (fileId) {
-        return {
-          preview: `https://drive.google.com/file/d/${fileId}/preview`,
-          view: `https://drive.google.com/file/d/${fileId}/view`
-        }
+
+    if (!fileId) return null
+
+    const getMimeFromName = (name: string) => {
+      const ext = name.split('.').pop()?.toLowerCase()
+      const map: Record<string, string> = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp', svg: 'image/svg+xml',
+        pdf: 'application/pdf',
+        doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        txt: 'text/plain'
       }
+      return ext ? map[ext] : undefined
     }
-    
-    return null
+
+    const mimeType = expense.mimeType || getMimeFromName(fileName) || ''
+    const isImage = mimeType.startsWith('image/')
+    const isPdf = mimeType === 'application/pdf'
+
+    return {
+      fileId,
+      fileName,
+      mimeType,
+      isImage,
+      isPdf,
+      imageUrl: `https://drive.google.com/uc?id=${fileId}&export=view`,
+      previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+      viewUrl: `https://drive.google.com/file/d/${fileId}/view`
+    }
   }, [expense])
+
+  useEffect(() => {
+    setImageError(false)
+  }, [driveFile?.imageUrl])
 
   const handleApprove = async () => {
     if (!user) return
@@ -342,20 +373,34 @@ export default function ExpenseDetailPage() {
                 <div className="mt-6 pt-4 border-t border-slate-800/60">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">添付資料・証憑プレビュー</label>
                   
-                  {driveUrls ? (
+                  {driveFile && !imageError ? (
                     <div className="space-y-3">
-                      <div className="w-full h-[550px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner relative">
-                        <iframe 
-                          src={driveUrls.preview}
-                          className="w-full h-full border-0"
-                          allow="autoplay"
-                          title="file-preview"
-                        />
+                      <div className="w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner relative">
+                        {driveFile.isImage ? (
+                          <img
+                            src={driveFile.imageUrl}
+                            alt={driveFile.fileName || '添付資料'}
+                            className="w-full h-auto max-h-[70vh] object-contain"
+                            onError={() => setImageError(true)}
+                          />
+                        ) : driveFile.isPdf ? (
+                          <iframe
+                            src={driveFile.previewUrl}
+                            className="w-full h-[550px] border-0"
+                            allow="autoplay"
+                            title="file-preview"
+                            sandbox="allow-scripts allow-same-origin allow-popups"
+                          />
+                        ) : (
+                          <div className="p-8 text-center text-slate-400 text-sm">
+                            プレビューに対応していないファイル形式です
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
-                        <a 
-                          href={driveUrls.view} 
-                          target="_blank" 
+                        <a
+                          href={driveFile.viewUrl}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs font-bold text-indigo-400 hover:text-indigo-300 underline group"
                         >
@@ -366,10 +411,22 @@ export default function ExpenseDetailPage() {
                     </div>
                   ) : (
                     <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-4">
-                      <p className="text-xs text-slate-500 mb-2">⚠️ 現在プレビュー生成用データを準備中です（GAS連携の反映待ち）。登録されているファイル名：</p>
-                      <p className="text-sm text-indigo-400 font-medium break-all font-mono">
-                        {expense.添付資料}
-                      </p>
+                      <p className="text-xs text-slate-500 mb-2">⚠️ プレビューを表示できません。直接Googleドライブで開いてください。</p>
+                      {driveFile ? (
+                        <a
+                          href={driveFile.viewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300 underline font-medium break-all font-mono"
+                        >
+                          {expense.添付資料}
+                          <ExternalLink size={12} />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-indigo-400 font-medium break-all font-mono">
+                          {expense.添付資料}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
