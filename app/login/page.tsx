@@ -1,59 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase' 
-import { LogIn, UserPlus, ShieldAlert } from 'lucide-react'
+import { LogIn, ShieldAlert } from 'lucide-react'
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [title, setTitle] = useState('')
-  const [department, setDepartment] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
-  const { signIn, signUp } = useAuth()
+
+  const { user, signInWithGoogle } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard')
+    }
+  }, [user, router])
 
   const handleGoogleSignIn = async () => {
     setError('')
     setLoading(true)
-    
+
     try {
-      const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
-      router.push('/dashboard')
+      await signInWithGoogle()
     } catch (err: any) {
       console.error('Google Sign-In Error:', err)
       if (err.code === 'auth/popup-blocked') {
         setError('ポップアップがブロックされました。ブラウザの設定を許可してください。')
       } else {
-        setError('Googleログインに失敗しました。もう一度お試しください。')
+        setError(err.message || 'Googleログインに失敗しました。もう一度お試しください。')
       }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      if (isLogin) {
-        await signIn(email, password)
-      } else {
-        await signUp(email, password, name, title, department)
-      }
-      router.push('/dashboard')
-    } catch (err: any) {
-      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -65,10 +42,10 @@ export default function LoginPage() {
         
         <div className="flex flex-col items-center mb-8">
           <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 mb-3">
-            {isLogin ? <LogIn size={28} /> : <UserPlus size={24} />}
+            <LogIn size={28} />
           </div>
           <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-            {isLogin ? 'ポータルにログイン' : '新規アカウント登録'}
+            ポータルにログイン
           </h1>
           <p className="text-slate-500 text-xs mt-1">社内承認・回覧管理システム</p>
         </div>
@@ -96,103 +73,9 @@ export default function LoginPage() {
             Googleアカウントで続行
           </button>
 
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-slate-800/80"></div>
-            <span className="flex-shrink mx-4 text-slate-600 text-xs uppercase tracking-widest font-bold">または</span>
-            <div className="flex-grow border-t border-slate-800/80"></div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-4 animate-in fade-in duration-300">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-1">氏名</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    placeholder="山田 太郎"
-                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-1">役職</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                      placeholder="主任"
-                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-1">所属部門</label>
-                    <input
-                      type="text"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      required
-                      placeholder="営業管理本部"
-                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-1">メールアドレス</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="name@company.com"
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-1">パスワード</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="••••••••"
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-950/50 transition-all duration-200 text-sm tracking-widest mt-2 disabled:opacity-50 disabled:cursor-not-allowed uppercase flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                isLogin ? 'ログインする' : 'アカウントを作成する'
-              )}
-            </button>
-          </form>
-        </div>
-
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setError('')
-              setIsLogin(!isLogin)
-            }}
-            className="text-xs font-semibold text-slate-400 hover:text-indigo-400 transition-colors"
-          >
-            {isLogin ? 'アカウントをお持ちでない方はこちら ➔' : '既にアカウントをお持ちの方はこちら ➔'}
-          </button>
+          <p className="text-center text-xs text-slate-500">
+            社員マスタに登録されたGoogleアカウントでのみログインできます。
+          </p>
         </div>
       </div>
     </div>
