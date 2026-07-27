@@ -1064,7 +1064,6 @@ export default function DashboardPage() {
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
@@ -1090,18 +1089,6 @@ export default function DashboardPage() {
                               </td>
                               <td className="py-3.5 px-4 text-sm text-slate-400">
                                 {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
-                              </td>
-                              <td className="py-3.5 px-4 text-sm">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/create?reuse=${app.id}`)
-                                  }}
-                                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 px-2 py-1 rounded-md bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors"
-                                >
-                                  再利用
-                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1403,18 +1390,6 @@ export default function DashboardPage() {
               <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
                 <div className="flex items-center gap-2">
-                  {modalSource === 'sent' && isApplication(selectedApplication) && (
-                    <button
-                      onClick={() => {
-                        setShowDetailModal(false)
-                        setModalSource(null)
-                        router.push(`/create?reuse=${selectedApplication.id}`)
-                      }}
-                      className="text-xs font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 px-2 py-1 rounded-md bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors"
-                    >
-                      再利用
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setShowDetailModal(false)
@@ -1665,6 +1640,21 @@ export default function DashboardPage() {
                           className="w-full bg-rose-950/30 border border-rose-500/30 hover:bg-rose-900/40 text-rose-400 font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           申請を取り消す
+                        </button>
+                      </div>
+                    )}
+
+                    {modalSource === 'sent' && isApplication(selectedApplication) && (
+                      <div className="border-t border-slate-800 pt-4">
+                        <button
+                          onClick={() => {
+                            setShowDetailModal(false)
+                            setModalSource(null)
+                            router.push(`/create?reuse=${selectedApplication.id}`)
+                          }}
+                          className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
+                        >
+                          再利用
                         </button>
                       </div>
                     )}
