@@ -129,7 +129,7 @@ function ApplicationAccordion({
           {title}
           {showCount && (
             <span className="ml-1 px-2 py-0.5 text-xs font-semibold bg-slate-700 text-slate-300 rounded-full">
-              {applications.length}件
+              {loading ? '...' : `${applications.length}件`}
             </span>
           )}
           {subtitle && <span className="text-sm font-normal text-slate-500">{subtitle}</span>}
@@ -586,11 +586,10 @@ export default function DashboardPage() {
     fetchAllApplications(allAppsPage)
   }, [allAppsOpen, allAppsPage, fetchAllApplications])
 
-  // 差し戻し申請の遅延読み込み
+  // 差し戻し申請の件数も開く前に取得する
   useEffect(() => {
-    if (!rejectedAppsOpen) return
     fetchRejectedApplications()
-  }, [rejectedAppsOpen, fetchRejectedApplications])
+  }, [fetchRejectedApplications])
 
   // 完了済み申請の遅延読み込み
   useEffect(() => {
