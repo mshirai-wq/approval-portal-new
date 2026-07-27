@@ -112,11 +112,11 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
     },
     '代表者印捺印申請': { 
       decisionMaker: '社長', 
-      generalAffairsLabel: '総務管理本部（森雅代、片瀬泰弘）',
+      generalAffairsLabel: '総務管理本部（森雅代）',
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
-      defaultGeneralAffairs: [mori, katase],
-      defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name].filter(Boolean) : [], 
-      defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
+      defaultGeneralAffairs: [mori],
+      defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name, katase].filter(Boolean) : [], 
+      defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && m.name !== katase && !m.name.includes('森')).map(m => m.name),
       stepOrder: ['部長', '総務管理本部', '本部長', '社長', '本部長回覧']
     },
     '営業統轄本部長決裁見積申請（300万円未満）': { 
@@ -642,7 +642,7 @@ function CreatePageContent() {
                           <option value="求人稟議（パート・アルバイト採用）">求人稟議（パート・アルバイト採用）</option>
                           <option value="求人稟議（キャリア・新卒採用）">求人稟議（キャリア・新卒採用）</option>
                           <option value="代表者印捺印申請">代表者印捺印申請</option>
-                          <option value="営業統括本部長決裁見積申請（300万円未満）">営業統括本部長決裁見積申請（300万円未満）</option>
+                          <option value="営業統轄本部長決裁見積申請（300万円未満）">営業統轄本部長決裁見積申請（300万円未満）</option>
                           <option value="社長決裁見積書申請（300万円以上）">社長決裁見積書申請（300万円以上）</option>
                           <option value="協力会社登録">協力会社登録</option>
                           <option value="出張旅費申請">出張旅費申請</option>
@@ -666,6 +666,26 @@ function CreatePageContent() {
                 </div>
               </div>
               
+              {mode === 'approval' && (
+                <>
+                  {subType === '代表者印捺印申請' && (
+                    <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200 whitespace-pre-line animate-in slide-in-from-top-2 duration-300'>
+                      契約書の捺印申請は収入印紙額を明記<br />①契約書捺印申請では総務管理本部長を承認者に選択<br />②廃棄物関係の申請では品質管理本部長を承認者に選択
+                    </div>
+                  )}
+                  {subType === '協力会社登録' && (
+                    <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300'>
+                      知り合った経緯（紹介先）を記入する事
+                    </div>
+                  )}
+                  {subType === '出張旅費申請' && (
+                    <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200 animate-in slide-in-from-top-2 duration-300'>
+                      上司から指示を受けていない出張に関しては、上司の承諾を得てから出張旅費申請をあげる事
+                    </div>
+                  )}
+                </>
+              )}
+
               {mode === 'report' && subType === '入札結果報告' && (
                 <div className="space-y-8 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
                   <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
@@ -775,13 +795,6 @@ function CreatePageContent() {
 
             {mode === 'approval' && subType === '代表者印捺印申請' && (
               <section className='space-y-6 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
-                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
-                  <FileText size={22} className='text-cyan-400' />
-                  <h3 className='text-lg font-bold text-slate-100'>注意事項</h3>
-                </div>
-                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200 whitespace-pre-line'>
-                  {'契約書の捺印申請は収入印紙額を明記\n①契約書捺印申請では総務管理本部長を承認者に選択\n②廃棄物関係の申請では品質管理本部長を承認者に選択'}
-                </div>
                 <div>
                   <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額</label>
                   <div className='relative'><span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
@@ -791,26 +804,11 @@ function CreatePageContent() {
               </section>
             )}
 
-            {mode === 'approval' && subType === '協力会社登録' && (
-              <section className='space-y-6 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
-                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
-                  <FileText size={22} className='text-cyan-400' />
-                  <h3 className='text-lg font-bold text-slate-100'>注意事項</h3>
-                </div>
-                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200'>
-                  知り合った経緯（紹介先）を記入する事
-                </div>
-              </section>
-            )}
-
             {mode === 'approval' && subType === '出張旅費申請' && (
               <section className='space-y-8 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
                 <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
                   <FileText size={22} className='text-cyan-400' />
                   <h3 className='text-lg font-bold text-slate-100'>出張旅費明細</h3>
-                </div>
-                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200'>
-                  上司から指示を受けていない出張に関しては、上司の承諾を得てから出張旅費申請をあげる事
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
