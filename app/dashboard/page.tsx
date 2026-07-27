@@ -1402,15 +1402,29 @@ export default function DashboardPage() {
             <div className="p-6">
               <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false)
-                    setModalSource(null)
-                  }}
-                  className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  {modalSource === 'sent' && isApplication(selectedApplication) && (
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false)
+                        setModalSource(null)
+                        router.push(`/create?reuse=${selectedApplication.id}`)
+                      }}
+                      className="text-xs font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 px-2 py-1 rounded-md bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors"
+                    >
+                      再利用
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false)
+                      setModalSource(null)
+                    }}
+                    className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6">
