@@ -6,10 +6,12 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
+import { Search } from 'lucide-react'
 
 // 型定義の拡張
 interface Application {
   id: string
+  applicationNo?: number
   appName: string
   subType: string
   title: string
@@ -151,6 +153,7 @@ function ApplicationAccordion({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-800">
+                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
                     <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
                     <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
                     <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
@@ -164,6 +167,7 @@ function ApplicationAccordion({
                       className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
                       onClick={() => onItemClick(app)}
                     >
+                      <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
                       <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
                       <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
                       <td className="py-3.5 px-4 text-sm">
@@ -209,6 +213,7 @@ export default function DashboardPage() {
   const [allAppsPage, setAllAppsPage] = useState(1)
   const [loadingAllApps, setLoadingAllApps] = useState(false)
   const [allAppsHasNext, setAllAppsHasNext] = useState(false)
+  const [allAppsSearchQuery, setAllAppsSearchQuery] = useState('')
   const allAppsCursorsRef = useRef<any[]>([])
 
   const [pendingApprovals, setPendingApprovals] = useState<Application[]>([])
@@ -508,8 +513,20 @@ export default function DashboardPage() {
 
   const visibleAllApplications = useMemo(() => {
     if (!user) return []
-    return allApplications.filter(app => app.applicantId !== user.id)
-  }, [allApplications, user])
+    const q = allAppsSearchQuery.trim()
+    return allApplications.filter(app => {
+      if (app.applicantId === user.id) return false
+      if (!q) return true
+      const lowerQ = q.toLowerCase()
+      const idMatch = app.applicationNo ? String(app.applicationNo).includes(q) : false
+      return (
+        idMatch ||
+        app.title.toLowerCase().includes(lowerQ) ||
+        app.applicantName.toLowerCase().includes(lowerQ) ||
+        app.subType.toLowerCase().includes(lowerQ)
+      )
+    })
+  }, [allApplications, user, allAppsSearchQuery])
 
   const fetchRejectedApplications = useCallback(async () => {
     if (!user) return
@@ -1042,10 +1059,12 @@ export default function DashboardPage() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="border-b border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
                             <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
@@ -1055,6 +1074,7 @@ export default function DashboardPage() {
                               className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
                               onClick={() => handleApplicationClick(app, 'sent')}
                             >
+                              <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
                               <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
                               <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
                               <td className="py-3.5 px-4 text-sm">
@@ -1070,6 +1090,18 @@ export default function DashboardPage() {
                               </td>
                               <td className="py-3.5 px-4 text-sm text-slate-400">
                                 {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
+                              </td>
+                              <td className="py-3.5 px-4 text-sm">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/create?reuse=${app.id}`)
+                                  }}
+                                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 px-2 py-1 rounded-md bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors"
+                                >
+                                  再利用
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1106,6 +1138,16 @@ export default function DashboardPage() {
                 </button>
                 {allAppsOpen && (
                   <div className="mt-4">
+                    <div className="relative mb-4">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        value={allAppsSearchQuery}
+                        onChange={(e) => setAllAppsSearchQuery(e.target.value)}
+                        placeholder="件名・申請者・種別・申請番号で検索"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                      />
+                    </div>
                     {loadingAllApps ? (
                       <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
                         読み込み中...
@@ -1119,6 +1161,7 @@ export default function DashboardPage() {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="border-b border-slate-800">
+                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
                               <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
                               <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">申請者</th>
                               <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
@@ -1133,6 +1176,7 @@ export default function DashboardPage() {
                                 className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
                                 onClick={() => handleApplicationClick(app, 'sent')}
                               >
+                                <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
                                 <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
                                 <td className="py-3.5 px-4 text-sm text-slate-400">{app.applicantName}</td>
                                 <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
@@ -1409,6 +1453,8 @@ export default function DashboardPage() {
                 ) : isApplication(selectedApplication) ? (
                   <>
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
+                      <span className="text-slate-300 font-mono">No. {selectedApplication.applicationNo ?? '-'}</span>
+                      <span className="text-slate-700">•</span>
                       <span>{selectedApplication.appName}</span>
                       <span className="text-slate-700">•</span>
                       <span>{selectedApplication.subType}</span>

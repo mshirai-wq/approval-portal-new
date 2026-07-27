@@ -30,6 +30,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // 連番カウンターコレクション
+    match /counters/{counterId} {
+      allow read, write: if isAuthenticated();
+    }
     
     // 申請書コレクション
     match /applications/{applicationId} {

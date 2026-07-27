@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth'
-import { useRouter } from 'next/navigation'
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock } from 'lucide-react'
@@ -118,7 +118,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
       stepOrder: ['部長', '総務管理本部', '本部長', '社長', '本部長回覧']
     },
-    '営業統括本部長決裁見積申請（300万円未満）': { 
+    '営業統轄本部長決裁見積申請（300万円未満）': { 
       decisionMaker: '営業管理本部長', 
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGM: salesGM ? [salesGM.name] : [], 
@@ -228,6 +228,8 @@ const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<
 export default function CreatePage() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const reuseId = searchParams.get('reuse')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
@@ -295,7 +297,51 @@ export default function CreatePage() {
   }, [subType, user, employeeMaster, generalManagers])
 
   useEffect(() => {
-    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval') {
+    const loadOriginal = async () => {
+      if (!reuseId || !user || Object.keys(employeeMaster).length === 0) return
+      try {
+        const snap = await getDoc(doc(db, 'applications', reuseId))
+        if (!snap.exists()) return
+        const data = snap.data() as any
+
+        setMode(data.appName === '回覧報告' ? 'report' : 'approval')
+        setSubType(data.subType || '')
+        setTitle(data.title || '')
+        setDescription(data.description || '')
+        setRemarks(data.remarks || '')
+        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : '所属長')
+
+        const fd = data.formDetails || {}
+        if (fd.amount !== undefined) setAmount(String(fd.amount))
+        if (fd.paymentDate !== undefined) setPaymentDate(fd.paymentDate)
+        if (fd.payee !== undefined) setPayee(fd.payee)
+        if (data.subType === '入札結果報告') {
+          setBiddingDetails(prev => ({ ...prev, ...fd }))
+        }
+
+        const wf = data.workflow || {}
+        const steps = wf.steps || {}
+        const stepOrder = wf.stepOrder || []
+        const route = getApprovalRoute(data.subType || '', user?.department || '', user?.title || '', employeeMaster, generalManagers)
+
+        setSelectedDeptHead(steps['部長']?.approvers || [])
+        setSelectedExec(steps['社長']?.approvers || [])
+        const gmKey = stepOrder.find((k: string) => k === '本部長' || k === route.decisionMaker) || '本部長'
+        setSelectedGM(steps[gmKey]?.approvers || [])
+        const gaKey = stepOrder.find((k: string) => k === '総務管理本部' || k === route.generalAffairsLabel) || '総務管理本部'
+        setSelectedGeneralAffairs(steps[gaKey]?.approvers || [])
+        const gmCircKey = stepOrder.find((k: string) => k === '本部長回覧') || '本部長回覧'
+        setSelectedGMForCirculation(steps[gmCircKey]?.approvers || [])
+        const postKey = route.postDecisionCirculationLabel && stepOrder.find((k: string) => k === route.postDecisionCirculationLabel)
+        setSelectedPostDecisionCirculation(postKey ? steps[postKey]?.approvers || [] : [])
+        setSelectedCirculation(wf.circulations || [])
+      } catch (err) { console.error('Error loading reuse application:', err) }
+    }
+    loadOriginal()
+  }, [reuseId, user, employeeMaster, generalManagers])
+
+  useEffect(() => {
+    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId) {
       setSelectedDeptHead(currentRoute.defaultDeptHead || [])
       setSelectedGM(currentRoute.defaultGM || [])
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
@@ -303,7 +349,7 @@ export default function CreatePage() {
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
       setActiveAccord('所属長')
     }
-  }, [subType, user, employeeMaster, currentRoute, mode])
+  }, [subType, user, employeeMaster, currentRoute, mode, reuseId])
 
   useEffect(() => {
     if (employeeMaster && Object.keys(employeeMaster).length > 0) {
@@ -398,15 +444,24 @@ export default function CreatePage() {
         ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
       ]))
       
+      const applicationNo = await runTransaction(db, async (transaction) => {
+        const counterRef = doc(db, 'counters', 'applications')
+        const counterDoc = await transaction.get(counterRef)
+        const nextNo = (counterDoc.exists() ? (counterDoc.data().nextNumber || 0) : 0) + 1
+        transaction.set(counterRef, { nextNumber: nextNo })
+        return nextNo
+      })
+
       const applicationData = {
         appName, subType, title, description, remarks,
         applicantId: user?.id || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicationNo,
         formDetails,
         workflow: {
           currentStep: firstStepKey,
           status: mode === 'report' ? '承認済み' : '承認待ち',
-          currentApprovers: initialApprovers, 
-          allCirculators: allCirculators,     
+          currentApprovers: initialApprovers,
+          allCirculators: allCirculators,
           decisionMaker: currentRoute.decisionMaker,
           stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => k === '本部長' ? (currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker) : k === '決裁後回覧' ? currentRoute.postDecisionCirculationLabel : k) : ['回覧先'],
           steps: stepsObj,
