@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
@@ -225,7 +225,7 @@ const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<
   })
 }
 
-export default function CreatePage() {
+function CreatePageContent() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -833,5 +833,13 @@ export default function CreatePage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
       `}</style>
     </div>
+  )
+}
+
+export default function CreatePage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-400">Loading...</div>}>
+      <CreatePageContent />
+    </Suspense>
   )
 }
