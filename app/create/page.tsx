@@ -78,6 +78,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   const miura = generalAffairsDept.find(m => m.name.includes('三浦'))?.name || '三浦暢子'
   const asakura = generalAffairsDept.find(m => m.name.includes('朝倉'))?.name || '朝倉千晶'
   const kawakami = generalAffairsDept.find(m => m.name.includes('川上'))?.name || '川上沙織'
+  const katase = generalAffairsDept.find(m => m.name.includes('片瀬'))?.name || '片瀬泰弘'
 
   const residentGM = generalManagers.find(m => m.dept === '常駐管理本部')
   const salesGM = generalManagers.find(m => m.dept === '営業管理本部')
@@ -111,9 +112,9 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
     },
     '代表者印捺印申請': { 
       decisionMaker: '社長', 
-      generalAffairsLabel: '総務管理本部（森雅代）',
+      generalAffairsLabel: '総務管理本部（森雅代、片瀬泰弘）',
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
-      defaultGeneralAffairs: [mori],
+      defaultGeneralAffairs: [mori, katase],
       defaultGM: salesGM ? [salesGM.name, generalAffairsGM?.name].filter(Boolean) : [], 
       defaultGMForCirculation: generalManagers.filter(m => m.name !== (salesGM?.name) && m.name !== (generalAffairsGM?.name) && !m.name.includes('森')).map(m => m.name),
       stepOrder: ['部長', '総務管理本部', '本部長', '社長', '本部長回覧']
@@ -261,6 +262,17 @@ function CreatePageContent() {
     participants: Array(6).fill({ name: '', bid1: '', bid2: '' })
   })
 
+  const [tripDetails, setTripDetails] = useState({
+    startDate: '',
+    endDate: '',
+    transport: Array(5).fill({ method: '', amount: '' }),
+    accommodationNights: '',
+    accommodationUnitPrice: '',
+    businessHours: '',
+    dailyAllowanceDays: '',
+    dailyAllowanceUnitPrice: ''
+  })
+
   const fetchEmployeeMaster = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
@@ -295,6 +307,22 @@ function CreatePageContent() {
   const currentRoute = useMemo(() => {
     return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers)
   }, [subType, user, employeeMaster, generalManagers])
+
+  const transportTotal = useMemo(() =>
+    tripDetails.transport.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+  [tripDetails.transport])
+
+  const accommodationTotal = useMemo(() =>
+    (Number(tripDetails.accommodationNights) || 0) * (Number(tripDetails.accommodationUnitPrice) || 0),
+  [tripDetails.accommodationNights, tripDetails.accommodationUnitPrice])
+
+  const dailyAllowanceTotal = useMemo(() =>
+    (Number(tripDetails.dailyAllowanceDays) || 0) * (Number(tripDetails.dailyAllowanceUnitPrice) || 0),
+  [tripDetails.dailyAllowanceDays, tripDetails.dailyAllowanceUnitPrice])
+
+  const tripTotal = useMemo(() =>
+    transportTotal + accommodationTotal + dailyAllowanceTotal,
+  [transportTotal, accommodationTotal, dailyAllowanceTotal])
 
   useEffect(() => {
     const loadOriginal = async () => {
@@ -393,6 +421,12 @@ function CreatePageContent() {
       let formDetails: any = { description, remarks }
       if (mode === 'approval' && subType === '通常申請') {
         formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
+      }
+      if (mode === 'approval' && subType === '代表者印捺印申請') {
+        formDetails = { ...formDetails, amount: Number(amount) || 0 }
+      }
+      if (mode === 'approval' && subType === '出張旅費申請') {
+        formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
       }
       if (mode === 'report' && subType === '入札結果報告') {
         formDetails = { ...formDetails, ...biddingDetails }
@@ -739,7 +773,123 @@ function CreatePageContent() {
               </section>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {mode === 'approval' && subType === '代表者印捺印申請' && (
+              <section className='space-y-6 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
+                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
+                  <FileText size={22} className='text-cyan-400' />
+                  <h3 className='text-lg font-bold text-slate-100'>注意事項</h3>
+                </div>
+                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200 whitespace-pre-line'>
+                  {'契約書の捺印申請は収入印紙額を明記\n①契約書捺印申請では総務管理本部長を承認者に選択\n②廃棄物関係の申請では品質管理本部長を承認者に選択'}
+                </div>
+                <div>
+                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額</label>
+                  <div className='relative'><span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
+                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xl font-black text-cyan-400 outline-none' />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {mode === 'approval' && subType === '協力会社登録' && (
+              <section className='space-y-6 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
+                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
+                  <FileText size={22} className='text-cyan-400' />
+                  <h3 className='text-lg font-bold text-slate-100'>注意事項</h3>
+                </div>
+                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200'>
+                  知り合った経緯（紹介先）を記入する事
+                </div>
+              </section>
+            )}
+
+            {mode === 'approval' && subType === '出張旅費申請' && (
+              <section className='space-y-8 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
+                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
+                  <FileText size={22} className='text-cyan-400' />
+                  <h3 className='text-lg font-bold text-slate-100'>出張旅費明細</h3>
+                </div>
+                <div className='bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-sm text-amber-200'>
+                  上司から指示を受けていない出張に関しては、上司の承諾を得てから出張旅費申請をあげる事
+                </div>
+
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>出張開始日</label>
+                    <input type='date' value={tripDetails.startDate} onChange={(e) => setTripDetails({ ...tripDetails, startDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                  </div>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>出張終了日</label>
+                    <input type='date' value={tripDetails.endDate} onChange={(e) => setTripDetails({ ...tripDetails, endDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                  </div>
+                </div>
+
+                <div className='space-y-4'>
+                  <h4 className='text-sm font-bold text-slate-300 uppercase tracking-widest'>利用交通機関・料金</h4>
+                  {tripDetails.transport.map((t, idx) => (
+                    <div key={idx} className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                      <input type='text' value={t.method} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], method: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder={`交通機関 ${idx + 1}`} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                      <div className='relative'>
+                        <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
+                        <input type='number' value={t.amount} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], amount: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder='金額' className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                      </div>
+                    </div>
+                  ))}
+                  <div className='flex justify-end items-center gap-3 border-t border-slate-800 pt-4'>
+                    <span className='text-sm text-slate-400'>交通費合計</span>
+                    <span className='text-2xl font-black text-cyan-400'>¥{transportTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>宿泊日数</label>
+                    <input type='number' value={tripDetails.accommodationNights} onChange={(e) => setTripDetails({ ...tripDetails, accommodationNights: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                  </div>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>宿泊単価</label>
+                    <div className='relative'>
+                      <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
+                      <input type='number' value={tripDetails.accommodationUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, accommodationUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                    </div>
+                  </div>
+                  <div className='flex flex-col justify-end'>
+                    <span className='text-[10px] text-slate-500 uppercase tracking-widest mb-1'>宿泊費合計</span>
+                    <span className='text-xl font-black text-cyan-400'>¥{accommodationTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>業務対応時間</label>
+                  <input type='text' value={tripDetails.businessHours} onChange={(e) => setTripDetails({ ...tripDetails, businessHours: e.target.value })} placeholder='例：8時間' className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                </div>
+
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>日当（日数）</label>
+                    <input type='number' value={tripDetails.dailyAllowanceDays} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceDays: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                  </div>
+                  <div>
+                    <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>日当単価</label>
+                    <div className='relative'>
+                      <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
+                      <input type='number' value={tripDetails.dailyAllowanceUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                    </div>
+                  </div>
+                  <div className='flex flex-col justify-end'>
+                    <span className='text-[10px] text-slate-500 uppercase tracking-widest mb-1'>日当合計</span>
+                    <span className='text-xl font-black text-cyan-400'>¥{dailyAllowanceTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className='flex justify-end items-center gap-4 border-t border-slate-800 pt-6'>
+                  <span className='text-sm font-bold text-slate-300 uppercase tracking-widest'>旅費合計</span>
+                  <span className='text-3xl font-black text-emerald-400'>¥{tripTotal.toLocaleString()}</span>
+                </div>
+              </section>
+            )}
+
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
               <div>
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考</label>
                 <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none" />
