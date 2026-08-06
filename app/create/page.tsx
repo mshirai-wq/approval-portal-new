@@ -582,6 +582,36 @@ function CreatePageContent() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="検索..." className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border border-slate-700/60 rounded-xl text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
           </div>
         )}
+        {filterType === '回覧' && (
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(employeeMaster).map(([dept, members]) => {
+              const allSelected = members.every(m => selectedList.includes(m.name))
+              const someSelected = !allSelected && members.some(m => selectedList.includes(m.name))
+              return (
+                <button
+                  key={dept}
+                  type="button"
+                  onClick={() => {
+                    if (allSelected) {
+                      setSelectedList(selectedList.filter(n => !members.some(m => m.name === n)))
+                    } else {
+                      setSelectedList(Array.from(new Set([...selectedList, ...members.map(m => m.name)])))
+                    }
+                  }}
+                  className={`text-xs font-bold rounded-full px-3 py-1.5 border transition-all ${
+                    allSelected
+                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                      : someSelected
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                        : 'bg-slate-900/40 border-slate-800/60 text-slate-400 hover:bg-slate-800/60'
+                  }`}
+                >
+                  {dept}
+                </button>
+              )
+            })}
+          </div>
+        )}
         <div className="space-y-4 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
           {Object.entries(employeeMaster).map(([dept, members]) => {
             let filtered = members
