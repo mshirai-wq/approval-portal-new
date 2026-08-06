@@ -628,7 +628,7 @@ function CreatePageContent() {
                 <div className="grid grid-cols-1 gap-1.5">
                   {filtered.map((m) => (
                     <button key={m.name} type="button" onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${selectedList.includes(m.name) ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-900/40 border-slate-800/60 text-slate-400 hover:bg-slate-800/60'}`}>
-                      <span>{m.name} <span className="text-[10px] font-normal opacity-60 ml-2">{m.title}</span></span>
+                      <span>{m.name}</span>
                       {selectedList.includes(m.name) && <Check size={12} />}
                     </button>
                   ))}
