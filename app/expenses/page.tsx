@@ -140,7 +140,7 @@ export default function ExpensesPage() {
         {/* フィルターと検索セクション */}
         <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 mb-8 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex items-center min-w-[200px]">
+            <div className="relative flex items-center w-full sm:min-w-[200px]">
               <Filter size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
               <select
                 value={filterStatus}

@@ -978,7 +978,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div 
                 onClick={() => setView('approvals')}
-                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
+                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
                 <div>
@@ -990,7 +990,7 @@ export default function DashboardPage() {
                       承認・回覧
                     </h2>
                   </div>
-                  <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+                  <p className="text-slate-400 text-sm max-w-full leading-relaxed">
                     あなた宛てに届いている承認依頼の確認や、回覧報告、その他経費申請の一覧ページへ移動します。
                   </p>
                 </div>
@@ -1007,7 +1007,7 @@ export default function DashboardPage() {
 
               <div 
                 onClick={() => router.push('/create')}
-                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between h-56"
+                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
                 <div>
@@ -1019,7 +1019,7 @@ export default function DashboardPage() {
                       新規申請・回覧報告の作成
                     </h2>
                   </div>
-                  <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+                  <p className="text-slate-400 text-sm max-w-full leading-relaxed">
                     画像付き各種ワークフローの起票、稟議書、新規の回覧・報告書類を新しく作成して送信します。
                   </p>
                 </div>
