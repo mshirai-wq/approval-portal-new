@@ -1505,13 +1505,23 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {selectedApplication.workflow.status === '差し戻し' && (() => {
-                      const lastReject = [...approvalHistory].reverse().find((h: any) => h.action === 'reject')
-                      return lastReject && lastReject.comment ? (
-                        <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-xl">
-                          <h3 className="text-sm font-bold text-orange-300 mb-2 uppercase tracking-wider">差し戻しコメント</h3>
-                          <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{lastReject.comment}</p>
-                          <p className="text-xs text-slate-500 mt-2">差し戻し者: {lastReject.approverName} | {lastReject.createdAt ? new Date(lastReject.createdAt.toDate()).toLocaleString('ja-JP') : '-'}</p>
+                    {(() => {
+                      const lastComment = [...approvalHistory].reverse().find((h: any) => h.comment)
+                      return lastComment ? (
+                        <div className={`p-4 rounded-xl border ${
+                          lastComment.action === 'reject'
+                            ? 'bg-orange-500/10 border-orange-500/30'
+                            : 'bg-emerald-500/10 border-emerald-500/30'
+                        }`}>
+                          <h3 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
+                            lastComment.action === 'reject' ? 'text-orange-300' : 'text-emerald-300'
+                          }`}>
+                            {lastComment.action === 'reject' ? '差し戻しコメント' : '承認者コメント'}
+                          </h3>
+                          <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{lastComment.comment}</p>
+                          <p className="text-xs text-slate-500 mt-2">
+                            {lastComment.action === 'reject' ? '差し戻し者' : '承認者'}: {lastComment.approverName} | {lastComment.createdAt ? new Date(lastComment.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
+                          </p>
                         </div>
                       ) : null
                     })()}
