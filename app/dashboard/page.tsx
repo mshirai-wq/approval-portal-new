@@ -701,6 +701,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
+      window.location.reload()
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
@@ -751,6 +752,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
+      window.location.reload()
     } catch (error) {
       console.error('Resubmit error:', error)
       alert('再申請に失敗しました')
@@ -888,6 +890,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
+      window.location.reload()
     } catch (error) {
       console.error('Circulation error:', error)
       alert('処理に失敗しました')
@@ -904,7 +907,7 @@ export default function DashboardPage() {
       setSelectedApplication(null)
       setModalSource(null)
 
-      await loadInformations()
+      window.location.reload()
     } catch (error) {
       console.error('Information confirm error:', error)
       alert('処理に失敗しました')
@@ -944,6 +947,7 @@ export default function DashboardPage() {
       setSelectedApplication(null)
       setModalSource(null)
       alert('申請を取り消しました')
+      window.location.reload()
     } catch (error) {
       console.error('Delete application error:', error)
       alert('取消に失敗しました')
