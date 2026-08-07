@@ -745,7 +745,7 @@ export default function DashboardPage() {
       })
 
       if (originalApprovers.length > 0) {
-        await sendApprovalNotification(selectedApplication, user.name, originalApprovers)
+        await sendResubmitNotification(selectedApplication, user.name, originalApprovers)
       }
 
       alert('修正して再申請しました。差し戻し元から処理を再開します。')
@@ -819,6 +819,38 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Email notification error:', error)
+    }
+  }
+
+  const sendResubmitNotification = async (application: any, resubmitterName: string, approvers: string[]) => {
+    try {
+      if (!approvers || approvers.length === 0) return
+      const approverEmails = await getApproversEmails(approvers)
+
+      for (const email of approverEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `【再申請】承認依頼: ${application.title}`,
+            text: `${resubmitterName}さんが「${application.title}」を修正し、再申請しました。\n\n前段の承認は維持されています。確認・承認をお願いします。\n\nダッシュボードから詳細を確認してください。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #4f46e5;">再申請の承認依頼</h2>
+                <p><strong>${resubmitterName}</strong>さんが「<strong>${application.title}</strong>」を修正し、再申請しました。</p>
+                <div style="background-color: #eef2ff; padding: 15px; margin: 15px 0; border-left: 4px solid #4f46e5; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">依頼内容:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">前段の承認は維持されています。確認・承認をお願いします。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Resubmit email notification error:', error)
     }
   }
 
