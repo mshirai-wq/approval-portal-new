@@ -688,8 +688,12 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      if (action === 'approve' && didAdvance && nextApprovers.length > 0) {
-        await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
+      if (action === 'approve' && didAdvance) {
+        if (nextApprovers.length > 0) {
+          await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
+        } else if (nextStatus === '承認済み') {
+          await sendFinalApprovalNotification(selectedApplication)
+        }
       } else if (action === 'reject') {
         await sendRejectNotification(selectedApplication, user.name, comment)
       }
@@ -753,6 +757,34 @@ export default function DashboardPage() {
     }
   }
 
+  const sendFinalApprovalNotification = async (application: any) => {
+    try {
+      const applicantEmails = await getApproversEmails([application.applicantName])
+
+      for (const email of applicantEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `【承認完了】${application.title}`,
+            text: `「${application.title}」の承認が完了しました。\n\nすべての承認プロセスが終了し、最終決裁が下りました。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #10b981;">承認完了のお知らせ</h2>
+                <p>「<strong>${application.title}</strong>」の承認が完了しました。</p>
+                <p>すべての承認プロセスが終了し、最終決裁が下りました。</p>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Final approval notification error:', error)
+    }
+  }
+
   const sendApprovalNotification = async (application: any, approverName: string, nextApprovers: string[]) => {
     try {
       if (!nextApprovers || nextApprovers.length === 0) return
@@ -780,11 +812,26 @@ export default function DashboardPage() {
     }
   }
 
+  const getPreviousApprovers = (application: any) => {
+    const steps = application.workflow?.steps || {}
+    const names = new Set<string>()
+    Object.values(steps).forEach((step: any) => {
+      const approvedBy = step?.approvedBy || []
+      approvedBy.forEach((name: string) => {
+        if (name) names.add(name)
+      })
+    })
+    return Array.from(names)
+  }
+
   const sendRejectNotification = async (application: any, rejectorName: string, comment: string) => {
     try {
-      const applicantEmails = await getApproversEmails([application.applicantName])
+      // 申請者と前の承認者に通知
+      const previousApprovers = getPreviousApprovers(application)
+      const notifyNames = Array.from(new Set([application.applicantName, ...previousApprovers]))
+      const emails = await getApproversEmails(notifyNames)
 
-      for (const email of applicantEmails) {
+      for (const email of emails) {
         await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1457,6 +1504,17 @@ export default function DashboardPage() {
                         {selectedApplication.workflow.status}
                       </span>
                     </div>
+
+                    {selectedApplication.workflow.status === '差し戻し' && (() => {
+                      const lastReject = [...approvalHistory].reverse().find((h: any) => h.action === 'reject')
+                      return lastReject && lastReject.comment ? (
+                        <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-xl">
+                          <h3 className="text-sm font-bold text-orange-300 mb-2 uppercase tracking-wider">差し戻しコメント</h3>
+                          <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{lastReject.comment}</p>
+                          <p className="text-xs text-slate-500 mt-2">差し戻し者: {lastReject.approverName} | {lastReject.createdAt ? new Date(lastReject.createdAt.toDate()).toLocaleString('ja-JP') : '-'}</p>
+                        </div>
+                      ) : null
+                    })()}
 
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">申請者情報</h3>

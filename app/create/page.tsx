@@ -66,7 +66,7 @@ function getRelatedGM(dept: string, generalManagers: any[]) {
   return generalManagers.find(m => m.dept === dept)
 }
 
-function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[]) {
+function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[], division: string = '') {
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   
@@ -97,11 +97,24 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       stepOrder: ['部長', '本部長', '社長', '本部長回覧', '総務管理本部']
     },
     '求人稟議（パート・アルバイト採用）': { 
-      decisionMaker: '常駐管理本部長', 
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
-      defaultGM: residentGM ? [residentGM.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda],
-      stepOrder: ['部長', '本部長', '総務管理本部']
+      stepOrder: ['部長', '本部長', '総務管理本部'],
+      ...(() => {
+        // パート・アルバイト採用の場合、ドロップダウンで最終決裁者を変更
+        if (division === '設備') {
+          const gm = generalManagers.find(m => m.dept === '技術管理本部')
+          return { decisionMaker: '技術管理本部長', defaultGM: gm ? [gm.name] : [] }
+        } else if (division === '警備') {
+          const gm = generalManagers.find(m => m.dept === '警備管理本部') || generalManagers.find(m => m.dept === '技術管理本部')
+          return { decisionMaker: '警備管理本部長', defaultGM: gm ? [gm.name] : [] }
+        } else if (division === '九州') {
+          const gm = generalManagers.find(m => m.dept === '営業管理本部')
+          return { decisionMaker: '営業管理本部長', defaultGM: gm ? [gm.name] : [] }
+        }
+        // バス or 未選択：常駐管理本部
+        return { decisionMaker: '常駐管理本部長', defaultGM: residentGM ? [residentGM.name] : [] }
+      })()
     },
     '求人稟議（キャリア・新卒採用）': { 
       decisionMaker: '社長', 
@@ -247,7 +260,8 @@ function CreatePageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeAccord, setActiveAccord] = useState('所属長')
 
-  const [subType, setSubType] = useState('通常申請')
+  const [subType, setSubType] = useState<string>('通常申請')
+  const [recruitmentDivision, setRecruitmentDivision] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -293,6 +307,7 @@ function CreatePageContent() {
   const handleModeChange = (newMode: 'approval' | 'report') => {
     setMode(newMode)
     setSubType(newMode === 'approval' ? '通常申請' : '退職者通知')
+    setRecruitmentDivision('')
     setActiveAccord(newMode === 'approval' ? '所属長' : '回覧先')
   }
 
@@ -305,8 +320,8 @@ function CreatePageContent() {
   }, [employeeMaster])
 
   const currentRoute = useMemo(() => {
-    return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers)
-  }, [subType, user, employeeMaster, generalManagers])
+    return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision)
+  }, [subType, user, employeeMaster, generalManagers, recruitmentDivision])
 
   const transportTotal = useMemo(() =>
     tripDetails.transport.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
@@ -343,6 +358,7 @@ function CreatePageContent() {
         if (fd.amount !== undefined) setAmount(String(fd.amount))
         if (fd.paymentDate !== undefined) setPaymentDate(fd.paymentDate)
         if (fd.payee !== undefined) setPayee(fd.payee)
+        if (fd.recruitmentDivision !== undefined) setRecruitmentDivision(fd.recruitmentDivision)
         if (data.subType === '入札結果報告') {
           setBiddingDetails(prev => ({ ...prev, ...fd }))
         }
@@ -350,7 +366,7 @@ function CreatePageContent() {
         const wf = data.workflow || {}
         const steps = wf.steps || {}
         const stepOrder = wf.stepOrder || []
-        const route = getApprovalRoute(data.subType || '', user?.department || '', user?.title || '', employeeMaster, generalManagers)
+        const route = getApprovalRoute(data.subType || '', user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '')
 
         setSelectedDeptHead(steps['部長']?.approvers || [])
         setSelectedExec(steps['社長']?.approvers || [])
@@ -399,6 +415,9 @@ function CreatePageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
+    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !recruitmentDivision) {
+      return setError('採用区分を選択してください')
+    }
     setLoading(true)
 
     try {
@@ -419,6 +438,9 @@ function CreatePageContent() {
       }
 
       let formDetails: any = { description, remarks }
+      if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
+        formDetails = { ...formDetails, recruitmentDivision }
+      }
       if (mode === 'approval' && subType === '通常申請') {
         formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
       }
@@ -695,7 +717,25 @@ function CreatePageContent() {
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="件名を入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
                 </div>
               </div>
-              
+
+              {mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">採用区分 <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <option value="">選択してください</option>
+                        <option value="バス">バス</option>
+                        <option value="設備">設備</option>
+                        <option value="警備">警備</option>
+                        <option value="九州">九州</option>
+                      </select>
+                      <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {mode === 'approval' && (
                 <>
                   {subType === '代表者印捺印申請' && (
