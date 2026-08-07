@@ -552,8 +552,18 @@ function CreatePageContent() {
           body: JSON.stringify({
             to: email,
             subject: `新規承認依頼: ${applicationData.title}`,
-            text: `「${applicationData.title}」の新規承認依頼が届きました。確認・承認をお願いします。`,
-            html: `<h2>新規承認依頼</h2><p>「${applicationData.title}」の新規承認依頼が届きました。</p><p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>`
+            text: `「${applicationData.title}」の新規承認依頼が届きました。\n\n確認・承認をお願いします。\n\nダッシュボードから詳細を確認してください。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #4f46e5;">新規承認依頼</h2>
+                <p>「<strong>${applicationData.title}</strong>」の新規承認依頼が届きました。</p>
+                <div style="background-color: #eef2ff; padding: 15px; margin: 15px 0; border-left: 4px solid #4f46e5; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">依頼内容:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">確認・承認をお願いします。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
           })
         })
       }
@@ -573,8 +583,18 @@ function CreatePageContent() {
           body: JSON.stringify({
             to: email,
             subject: `新規回覧報告: ${applicationData.title}`,
-            text: `「${applicationData.title}」の新しい回覧報告が共有されました。内容の確認をお願いします。`,
-            html: `<h2>新規回覧報告</h2><p>「${applicationData.title}」の新しい回覧報告が共有されました。</p><p>内容の確認をお願いします。</p><p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>`
+            text: `「${applicationData.title}」の新しい回覧報告が共有されました。\n\n内容の確認をお願いします。\n\nダッシュボードから詳細を確認してください。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #0ea5e9;">新規回覧報告</h2>
+                <p>「<strong>${applicationData.title}</strong>」の新しい回覧報告が共有されました。</p>
+                <div style="background-color: #f0f9ff; padding: 15px; margin: 15px 0; border-left: 4px solid #0ea5e9; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">依頼内容:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">内容の確認をお願いします。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
           })
         })
       }

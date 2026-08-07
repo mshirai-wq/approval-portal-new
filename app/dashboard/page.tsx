@@ -770,13 +770,16 @@ export default function DashboardPage() {
           body: JSON.stringify({
             to: email,
             subject: `【承認完了】${application.title}`,
-            text: `「${application.title}」の承認が完了しました。\n\nすべての承認プロセスが終了し、最終決裁が下りました。`,
+            text: `「${application.title}」の承認が完了しました。\n\nすべての承認プロセスが終了し、最終決裁が下りました。\n\nダッシュボードから詳細を確認してください。`,
             html: `
               <div style="font-family: sans-serif; color: #333;">
                 <h2 style="color: #10b981;">承認完了のお知らせ</h2>
                 <p>「<strong>${application.title}</strong>」の承認が完了しました。</p>
-                <p>すべての承認プロセスが終了し、最終決裁が下りました。</p>
-                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+                <div style="background-color: #f0fdf4; padding: 15px; margin: 15px 0; border-left: 4px solid #10b981; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">状況:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">すべての承認プロセスが終了し、最終決裁が下りました。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
               </div>
             `
           })
@@ -799,12 +802,17 @@ export default function DashboardPage() {
           body: JSON.stringify({
             to: email,
             subject: `承認依頼: ${application.title}`,
-            text: `${approverName}さんが「${application.title}」を承認しました。あなたの確認・承認をお願いします。`,
+            text: `${approverName}さんが「${application.title}」を承認しました。\n\n次の承認者として、あなたの確認・承認をお願いします。\n\nダッシュボードから詳細を確認してください。`,
             html: `
-              <h2>承認依頼</h2>
-              <p>${approverName}さんが「${application.title}」を承認しました。</p>
-              <p>あなたの確認・承認をお願いします。</p>
-              <p><a href="${window.location.origin}/dashboard">ダッシュボードを開く</a></p>
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #4f46e5;">承認依頼</h2>
+                <p><strong>${approverName}</strong>さんが「<strong>${application.title}</strong>」を承認しました。</p>
+                <div style="background-color: #eef2ff; padding: 15px; margin: 15px 0; border-left: 4px solid #4f46e5; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">依頼内容:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">次の承認者として、確認・承認をお願いします。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
             `
           })
         })
