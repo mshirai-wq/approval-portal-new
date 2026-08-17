@@ -91,7 +91,25 @@ function getExpenses(e) {
   const data = sheet.getDataRange().getValues()
   
   const headers = data[0]
-  const rows = data.slice(1)
+  
+  // フロントエンドからの絞り込み条件
+  const filterStatus = e.parameter.status
+  const filterUserEmail = (e.parameter.userEmail || '').toString().trim().toLowerCase()
+  
+  const statusIndex = headers.indexOf('承認ステータス')
+  const approverEmailIndex = headers.indexOf('承認者メールアドレス')
+  
+  const rows = data.slice(1).filter(row => {
+    if (filterStatus && statusIndex !== -1) {
+      const status = (row[statusIndex] || '').toString().trim()
+      if (status !== filterStatus) return false
+    }
+    if (filterUserEmail && approverEmailIndex !== -1) {
+      const approverEmail = (row[approverEmailIndex] || '').toString().trim().toLowerCase()
+      if (!approverEmail.includes(filterUserEmail)) return false
+    }
+    return true
+  })
   
   const expenses = rows.map((row, index) => {
     const expense = {}
