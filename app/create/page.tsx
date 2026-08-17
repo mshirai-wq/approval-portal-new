@@ -240,7 +240,7 @@ const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<
 }
 
 function CreatePageContent() {
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const reuseId = searchParams.get('reuse')
@@ -521,7 +521,7 @@ function CreatePageContent() {
 
       const applicationData = {
         appName, subType, title, description, remarks,
-        applicantId: user?.id || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicantId: firebaseUser?.uid || user?.email || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
         workflow: {
