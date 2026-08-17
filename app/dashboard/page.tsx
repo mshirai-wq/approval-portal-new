@@ -442,7 +442,7 @@ export default function DashboardPage() {
       if (cursor) {
         q = query(
           collection(db, 'applications'),
-          where('applicantId', '==', user.id),
+          where('applicantId', '==', user?.id || user?.email),
           orderBy('createdAt', 'desc'),
           startAfter(cursor),
           limit(31)
@@ -450,7 +450,7 @@ export default function DashboardPage() {
       } else {
         q = query(
           collection(db, 'applications'),
-          where('applicantId', '==', user.id),
+          where('applicantId', '==', user?.id || user?.email),
           orderBy('createdAt', 'desc'),
           limit(31)
         )
@@ -534,7 +534,7 @@ export default function DashboardPage() {
     try {
       const q = query(
         collection(db, 'applications'),
-        where('applicantId', '==', user.id),
+        where('applicantId', '==', user?.id || user?.email),
         orderBy('createdAt', 'desc'),
         limit(50)
       )
@@ -557,7 +557,7 @@ export default function DashboardPage() {
     try {
       const q = query(
         collection(db, 'applications'),
-        where('applicantId', '==', user.id),
+        where('applicantId', '==', user?.id || user?.email),
         orderBy('createdAt', 'desc'),
         limit(50)
       )
@@ -1018,6 +1018,23 @@ export default function DashboardPage() {
     }
     
     return Array.from(new Set(urls.filter(url => typeof url === 'string' && url.trim() !== '')))
+  }, [selectedApplication])
+
+  const attachedPdfs = useMemo(() => {
+    if (!selectedApplication) return []
+    const pdfs: { url: string; name: string }[] = []
+    if (isApplication(selectedApplication) && Array.isArray(selectedApplication.attachments)) {
+      selectedApplication.attachments.forEach(file => {
+        if (file.url) {
+          const isPdfMime = file.type && file.type === 'application/pdf'
+          const isPdfExt = file.name && file.name.toLowerCase().endsWith('.pdf')
+          if (isPdfMime || isPdfExt) {
+            pdfs.push({ url: file.url, name: file.name })
+          }
+        }
+      })
+    }
+    return pdfs
   }, [selectedApplication])
 
   if (loading) {
@@ -1671,6 +1688,36 @@ export default function DashboardPage() {
                               <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
                                 画像 {index + 1} (拡大可)
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {attachedPdfs.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
+                        <div className="space-y-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                          {attachedPdfs.map((pdf, index) => (
+                            <div key={index} className="space-y-2">
+                              <p className="text-xs text-slate-400">{pdf.name}</p>
+                              <object
+                                data={pdf.url}
+                                type="application/pdf"
+                                className="w-full h-80 rounded-lg border border-slate-700/50 bg-slate-950"
+                              >
+                                <p className="text-sm text-slate-400 p-2">
+                                  PDF を表示できません。
+                                  <a
+                                    href={pdf.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-cyan-400 hover:text-cyan-300 underline ml-2"
+                                  >
+                                    別タブで開く
+                                  </a>
+                                </p>
+                              </object>
                             </div>
                           ))}
                         </div>

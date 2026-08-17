@@ -524,7 +524,7 @@ function CreatePageContent() {
 
       const applicationData = {
         appName, subType, title, description, remarks,
-        applicantId: firebaseUser.uid || firebaseUser.email || user?.email || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
         workflow: {
