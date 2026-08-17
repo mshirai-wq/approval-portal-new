@@ -419,8 +419,10 @@ function CreatePageContent() {
       return setError('採用区分を選択してください')
     }
     setLoading(true)
+    let stage = '申請処理開始'
 
     try {
+      stage = '添付ファイルアップロード'
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       let fileIndex = 0
       
@@ -438,6 +440,7 @@ function CreatePageContent() {
         }
 
         const storageRef = ref(storage, `applications/${fileIndex}_${targetFile.name}`)
+        stage = `添付ファイルアップロード: ${targetFile.name} (type: ${contentType || 'unknown'})`
         await uploadBytes(storageRef, targetFile, { contentType })
         const downloadURL = await getDownloadURL(storageRef)
         uploadedAttachments.push({ name: targetFile.name, url: downloadURL, type: contentType || 'application/octet-stream' })
@@ -507,6 +510,7 @@ function CreatePageContent() {
         ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
       ]))
       
+      stage = '申請データ登録'
       const applicationNo = await runTransaction(db, async (transaction) => {
         const counterRef = doc(db, 'counters', 'applications')
         const counterDoc = await transaction.get(counterRef)
@@ -544,7 +548,7 @@ function CreatePageContent() {
       }
       
       router.push('/dashboard')
-    } catch (err: any) { setError('失敗しました: ' + err.message) } finally { setLoading(false) }
+    } catch (err: any) { setError(`${stage}で失敗しました: ${err.message} (code: ${err.code || 'unknown'})`) } finally { setLoading(false) }
   }
 
   const sendNewApplicationNotification = async (applicationData: any, initialApprovers: string[]) => {
