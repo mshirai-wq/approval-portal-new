@@ -426,14 +426,21 @@ function CreatePageContent() {
       
       for (const file of files) {
         let targetFile = file
+        const isPdf = file.name.toLowerCase().endsWith('.pdf')
+        const isImage = file.type.startsWith('image/') || (/\.(jpg|jpeg|png|gif|webp|bmp)$/i).test(file.name)
+        let contentType = file.type
+        if (!contentType) {
+          if (isPdf) contentType = 'application/pdf'
+          else if (isImage) contentType = 'image/png'
+        }
         if (file.type.startsWith('image/')) {
           targetFile = await compressImageFile(file, 1200, 0.8)
         }
 
         const storageRef = ref(storage, `applications/${fileIndex}_${targetFile.name}`)
-        await uploadBytes(storageRef, targetFile, { contentType: targetFile.type })
+        await uploadBytes(storageRef, targetFile, { contentType })
         const downloadURL = await getDownloadURL(storageRef)
-        uploadedAttachments.push({ name: targetFile.name, url: downloadURL, type: targetFile.type })
+        uploadedAttachments.push({ name: targetFile.name, url: downloadURL, type: contentType || 'application/octet-stream' })
         fileIndex++
       }
 
