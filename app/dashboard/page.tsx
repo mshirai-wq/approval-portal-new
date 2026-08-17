@@ -1723,9 +1723,9 @@ export default function DashboardPage() {
                                     </a>
                                   </p>
                                 </object>
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                                  <Search size={32} className="text-white drop-shadow-lg" />
-                                  <span className="ml-2 text-sm text-white font-medium drop-shadow-lg">拡大表示</span>
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium backdrop-blur-sm border border-white/10 shadow-lg pointer-events-none">
+                                  <Search size={14} className="text-white" />
+                                  <span>拡大</span>
                                 </div>
                               </div>
                             </div>
