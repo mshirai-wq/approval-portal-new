@@ -122,9 +122,11 @@ async function postAppsScript(data: any): Promise<any> {
 // 経費申請データ取得
 // ==========================================
 
-export async function getExpenses(status?: string): Promise<Expense[]> {
-  const params = status ? { status } : undefined
-  const response = await callAppsScript('getExpenses', params)
+export async function getExpenses(status?: string, userEmail?: string): Promise<Expense[]> {
+  const params: Record<string, string> = {}
+  if (status) params.status = status
+  if (userEmail) params.userEmail = userEmail
+  const response = await callAppsScript('getExpenses', Object.keys(params).length > 0 ? params : undefined)
   
   if (response.error) {
     throw new Error(response.error)

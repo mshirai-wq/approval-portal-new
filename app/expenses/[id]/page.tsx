@@ -139,7 +139,8 @@ export default function ExpenseDetailPage() {
   const sendExpenseApprovalNotification = async (expenseData: any, approverName: string) => {
     try {
       // 経費申請の次の承認者を特定（経費申請はGAS経由なので、ここでは申請者に通知）
-      const applicantEmail = expenseData.申請者メール || expenseData.applicantEmail
+      const applicantEmail = expenseData.メールアドレス || expenseData.申請者メール || expenseData.applicantEmail || ''
+      const title = String(expenseData.内容 || expenseData.件名 || expenseData.title || '').trim()
       
       if (!applicantEmail) return
 
@@ -148,12 +149,12 @@ export default function ExpenseDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: applicantEmail,
-          subject: `経費申請承認: ${expenseData.件名 || expenseData.title}`,
-          text: `${approverName}さんが経費申請「${expenseData.件名 || expenseData.title}」を承認しました。\n\n詳細を確認するには、ダッシュボードを開いてください。`,
+          subject: `経費申請承認: ${title || '（件名なし）'}`,
+          text: `${approverName}さんが経費申請「${title || '（件名なし）'}」を承認しました。\n\n詳細を確認するには、ダッシュボードを開いてください。`,
           html: `
             <div style="font-family: sans-serif; color: #333;">
               <h2 style="color: #10b981;">経費申請承認</h2>
-              <p><strong>${approverName}</strong>さんが経費申請「<strong>${expenseData.件名 || expenseData.title}</strong>」を承認しました。</p>
+              <p><strong>${approverName}</strong>さんが経費申請「<strong>${title || '（件名なし）'}</strong>」を承認しました。</p>
               <div style="background-color: #f0fdf4; padding: 15px; margin: 15px 0; border-left: 4px solid #10b981; border-radius: 4px;">
                 <p style="margin: 0; font-size: 12px; color: #666;">状況:</p>
                 <p style="margin: 5px 0 0 0; font-weight: bold;">経費申請が承認されました。</p>

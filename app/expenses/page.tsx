@@ -20,7 +20,10 @@ export default function ExpensesPage() {
   const fetchExpenses = async () => {
     try {
       setLoading(true)
-      const data = await getExpenses(undefined)
+      const data = await getExpenses(
+        filterStatus === 'all' ? undefined : filterStatus,
+        user?.email
+      )
       setExpenses(data)
     } catch (err: any) {
       console.error('Error fetching expenses:', err)
@@ -31,8 +34,9 @@ export default function ExpensesPage() {
   }
 
   useEffect(() => {
+    if (!user) return
     fetchExpenses()
-  }, [])
+  }, [user])
 
   // ==========================================
   // ブラウザ側での仕分け処理
