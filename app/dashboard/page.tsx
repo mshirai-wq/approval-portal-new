@@ -233,6 +233,7 @@ export default function DashboardPage() {
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null)
 
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
 
@@ -1701,23 +1702,32 @@ export default function DashboardPage() {
                           {attachedPdfs.map((pdf, index) => (
                             <div key={index} className="space-y-2">
                               <p className="text-xs text-slate-400">{pdf.name}</p>
-                              <object
-                                data={pdf.url}
-                                type="application/pdf"
-                                className="w-full h-80 rounded-lg border border-slate-700/50 bg-slate-950"
+                              <div
+                                onClick={() => setPreviewPdfUrl(pdf.url)}
+                                className="group relative w-full h-80 rounded-lg border border-slate-700/50 bg-slate-950 cursor-pointer overflow-hidden"
                               >
-                                <p className="text-sm text-slate-400 p-2">
-                                  PDF を表示できません。
-                                  <a
-                                    href={pdf.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-cyan-400 hover:text-cyan-300 underline ml-2"
-                                  >
-                                    別タブで開く
-                                  </a>
-                                </p>
-                              </object>
+                                <object
+                                  data={pdf.url}
+                                  type="application/pdf"
+                                  className="w-full h-full pointer-events-none"
+                                >
+                                  <p className="text-sm text-slate-400 p-2">
+                                    PDF を表示できません。
+                                    <a
+                                      href={pdf.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-cyan-400 hover:text-cyan-300 underline ml-2"
+                                    >
+                                      別タブで開く
+                                    </a>
+                                  </p>
+                                </object>
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                  <Search size={32} className="text-white drop-shadow-lg" />
+                                  <span className="ml-2 text-sm text-white font-medium drop-shadow-lg">拡大表示</span>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1853,6 +1863,40 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {previewPdfUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] animate-in fade-in duration-200 cursor-zoom-out"
+          onClick={() => setPreviewPdfUrl(null)}
+        >
+          <button
+            onClick={() => setPreviewPdfUrl(null)}
+            className="absolute top-6 right-6 text-slate-400 hover:text-white bg-slate-900/80 p-2.5 rounded-full border border-slate-800 hover:border-slate-600 transition-all text-sm z-10 font-bold shadow-2xl"
+          >
+            ✕ 閉じる
+          </button>
+          <div className="relative w-[95vw] h-[90vh] rounded-lg overflow-hidden border border-slate-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-200 bg-slate-950">
+            <object
+              data={previewPdfUrl}
+              type="application/pdf"
+              className="w-full h-full"
+            >
+              <p className="text-slate-400 p-4 text-center">
+                PDF を表示できません。
+                <a
+                  href={previewPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-400 hover:text-cyan-300 underline ml-2"
+                >
+                  別タブで開く
+                </a>
+              </p>
+            </object>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
