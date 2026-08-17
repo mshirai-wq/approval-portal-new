@@ -431,7 +431,7 @@ function CreatePageContent() {
         }
 
         const storageRef = ref(storage, `applications/${fileIndex}_${targetFile.name}`)
-        await uploadBytes(storageRef, targetFile)
+        await uploadBytes(storageRef, targetFile, { contentType: targetFile.type })
         const downloadURL = await getDownloadURL(storageRef)
         uploadedAttachments.push({ name: targetFile.name, url: downloadURL, type: targetFile.type })
         fileIndex++
