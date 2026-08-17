@@ -419,6 +419,10 @@ function CreatePageContent() {
       return setError('採用区分を選択してください')
     }
     setLoading(true)
+    if (!firebaseUser) {
+      setLoading(false)
+      return setError('ログイン情報が取得できません。再度ログインしてください。')
+    }
     let stage = '申請処理開始'
 
     try {
@@ -430,13 +434,12 @@ function CreatePageContent() {
         let targetFile = file
         const isPdf = file.name.toLowerCase().endsWith('.pdf')
         const isImage = file.type.startsWith('image/') || (/\.(jpg|jpeg|png|gif|webp|bmp)$/i).test(file.name)
-        let contentType = file.type
-        if (!contentType) {
-          if (isPdf) contentType = 'application/pdf'
-          else if (isImage) contentType = 'image/png'
-        }
-        if (file.type.startsWith('image/')) {
+        let contentType = file.type || (isPdf ? 'application/pdf' : isImage ? 'image/png' : 'application/octet-stream')
+        if (isPdf) {
+          contentType = 'application/pdf'
+        } else if (file.type.startsWith('image/')) {
           targetFile = await compressImageFile(file, 1200, 0.8)
+          contentType = targetFile.type || contentType
         }
 
         const storageRef = ref(storage, `applications/${fileIndex}_${targetFile.name}`)
@@ -521,7 +524,7 @@ function CreatePageContent() {
 
       const applicationData = {
         appName, subType, title, description, remarks,
-        applicantId: firebaseUser?.uid || user?.email || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicantId: firebaseUser.uid || firebaseUser.email || user?.email || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
         workflow: {
