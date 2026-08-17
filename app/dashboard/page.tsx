@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
-import { Search } from 'lucide-react'
+import { Search, Printer } from 'lucide-react'
 
 // 型定義の拡張
 interface Application {
@@ -1479,7 +1479,14 @@ export default function DashboardPage() {
             <div className="p-6">
               <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 print:hidden">
+                  <button
+                    onClick={() => window.print()}
+                    title="印刷"
+                    className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
+                  >
+                    <Printer size={18} />
+                  </button>
                   <button
                     onClick={() => {
                       setShowDetailModal(false)
