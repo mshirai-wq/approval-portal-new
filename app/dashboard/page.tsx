@@ -1034,7 +1034,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
-      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
+      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent cursor-pointer"
@@ -1063,7 +1063,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 print:hidden">
         {view === 'top' && (
           <div className="space-y-12">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1474,8 +1474,8 @@ export default function DashboardPage() {
       </main>
 
       {showDetailModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity print:static print:block print:h-auto print:max-h-none print:overflow-visible print:p-0 print:bg-transparent">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:w-full print:rounded-none print:shadow-none print:border-0 print:min-h-0">
             <div className="p-6">
               <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
