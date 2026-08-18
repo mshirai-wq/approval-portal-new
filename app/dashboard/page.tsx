@@ -1499,7 +1499,8 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
                 <div className="flex items-center gap-2 print:hidden">
                   <button
-                    onClick={() => window.print()}
+                    type="button"
+                    onClick={() => setTimeout(() => window.print(), 100)}
                     title="印刷"
                     className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                   >
