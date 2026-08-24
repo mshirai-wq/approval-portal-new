@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
-import { Search, Printer } from 'lucide-react'
+import { Search, Printer, FileText } from 'lucide-react'
 
 // 型定義の拡張
 interface Application {
@@ -360,7 +360,6 @@ export default function DashboardPage() {
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
-  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null)
 
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
 
@@ -1850,37 +1849,21 @@ export default function DashboardPage() {
                     {attachedPdfs.length > 0 && (
                       <div className="print:hidden">
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
-                        <div className="space-y-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                        <div className="space-y-3 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
                           {attachedPdfs.map((pdf, index) => (
-                            <div key={index} className="space-y-2">
-                              <p className="text-xs text-slate-400">{pdf.name}</p>
-                              <div
-                                onClick={() => setPreviewPdfUrl(pdf.url)}
-                                className="group relative w-full h-80 rounded-lg border border-slate-700/50 bg-slate-950 cursor-pointer overflow-hidden"
-                              >
-                                <object
-                                  data={pdf.url}
-                                  type="application/pdf"
-                                  className="w-full h-full pointer-events-none"
-                                >
-                                  <p className="text-sm text-slate-400 p-2">
-                                    PDF を表示できません。
-                                    <a
-                                      href={pdf.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-cyan-400 hover:text-cyan-300 underline ml-2"
-                                    >
-                                      別タブで開く
-                                    </a>
-                                  </p>
-                                </object>
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium backdrop-blur-sm border border-white/10 shadow-lg pointer-events-none">
-                                  <Search size={14} className="text-white" />
-                                  <span>拡大</span>
-                                </div>
+                            <a
+                              key={index}
+                              href={pdf.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-950 px-4 py-3 hover:border-indigo-500/40 transition-all"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <FileText size={18} className="text-slate-400 shrink-0" />
+                                <span className="text-sm text-slate-300 truncate">{pdf.name}</span>
                               </div>
-                            </div>
+                              <span className="text-sm text-cyan-400 whitespace-nowrap">開く</span>
+                            </a>
                           ))}
                         </div>
                       </div>
@@ -2012,39 +1995,6 @@ export default function DashboardPage() {
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()} 
             />
-          </div>
-        </div>
-      )}
-
-      {previewPdfUrl && (
-        <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] animate-in fade-in duration-200 cursor-zoom-out"
-          onClick={() => setPreviewPdfUrl(null)}
-        >
-          <button
-            onClick={() => setPreviewPdfUrl(null)}
-            className="absolute top-6 right-6 text-slate-400 hover:text-white bg-slate-900/80 p-2.5 rounded-full border border-slate-800 hover:border-slate-600 transition-all text-sm z-10 font-bold shadow-2xl"
-          >
-            ✕ 閉じる
-          </button>
-          <div className="relative w-[95vw] h-[90vh] rounded-lg overflow-hidden border border-slate-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-200 bg-slate-950">
-            <object
-              data={previewPdfUrl}
-              type="application/pdf"
-              className="w-full h-full"
-            >
-              <p className="text-slate-400 p-4 text-center">
-                PDF を表示できません。
-                <a
-                  href={previewPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 underline ml-2"
-                >
-                  別タブで開く
-                </a>
-              </p>
-            </object>
           </div>
         </div>
       )}
