@@ -113,27 +113,27 @@ export default function ApplicationDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">読み込み中...</div>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">読み込み中...</div>
       </div>
     )
   }
 
   if (!application) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">申請が見つかりません</div>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">申請が見つかりません</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-slate-950">
+      <header className="bg-slate-900 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={() => router.push('/dashboard')}
-            className="text-gray-600 hover:text-gray-800"
+            className="text-slate-400 hover:text-slate-200"
           >
             ← ダッシュボードに戻る
           </button>
@@ -141,19 +141,19 @@ export default function ApplicationDetailPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-slate-900 rounded-lg shadow-md p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold mb-2">{application.title}</h1>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-4 text-sm text-slate-400">
               <span>{application.appName}</span>
               <span>•</span>
               <span>{application.subType}</span>
               <span>•</span>
               <span className={`px-2 py-1 rounded text-xs ${
-                application.workflow.status === '承認待ち' ? 'bg-yellow-100 text-yellow-800' :
-                application.workflow.status === '承認済み' ? 'bg-green-100 text-green-800' :
-                application.workflow.status === '差し戻し' ? 'bg-orange-100 text-orange-800' :
-                'bg-red-100 text-red-800'
+                application.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400' :
+                application.workflow.status === '承認済み' ? 'bg-green-500/10 text-green-400' :
+                application.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400' :
+                'bg-red-500/10 text-red-400'
               }`}>
                 {application.workflow.status}
               </span>
@@ -162,8 +162,8 @@ export default function ApplicationDetailPage() {
 
           <div className="border-t pt-6 space-y-4">
             <div>
-              <h3 className="font-medium text-gray-700 mb-2">申請者情報</h3>
-              <div className="text-sm text-gray-600">
+              <h3 className="font-medium text-slate-300 mb-2">申請者情報</h3>
+              <div className="text-sm text-slate-400">
                 <p>氏名: {application.applicantName}</p>
                 <p>所属: {application.applicantDept}</p>
                 <p>役職: {application.applicantTitle}</p>
@@ -171,14 +171,14 @@ export default function ApplicationDetailPage() {
             </div>
 
             <div>
-              <h3 className="font-medium text-gray-700 mb-2">詳細説明</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{application.description}</p>
+              <h3 className="font-medium text-slate-300 mb-2">詳細説明</h3>
+              <p className="text-sm text-slate-400 whitespace-pre-wrap">{application.description}</p>
             </div>
 
             {application.formDetails && (
               <div>
-                <h3 className="font-medium text-gray-700 mb-2">詳細情報</h3>
-                <div className="text-sm text-gray-600 space-y-1">
+                <h3 className="font-medium text-slate-300 mb-2">詳細情報</h3>
+                <div className="text-sm text-slate-400 space-y-1">
                   {application.formDetails.amount && (
                     <p>金額: ¥{application.formDetails.amount.toLocaleString()}</p>
                   )}
@@ -194,39 +194,39 @@ export default function ApplicationDetailPage() {
 
             {application.remarks && (
               <div>
-                <h3 className="font-medium text-gray-700 mb-2">備考</h3>
-                <p className="text-sm text-gray-600 whitespace-pre-wrap">{application.remarks}</p>
+                <h3 className="font-medium text-slate-300 mb-2">備考</h3>
+                <p className="text-sm text-slate-400 whitespace-pre-wrap">{application.remarks}</p>
               </div>
             )}
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-slate-500">
               作成日: {application.createdAt ? new Date(application.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
             </div>
 
             {approvalHistory.length > 0 && (
               <div>
-                <h3 className="font-medium text-gray-700 mb-3">承認進捗状況</h3>
+                <h3 className="font-medium text-slate-300 mb-3">承認進捗状況</h3>
                 <div className="space-y-3">
                   {approvalHistory.map((history, index) => (
-                    <div key={history.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div key={history.id} className="bg-slate-950 border border-slate-700 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-slate-300">
                           {history.stepName}
                         </span>
                         <span className={`text-xs px-2 py-1 rounded ${
-                          history.action === 'approve' ? 'bg-green-100 text-green-800' :
-                          history.action === 'reject' ? 'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
+                          history.action === 'approve' ? 'bg-green-500/10 text-green-400' :
+                          history.action === 'reject' ? 'bg-orange-500/10 text-orange-400' :
+                          'bg-slate-800 text-slate-200'
                         }`}>
                           {history.action === 'approve' ? '承認' : '差し戻し'}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-slate-400">
                         <p>承認者: {history.approverName}</p>
                         {history.comment && (
-                          <p className="mt-1 text-gray-500">コメント: {history.comment}</p>
+                          <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
                         )}
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
                           {history.createdAt ? new Date(history.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
                         </p>
                       </div>
@@ -239,17 +239,17 @@ export default function ApplicationDetailPage() {
 
           {application.workflow.status === '承認待ち' && (
             <div className="border-t pt-6 mt-6">
-              <h3 className="font-medium text-gray-700 mb-4">承認処理</h3>
+              <h3 className="font-medium text-slate-300 mb-4">承認処理</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
                     コメント
                   </label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="承認/差し戻しのコメントを入力してください"
                   />
                 </div>
@@ -257,14 +257,14 @@ export default function ApplicationDetailPage() {
                   <button
                     onClick={() => handleAction('approve')}
                     disabled={processing}
-                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-green-600 text-slate-50 py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processing && action === 'approve' ? '処理中...' : '承認'}
                   </button>
                   <button
                     onClick={() => handleAction('reject')}
                     disabled={processing}
-                    className="flex-1 bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-orange-600 text-slate-50 py-2 px-4 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processing && action === 'reject' ? '処理中...' : '差し戻し'}
                   </button>

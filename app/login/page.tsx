@@ -37,8 +37,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-slate-900/60 border border-slate-700/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-sm">
         
         <div className="flex flex-col items-center mb-8">
           <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 mb-3">
@@ -62,7 +62,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full bg-slate-950 border border-slate-800 text-slate-200 py-3 px-4 rounded-xl hover:bg-slate-900 hover:border-slate-700 font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg"
+            className="w-full bg-slate-950 border border-slate-700 text-slate-200 py-3 px-4 rounded-xl hover:bg-slate-900 hover:border-slate-700 font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg"
           >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
