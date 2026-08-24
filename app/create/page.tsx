@@ -23,7 +23,7 @@ interface EmployeeMaster {
 }
 
 const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
-  <div className="border-b border-slate-800 last:border-0 overflow-hidden">
+  <div className="border-b border-slate-700 last:border-0 overflow-hidden">
     <button
       type="button"
       onClick={onClick}
@@ -49,7 +49,7 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
       </div>
     </button>
     {isActive && (
-      <div className="p-4 bg-slate-950/40 border-t border-slate-800/50 animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="p-4 bg-slate-950/40 border-t border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-300">
         {children}
       </div>
     )}
@@ -60,7 +60,7 @@ function FileUploadField({ label, file, onChange, required = false }: { label: s
   return (
     <div>
       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{label} {required && <span className="text-rose-500">*</span>}</label>
-      <label className="group flex items-center justify-between w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-all">
+      <label className="group flex items-center justify-between w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-all">
         <span className={`text-sm truncate ${file ? 'text-slate-200' : 'text-slate-600'}`}>{file ? file.name : 'ファイルを選択'}</span>
         <Paperclip size={16} className="text-slate-600 group-hover:text-indigo-400" />
         <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)} />
@@ -877,7 +877,7 @@ function CreatePageContent() {
                       ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
                       : someSelected
                         ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
-                        : 'bg-slate-900/40 border-slate-800/60 text-slate-400 hover:bg-slate-800/60'
+                        : 'bg-slate-900/40 border-slate-700/60 text-slate-400 hover:bg-slate-800/60'
                   }`}
                 >
                   {dept}
@@ -901,7 +901,7 @@ function CreatePageContent() {
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block px-1">{dept}</span>
                 <div className="grid grid-cols-1 gap-1.5">
                   {filtered.map((m) => (
-                    <button key={m.name} type="button" onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${selectedList.includes(m.name) ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-900/40 border-slate-800/60 text-slate-400 hover:bg-slate-800/60'}`}>
+                    <button key={m.name} type="button" onClick={() => toggleMemberSelection(m.name, selectedList, setSelectedList)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${selectedList.includes(m.name) ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-900/40 border-slate-700/60 text-slate-400 hover:bg-slate-800/60'}`}>
                       <span>{m.name}</span>
                       {selectedList.includes(m.name) && <Check size={12} />}
                     </button>
@@ -916,21 +916,21 @@ function CreatePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
-      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+      <header className="sticky top-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-700/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-          <button type="button" onClick={() => router.push('/dashboard')} className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"><ArrowLeft size={20} /></button>
+          <button type="button" onClick={() => router.push('/dashboard')} className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-50 rounded-xl border border-slate-700/50 transition-all"><ArrowLeft size={20} /></button>
           <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">新規申請・回覧作成</h1>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex p-1.5 bg-slate-900/80 border border-slate-800 rounded-2xl mb-8 max-w-md mx-auto shadow-2xl">
-          <button type="button" onClick={() => handleModeChange('approval')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'approval' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><FileText size={18}/> 稟議申請</button>
-          <button type="button" onClick={() => handleModeChange('report')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'report' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Share2 size={18}/> 回覧報告</button>
+        <div className="flex p-1.5 bg-slate-900/80 border border-slate-700 rounded-2xl mb-8 max-w-md mx-auto shadow-2xl">
+          <button type="button" onClick={() => handleModeChange('approval')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'approval' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><FileText size={18}/> 稟議申請</button>
+          <button type="button" onClick={() => handleModeChange('report')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'report' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Share2 size={18}/> 回覧報告</button>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+        <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
           {error && <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-5 py-4 rounded-xl mb-8 text-sm font-medium animate-in zoom-in duration-300">⚠️ {error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-10">
@@ -939,7 +939,7 @@ function CreatePageContent() {
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">書類種別</label>
                   <div className="relative">
-                    <select value={subType} onChange={(e) => setSubType(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                    <select value={subType} onChange={(e) => setSubType(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                       {mode === 'approval' ? (
                         <>
                           <option value="通常申請">通常申請</option>
@@ -966,13 +966,13 @@ function CreatePageContent() {
                 </div>
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">件名 <span className="text-rose-500">*</span></label>
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="件名を入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="件名を入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
                 </div>
               </div>
 
               {mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <Users size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">求人詳細情報</h3>
                   </div>
@@ -980,7 +980,7 @@ function CreatePageContent() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="三保事業所">三保事業所</option>
                           <option value="九州支店">九州支店</option>
@@ -995,7 +995,7 @@ function CreatePageContent() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="新規雇用">新規雇用</option>
                           <option value="欠員補充">欠員補充</option>
@@ -1005,34 +1005,34 @@ function CreatePageContent() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">配属現場名</label>
-                      <input type="text" value={jobLocation} onChange={(e) => setJobLocation(e.target.value)} placeholder="配属現場名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={jobLocation} onChange={(e) => setJobLocation(e.target.value)} placeholder="配属現場名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務内容</label>
-                      <input type="text" value={jobContent} onChange={(e) => setJobContent(e.target.value)} placeholder="例：受付業務" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={jobContent} onChange={(e) => setJobContent(e.target.value)} placeholder="例：受付業務" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務時間</label>
-                      <input type="text" value={workHours} onChange={(e) => setWorkHours(e.target.value)} placeholder="例：9:00-18:00" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={workHours} onChange={(e) => setWorkHours(e.target.value)} placeholder="例：9:00-18:00" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務曜日</label>
-                      <input type="text" value={workDays} onChange={(e) => setWorkDays(e.target.value)} placeholder="例：月〜金" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={workDays} onChange={(e) => setWorkDays(e.target.value)} placeholder="例：月〜金" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">募集単価</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                        <input type="number" value={recruitmentUnitPrice} onChange={(e) => setRecruitmentUnitPrice(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                        <input type="number" value={recruitmentUnitPrice} onChange={(e) => setRecruitmentUnitPrice(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">掲載希望日</label>
-                      <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">募集媒体</label>
                       <div className="relative">
-                        <select value={recruitmentMedia} onChange={(e) => setRecruitmentMedia(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={recruitmentMedia} onChange={(e) => setRecruitmentMedia(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="DOMO">DOMO</option>
                           <option value="インディードプラス">インディードプラス</option>
@@ -1046,32 +1046,32 @@ function CreatePageContent() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">掲載費用</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                        <input type="number" value={postingFee} onChange={(e) => setPostingFee(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                        <input type="number" value={postingFee} onChange={(e) => setPostingFee(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">売上</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                        <input type="number" value={salesAmount} onChange={(e) => setSalesAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                        <input type="number" value={salesAmount} onChange={(e) => setSalesAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">原価</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                        <input type="number" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                        <input type="number" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">原価率（%）</label>
-                      <input type="number" value={costRate} onChange={(e) => setCostRate(e.target.value)} placeholder="例：80" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={costRate} onChange={(e) => setCostRate(e.target.value)} placeholder="例：80" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名</label>
-                      <input type="text" value={retireeName} onChange={(e) => setRetireeName(e.target.value)} placeholder="欠員補充の場合のみ" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={retireeName} onChange={(e) => setRetireeName(e.target.value)} placeholder="欠員補充の場合のみ" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職（予定）日</label>
-                      <input type="date" value={retireeDate} onChange={(e) => setRetireeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" value={retireeDate} onChange={(e) => setRetireeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                 </div>
@@ -1098,23 +1098,23 @@ function CreatePageContent() {
               )}
 
               {mode === 'report' && subType === '入札結果報告' && (
-                <div className="space-y-8 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-8 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <Gavel size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">入札詳細情報</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札執行場所</label>
-                      <input type="text" value={biddingDetails.location} onChange={(e) => setBiddingDetails({...biddingDetails, location: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={biddingDetails.location} onChange={(e) => setBiddingDetails({...biddingDetails, location: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札執行日</label>
-                      <input type="date" style={{ colorScheme: 'dark' }} value={biddingDetails.date} onChange={(e) => setBiddingDetails({...biddingDetails, date: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" style={{ colorScheme: 'dark' }} value={biddingDetails.date} onChange={(e) => setBiddingDetails({...biddingDetails, date: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">入札時間</label>
-                      <input type="text" value={biddingDetails.time} onChange={(e) => setBiddingDetails({...biddingDetails, time: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={biddingDetails.time} onChange={(e) => setBiddingDetails({...biddingDetails, time: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/40 p-4 rounded-xl border border-indigo-500/20 shadow-lg">
@@ -1124,22 +1124,22 @@ function CreatePageContent() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">第1回落札金額</label>
-                      <input type="number" value={biddingDetails.winnerBid1} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid1: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={biddingDetails.winnerBid1} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid1: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">第2回落札金額</label>
-                      <input type="number" value={biddingDetails.winnerBid2} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid2: e.target.value})} className="w-full bg-slate-955 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={biddingDetails.winnerBid2} onChange={(e) => setBiddingDetails({...biddingDetails, winnerBid2: e.target.value})} className="w-full bg-slate-955 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
                     <div className="flex items-center text-sm font-bold text-emerald-400 px-2">ヤマダユニア株式会社</div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">第1回入札金額</label>
-                      <input type="number" value={biddingDetails.ourBid1} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid1: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={biddingDetails.ourBid1} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid1: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">第2回入札金額</label>
-                      <input type="number" value={biddingDetails.ourBid2} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid2: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                      <input type="number" value={biddingDetails.ourBid2} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid2: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -1149,19 +1149,19 @@ function CreatePageContent() {
                           <span className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-full text-[10px] font-bold text-slate-400">{(idx + 1).toString()}</span>
                           <input type="text" value={p.name} onChange={(e) => {
                             const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], name: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
-                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-300 outline-none" placeholder="参加業者名" />
+                          }} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-300 outline-none" placeholder="参加業者名" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-600 whitespace-nowrap font-bold uppercase">1回</span>
                           <input type="number" value={p.bid1} onChange={(e) => {
                             const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], bid1: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
-                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
+                          }} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-600 whitespace-nowrap font-bold uppercase">2回</span>
                           <input type="number" value={p.bid2} onChange={(e) => {
                             const newP = [...biddingDetails.participants]; newP[idx] = {...newP[idx], bid2: e.target.value}; setBiddingDetails({...biddingDetails, participants: newP});
-                          }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
+                          }} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 outline-none text-right" />
                         </div>
                       </div>
                     ))}
@@ -1170,12 +1170,12 @@ function CreatePageContent() {
                     <div className="md:col-span-2 flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-400" /><h4 className="text-sm font-bold text-amber-400 uppercase tracking-widest">前年度実績比較</h4></div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 px-1">前年度落札業者</label>
-                      <input type="text" value={biddingDetails.prevWinnerName} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={biddingDetails.prevWinnerName} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerName: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 px-1">前年度落札金額</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 font-bold">¥</span>
-                        <input type="number" value={biddingDetails.prevWinnerAmount} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerAmount: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-lg font-bold text-amber-200 outline-none text-right" />
+                        <input type="number" value={biddingDetails.prevWinnerAmount} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerAmount: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-amber-200 outline-none text-right" />
                       </div>
                     </div>
                   </div>
@@ -1183,23 +1183,23 @@ function CreatePageContent() {
               )}
 
               {mode === 'approval' && subType === '協力会社登録' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <Users size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">協力会社登録情報</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">取引開始予定日</label>
-                      <input type="date" value={coStartDate} onChange={(e) => setCoStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" value={coStartDate} onChange={(e) => setCoStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">知り得た経緯、発注予定の業務名</label>
-                      <textarea value={coBackground} onChange={(e) => setCoBackground(e.target.value)} rows={3} placeholder="紹介先、発注予定業務など" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <textarea value={coBackground} onChange={(e) => setCoBackground(e.target.value)} rows={3} placeholder="紹介先、発注予定業務など" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1214,73 +1214,73 @@ function CreatePageContent() {
               )}
 
               {mode === 'approval' && subType === '給与情報変更申請' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <FileText size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">給与情報変更情報</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">顧客名</label>
-                      <input type="text" value={salaryCustomerName} onChange={(e) => setSalaryCustomerName(e.target.value)} placeholder="顧客名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={salaryCustomerName} onChange={(e) => setSalaryCustomerName(e.target.value)} placeholder="顧客名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現場名</label>
-                      <input type="text" value={salarySiteName} onChange={(e) => setSalarySiteName(e.target.value)} placeholder="現場名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={salarySiteName} onChange={(e) => setSalarySiteName(e.target.value)} placeholder="現場名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">対象者社員番号（4桁）</label>
-                      <input type="text" value={salaryEmployeeNumber} onChange={(e) => setSalaryEmployeeNumber(e.target.value)} maxLength={4} placeholder="例：0123" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={salaryEmployeeNumber} onChange={(e) => setSalaryEmployeeNumber(e.target.value)} maxLength={4} placeholder="例：0123" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">対象者氏名</label>
-                      <input type="text" value={salaryEmployeeName} onChange={(e) => setSalaryEmployeeName(e.target.value)} placeholder="対象者氏名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={salaryEmployeeName} onChange={(e) => setSalaryEmployeeName(e.target.value)} placeholder="対象者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">変更詳細情報（現状と変更後）</label>
-                      <textarea value={salaryChangeDetails} onChange={(e) => setSalaryChangeDetails(e.target.value)} rows={4} placeholder="現状：&#10;変更後：" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <textarea value={salaryChangeDetails} onChange={(e) => setSalaryChangeDetails(e.target.value)} rows={4} placeholder="現状：&#10;変更後：" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務変更の開始日</label>
-                      <input type="date" value={salaryStartDate} onChange={(e) => setSalaryStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" value={salaryStartDate} onChange={(e) => setSalaryStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">事由及び変更後の状況</label>
-                      <textarea value={salaryReason} onChange={(e) => setSalaryReason(e.target.value)} rows={3} placeholder="事由や変更後の状況を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <textarea value={salaryReason} onChange={(e) => setSalaryReason(e.target.value)} rows={3} placeholder="事由や変更後の状況を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                 </div>
               )}
 
               {mode === 'report' && subType === '退職者通知' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <Users size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">退職者通知情報</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 <span className="text-rose-500">*</span></label>
-                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 <span className="text-rose-500">*</span></label>
-                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} />
@@ -1290,8 +1290,8 @@ function CreatePageContent() {
               )}
 
               {mode === 'report' && subType === '訃報連絡' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                     <Users size={22} className="text-cyan-400" />
                     <h3 className="text-lg font-bold text-slate-100">訃報連絡情報</h3>
                   </div>
@@ -1299,7 +1299,7 @@ function CreatePageContent() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="社員">社員</option>
                           <option value="社員家族">社員家族</option>
@@ -1310,33 +1310,33 @@ function CreatePageContent() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     {obituaryType === '社員' && (
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現場名</label>
-                        <input type="text" value={obituarySite} onChange={(e) => setObituarySite(e.target.value)} placeholder="社員の場合のみ" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituarySite} onChange={(e) => setObituarySite(e.target.value)} placeholder="社員の場合のみ" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                       </div>
                     )}
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required placeholder="例：実父" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required placeholder="例：実父" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">喪主名</label>
-                      <input type="text" value={obituaryChiefMourner} onChange={(e) => setObituaryChiefMourner(e.target.value)} placeholder="喪主名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryChiefMourner} onChange={(e) => setObituaryChiefMourner(e.target.value)} placeholder="喪主名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">通夜日時</label>
-                      <input type="datetime-local" value={obituaryWakeDate} onChange={(e) => setObituaryWakeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="datetime-local" value={obituaryWakeDate} onChange={(e) => setObituaryWakeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">葬儀日時</label>
-                      <input type="datetime-local" value={obituaryFuneralDate} onChange={(e) => setObituaryFuneralDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="datetime-local" value={obituaryFuneralDate} onChange={(e) => setObituaryFuneralDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} />
@@ -1344,27 +1344,27 @@ function CreatePageContent() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">① 通夜・葬儀会場</label>
-                      <input type="text" value={obituaryVenue} onChange={(e) => setObituaryVenue(e.target.value)} placeholder="会場名・住所など" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryVenue} onChange={(e) => setObituaryVenue(e.target.value)} placeholder="会場名・住所など" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">② 弔電送付先</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" value={obituaryCondolencePostal} onChange={(e) => setObituaryCondolencePostal(e.target.value)} placeholder="郵便番号" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
-                        <input type="text" value={obituaryCondolencePhone} onChange={(e) => setObituaryCondolencePhone(e.target.value)} placeholder="電話番号" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
-                        <input type="text" value={obituaryCondolenceVenueName} onChange={(e) => setObituaryCondolenceVenueName(e.target.value)} placeholder="会場名" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
-                        <input type="text" value={obituaryCondolenceAddress} onChange={(e) => setObituaryCondolenceAddress(e.target.value)} placeholder="住所" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolencePostal} onChange={(e) => setObituaryCondolencePostal(e.target.value)} placeholder="郵便番号" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolencePhone} onChange={(e) => setObituaryCondolencePhone(e.target.value)} placeholder="電話番号" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolenceVenueName} onChange={(e) => setObituaryCondolenceVenueName(e.target.value)} placeholder="会場名" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolenceAddress} onChange={(e) => setObituaryCondolenceAddress(e.target.value)} placeholder="住所" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">香典金額</label>
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                        <input type="number" value={obituaryCondolenceAmount} onChange={(e) => setObituaryCondolenceAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                        <input type="number" value={obituaryCondolenceAmount} onChange={(e) => setObituaryCondolenceAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="弔電依頼">弔電依頼</option>
                           <option value="弔電・生花依頼">弔電・生花依頼</option>
@@ -1377,7 +1377,7 @@ function CreatePageContent() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">当社参列者名</label>
-                      <input type="text" value={obituaryAttendees} onChange={(e) => setObituaryAttendees(e.target.value)} placeholder="複数の場合はカンマ区切り" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <input type="text" value={obituaryAttendees} onChange={(e) => setObituaryAttendees(e.target.value)} placeholder="複数の場合はカンマ区切り" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                 </div>
@@ -1385,40 +1385,40 @@ function CreatePageContent() {
 
               <div>
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
               </div>
             </section>
 
             {mode === 'approval' && subType === '通常申請' && (
-              <section className="bg-slate-950/40 border border-slate-800 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-300">
+              <section className="bg-slate-950/40 border border-slate-700 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-300">
                 <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">金額</label>
                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
                   </div>
                 </div>
                 <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日</label>
-                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none"/>
+                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none"/>
                 </div>
                 <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払先</label>
-                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl outline-none"/>
+                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl outline-none"/>
                 </div>
               </section>
             )}
 
             {mode === 'approval' && subType === '代表者印捺印申請' && (
-              <section className='space-y-6 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
+              <section className='space-y-6 bg-slate-950/40 border border-slate-700 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
                 <div>
                   <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額</label>
                   <div className='relative'><span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xl font-black text-cyan-400 outline-none' />
+                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none' />
                   </div>
                 </div>
               </section>
             )}
 
             {mode === 'approval' && subType === '出張旅費申請' && (
-              <section className='space-y-8 bg-slate-950/40 border border-slate-800 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
-                <div className='flex items-center gap-3 border-b border-slate-800 pb-4 mb-2'>
+              <section className='space-y-8 bg-slate-950/40 border border-slate-700 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
+                <div className='flex items-center gap-3 border-b border-slate-700 pb-4 mb-2'>
                   <FileText size={22} className='text-cyan-400' />
                   <h3 className='text-lg font-bold text-slate-100'>出張旅費明細</h3>
                 </div>
@@ -1426,11 +1426,11 @@ function CreatePageContent() {
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>出張開始日</label>
-                    <input type='date' value={tripDetails.startDate} onChange={(e) => setTripDetails({ ...tripDetails, startDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                    <input type='date' value={tripDetails.startDate} onChange={(e) => setTripDetails({ ...tripDetails, startDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none' />
                   </div>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>出張終了日</label>
-                    <input type='date' value={tripDetails.endDate} onChange={(e) => setTripDetails({ ...tripDetails, endDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                    <input type='date' value={tripDetails.endDate} onChange={(e) => setTripDetails({ ...tripDetails, endDate: e.target.value })} style={{ colorScheme: 'dark' }} className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none' />
                   </div>
                 </div>
 
@@ -1438,14 +1438,14 @@ function CreatePageContent() {
                   <h4 className='text-sm font-bold text-slate-300 uppercase tracking-widest'>利用交通機関・料金</h4>
                   {tripDetails.transport.map((t, idx) => (
                     <div key={idx} className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                      <input type='text' value={t.method} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], method: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder={`交通機関 ${idx + 1}`} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                      <input type='text' value={t.method} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], method: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder={`交通機関 ${idx + 1}`} className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none' />
                       <div className='relative'>
                         <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                        <input type='number' value={t.amount} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], amount: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder='金額' className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                        <input type='number' value={t.amount} onChange={(e) => { const nt = [...tripDetails.transport]; nt[idx] = { ...nt[idx], amount: e.target.value }; setTripDetails({ ...tripDetails, transport: nt }) }} placeholder='金額' className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none text-right' />
                       </div>
                     </div>
                   ))}
-                  <div className='flex justify-end items-center gap-3 border-t border-slate-800 pt-4'>
+                  <div className='flex justify-end items-center gap-3 border-t border-slate-700 pt-4'>
                     <span className='text-sm text-slate-400'>交通費合計</span>
                     <span className='text-2xl font-black text-cyan-400'>¥{transportTotal.toLocaleString()}</span>
                   </div>
@@ -1454,13 +1454,13 @@ function CreatePageContent() {
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>宿泊日数</label>
-                    <input type='number' value={tripDetails.accommodationNights} onChange={(e) => setTripDetails({ ...tripDetails, accommodationNights: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                    <input type='number' value={tripDetails.accommodationNights} onChange={(e) => setTripDetails({ ...tripDetails, accommodationNights: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none text-right' />
                   </div>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>宿泊単価</label>
                     <div className='relative'>
                       <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                      <input type='number' value={tripDetails.accommodationUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, accommodationUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                      <input type='number' value={tripDetails.accommodationUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, accommodationUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none text-right' />
                     </div>
                   </div>
                   <div className='flex flex-col justify-end'>
@@ -1471,19 +1471,19 @@ function CreatePageContent() {
 
                 <div>
                   <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>業務対応時間</label>
-                  <input type='text' value={tripDetails.businessHours} onChange={(e) => setTripDetails({ ...tripDetails, businessHours: e.target.value })} placeholder='例：8時間' className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none' />
+                  <input type='text' value={tripDetails.businessHours} onChange={(e) => setTripDetails({ ...tripDetails, businessHours: e.target.value })} placeholder='例：8時間' className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none' />
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>日当（日数）</label>
-                    <input type='number' value={tripDetails.dailyAllowanceDays} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceDays: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                    <input type='number' value={tripDetails.dailyAllowanceDays} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceDays: e.target.value })} className='w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none text-right' />
                   </div>
                   <div>
                     <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>日当単価</label>
                     <div className='relative'>
                       <span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                      <input type='number' value={tripDetails.dailyAllowanceUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 outline-none text-right' />
+                      <input type='number' value={tripDetails.dailyAllowanceUnitPrice} onChange={(e) => setTripDetails({ ...tripDetails, dailyAllowanceUnitPrice: e.target.value })} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none text-right' />
                     </div>
                   </div>
                   <div className='flex flex-col justify-end'>
@@ -1492,7 +1492,7 @@ function CreatePageContent() {
                   </div>
                 </div>
 
-                <div className='flex justify-end items-center gap-4 border-t border-slate-800 pt-6'>
+                <div className='flex justify-end items-center gap-4 border-t border-slate-700 pt-6'>
                   <span className='text-sm font-bold text-slate-300 uppercase tracking-widest'>旅費合計</span>
                   <span className='text-3xl font-black text-emerald-400'>¥{tripTotal.toLocaleString()}</span>
                 </div>
@@ -1502,17 +1502,17 @@ function CreatePageContent() {
             <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
               <div>
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考</label>
-                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 outline-none" />
+                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル</label>
-                <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-800 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
+                <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-700 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
                   <Paperclip size={24} className="text-slate-600 group-hover:text-indigo-400 mb-2" />
                   <span className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">選択してアップロード</span>
                   <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files && setFiles(prev => [...prev, ...Array.from(e.target.files!)])} />
                 </label>
                 <div className="mt-2 space-y-1">{files.map((f, i) => (
-                  <div key={i} className="flex justify-between items-center text-[10px] bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div key={i} className="flex justify-between items-center text-[10px] bg-slate-950/60 p-2 rounded-lg border border-slate-700">
                     <span className="truncate max-w-[200px]">{f.name}</span>
                     <button type="button" onClick={() => removeFile(i)} className="text-rose-500 hover:text-rose-400"><X size={12}/></button>
                   </div>
@@ -1522,7 +1522,7 @@ function CreatePageContent() {
 
             <section className="space-y-4">
               <h3 className="text-sm font-black text-slate-300 uppercase tracking-[0.2em] flex items-center gap-3 mb-6"><Users size={18} className="text-indigo-500" /> {mode === 'approval' ? '承認・回覧経路の設定' : '回覧先の選択'}</h3>
-              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
+              <div className="bg-slate-950/40 border border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
                 {mode === 'approval' ? (
                   <>
                     {currentRoute.stepOrder.map((stepKey: string) => {
@@ -1577,10 +1577,10 @@ function CreatePageContent() {
               </div>
             </section>
 
-            <div className="flex gap-4 pt-6 border-t border-slate-800/80">
-              <button type="button" onClick={() => router.push('/dashboard')} className="flex-1 bg-slate-800/40 text-slate-400 font-bold py-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:text-white transition-all text-sm tracking-widest uppercase">キャンセル</button>
-              <button type="submit" disabled={loading} className="flex-[2] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-4 rounded-xl shadow-lg transition-all text-base tracking-[0.2em] flex items-center justify-center gap-3 uppercase disabled:opacity-50">
-                {loading ? <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : <><Send size={18} /> {mode === 'approval' ? '申請を送信する' : '回覧を開始する'}</>}
+            <div className="flex gap-4 pt-6 border-t border-slate-700/80">
+              <button type="button" onClick={() => router.push('/dashboard')} className="flex-1 bg-slate-800/40 text-slate-400 font-bold py-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:text-slate-50 transition-all text-sm tracking-widest uppercase">キャンセル</button>
+              <button type="submit" disabled={loading} className="flex-[2] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-50 font-black py-4 rounded-xl shadow-lg transition-all text-base tracking-[0.2em] flex items-center justify-center gap-3 uppercase disabled:opacity-50">
+                {loading ? <div className="w-5 h-5 border-2 border-slate-50/20 border-t-slate-50 rounded-full animate-spin"></div> : <><Send size={18} /> {mode === 'approval' ? '申請を送信する' : '回覧を開始する'}</>}
               </button>
             </div>
           </form>

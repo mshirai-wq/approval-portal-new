@@ -151,7 +151,7 @@ function FormDetailsDisplay({ details }: { details: Record<string, any> }) {
         const label = FORM_DETAIL_LABELS[key] || key
         if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
           return (
-            <div key={key} className="border border-slate-800/50 rounded-lg p-3">
+            <div key={key} className="border border-slate-700/50 rounded-lg p-3">
               <span className="text-slate-500 mr-2">{label}:</span>
               <div className="mt-1 space-y-1 pl-2">
                 {Object.entries(value).map(([subKey, subValue]) => {
@@ -194,7 +194,7 @@ function PaginationControls({
   onRefresh: () => void
 }) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-800">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-700">
       <button
         onClick={onRefresh}
         disabled={loading}
@@ -253,7 +253,7 @@ function ApplicationList({
         <div
           key={app.id}
           onClick={() => onItemClick(app)}
-          className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 cursor-pointer hover:bg-slate-800/50 hover:border-slate-700 transition-all"
+          className="bg-slate-950/30 border border-slate-700/60 rounded-xl p-4 cursor-pointer hover:bg-slate-800/50 hover:border-slate-700 transition-all"
         >
           <div className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-3">
@@ -295,7 +295,7 @@ function ApplicationAccordion({
   showCount?: boolean
 }) {
   return (
-    <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+    <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
       <button
         type="button"
         onClick={onToggle}
@@ -318,11 +318,11 @@ function ApplicationAccordion({
       {isOpen && (
         <div className="mt-4">
           {loading ? (
-            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 animate-pulse">
               読み込み中...
             </div>
           ) : applications.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+            <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
               {emptyMessage}
             </div>
           ) : (
@@ -1211,7 +1211,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-slate-400 animate-pulse flex items-center gap-2 font-medium">
           データを読み込み中...
         </div>
@@ -1222,8 +1222,8 @@ export default function DashboardPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
-      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40 print:hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+      <header className="sticky top-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-700/80 z-40 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent cursor-pointer"
@@ -1258,7 +1258,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div 
                 onClick={() => setView('approvals')}
-                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
+                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-700 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-indigo-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
                 <div>
@@ -1287,7 +1287,7 @@ export default function DashboardPage() {
 
               <div 
                 onClick={() => router.push('/create')}
-                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
+                className="relative group overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)] hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-56"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
                 <div>
@@ -1309,7 +1309,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+            <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               <button
                 type="button"
                 onClick={() => setSendHistoryOpen(prev => !prev)}
@@ -1326,11 +1326,11 @@ export default function DashboardPage() {
               {sendHistoryOpen && (
                 <div className="mt-4">
                   {loadingMyApps ? (
-                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 animate-pulse">
                       読み込み中...
                     </div>
                   ) : myApplications.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
                       あなたが送信した申請はまだありません
                     </div>
                   ) : (
@@ -1351,7 +1351,7 @@ export default function DashboardPage() {
             </div>
 
             {user?.canViewAllApplications && (
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+              <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
                 <button
                   type="button"
                   onClick={() => setAllAppsOpen(prev => !prev)}
@@ -1374,15 +1374,15 @@ export default function DashboardPage() {
                         value={allAppsSearchQuery}
                         onChange={(e) => setAllAppsSearchQuery(e.target.value)}
                         placeholder="件名・申請者・種別・申請番号で検索"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
                       />
                     </div>
                     {loadingAllApps ? (
-                      <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 animate-pulse">
+                      <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 animate-pulse">
                         読み込み中...
                       </div>
                     ) : visibleAllApplications.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                      <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
                         他の社員の申請はまだありません
                       </div>
                     ) : (
@@ -1433,7 +1433,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <button 
                 onClick={() => setView('top')}
-                className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 group bg-slate-900 px-4 py-2 rounded-xl border border-slate-800"
+                className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 group bg-slate-900 px-4 py-2 rounded-xl border border-slate-700"
               >
                 <span className="group-hover:-translate-x-1 transition-transform">←</span> トップページへ戻る
               </button>
@@ -1442,13 +1442,13 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
               {/* カード1：社内用ポータル申請（承認待ち ＆ 回覧報告） */}
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
+              <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
                 <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/80 pb-4 mb-4">
                     <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
                       📥 ポータル申請タスク
                     </h2>
-                    <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800/80 text-xs font-semibold">
+                    <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700/80 text-xs font-semibold">
                       <button
                         onClick={() => setApprovalTab('pending')}
                         className={`px-3 py-1.5 rounded-md transition-all ${
@@ -1476,7 +1476,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-slate-400 text-xs mb-4">自分が承認者として設定されている申請</p>
                       {pendingApprovals.length === 0 ? (
-                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
                           承認待ちの申請はありません
                         </div>
                       ) : (
@@ -1484,10 +1484,10 @@ export default function DashboardPage() {
                           {pendingApprovals.map(app => (
                             <div 
                               key={app.id} 
-                              className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                              className="p-3 bg-slate-800/40 border border-slate-700/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
                               onClick={() => handleApplicationClick(app, 'pending')}
                             >
-                              <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
+                              <div className="font-semibold text-sm text-slate-200 group-hover:text-slate-50 transition-colors">{app.title}</div>
                               <div className="text-xs text-slate-400 mt-1 flex justify-between">
                                 <span>{app.applicantName}</span>
                                 <span className="text-slate-500">{app.subType}</span>
@@ -1501,7 +1501,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-slate-400 text-xs mb-4">自分が回覧先に設定されている未確認の申請</p>
                       {circulations.length === 0 ? (
-                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40">
+                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
                           未確認の回覧はありません
                         </div>
                       ) : (
@@ -1509,10 +1509,10 @@ export default function DashboardPage() {
                           {circulations.map(app => (
                             <div 
                               key={app.id} 
-                              className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                              className="p-3 bg-slate-800/40 border border-slate-700/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
                               onClick={() => handleApplicationClick(app, 'circulation')}
                             >
-                              <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{app.title}</div>
+                              <div className="font-semibold text-sm text-slate-200 group-hover:text-slate-50 transition-colors">{app.title}</div>
                               <div className="text-xs text-slate-400 mt-1 flex justify-between">
                                 <span>{app.applicantName}</span>
                                 <span className="text-slate-500">{app.subType}</span>
@@ -1527,9 +1527,9 @@ export default function DashboardPage() {
               </div>
 
               {/* カード2：AppSheet連携（情報収集 ＆ 経費申請） */}
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
+              <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between min-h-[420px]">
                 <div>
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                  <div className="flex items-center justify-between border-b border-slate-700 pb-4 mb-4">
                     <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
                       📊 AppSheet連携
                     </h2>
@@ -1546,7 +1546,7 @@ export default function DashboardPage() {
                   <p className="text-slate-400 text-xs mb-4">自分が確認担当者に設定されている未確認の情報</p>
                   
                   {informations.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-800 rounded-lg bg-slate-950/40 mb-6">
+                    <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 mb-6">
                       未確認の情報はありません
                     </div>
                   ) : (
@@ -1554,10 +1554,10 @@ export default function DashboardPage() {
                       {informations.map(info => (
                         <div 
                           key={info.id} 
-                          className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
+                          className="p-3 bg-slate-800/40 border border-slate-700/60 rounded-lg hover:bg-slate-800/90 hover:border-slate-700 transition-all cursor-pointer group"
                           onClick={() => handleInformationClick(info)}
                         >
-                          <div className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">{info.title}</div>
+                          <div className="font-semibold text-sm text-slate-200 group-hover:text-slate-50 transition-colors">{info.title}</div>
                           <div className="text-xs text-slate-400 mt-1">
                             確認担当者: {(info.reviewers || []).join(', ')}
                           </div>
@@ -1567,14 +1567,14 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="border-t border-slate-800/80 pt-6 mt-auto">
+                <div className="border-t border-slate-700/80 pt-6 mt-auto">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-slate-500">経費精算の承認・確認はこちら</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => router.push('/expenses')}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.25)] hover:shadow-[0_0_20px_rgba(147,51,234,0.35)] transition-all text-sm tracking-wide flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-slate-50 font-semibold py-3 px-4 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.25)] hover:shadow-[0_0_20px_rgba(147,51,234,0.35)] transition-all text-sm tracking-wide flex items-center justify-center gap-2"
                   >
                     <span>💸</span> AppSheet経費申請一覧を開く
                   </button>
@@ -1588,16 +1588,16 @@ export default function DashboardPage() {
 
       {showDetailModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity print:static print:block print:h-auto print:max-h-none print:overflow-visible print:p-0 print:bg-transparent">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:w-full print:rounded-none print:shadow-none print:border-0 print:min-h-0">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:w-full print:rounded-none print:shadow-none print:border-0 print:min-h-0">
             <div className="p-6">
-              <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
+              <div className="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
                 <h2 className="text-xl font-bold text-slate-100">{selectedApplication.title}</h2>
                 <div className="flex items-center gap-2 print:hidden">
                   <button
                     type="button"
                     onClick={() => window.print()}
                     title="印刷"
-                    className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
+                    className="text-slate-400 hover:text-slate-50 bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                   >
                     <Printer size={18} />
                   </button>
@@ -1606,7 +1606,7 @@ export default function DashboardPage() {
                       setShowDetailModal(false)
                       setModalSource(null)
                     }}
-                    className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
+                    className="text-slate-400 hover:text-slate-50 bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                   >
                     ✕
                   </button>
@@ -1616,13 +1616,13 @@ export default function DashboardPage() {
               <div className="space-y-6">
                 {modalSource === 'information' ? (
                   <>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-700/60 w-fit">
                       <span>情報収集データ</span>
                       <span className="text-slate-700">•</span>
                       <StatusBadge status={(selectedApplication as AppSheetInformation).ステータス} />
                     </div>
 
-                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                    <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">確認担当者</h3>
                       <div className="text-sm text-slate-400">
                         <p>{((selectedApplication as AppSheetInformation).確認担当者 || []).join(', ') || (selectedApplication as AppSheetInformation).reviewers?.join?.(', ') || '未設定'}</p>
@@ -1631,14 +1631,14 @@ export default function DashboardPage() {
 
                     <div>
                       <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">内容</h3>
-                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{(selectedApplication as AppSheetInformation).内容}</p>
+                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{(selectedApplication as AppSheetInformation).内容}</p>
                     </div>
 
-                    <div className="text-xs text-slate-500 text-right border-t border-slate-800 pt-4">
+                    <div className="text-xs text-slate-500 text-right border-t border-slate-700 pt-4">
                       作成日: {(selectedApplication as AppSheetInformation).作成日時 ? new Date((selectedApplication as AppSheetInformation).作成日時).toLocaleString('ja-JP') : '-'}
                     </div>
 
-                    <div className="border-t border-slate-800 pt-4">
+                    <div className="border-t border-slate-700 pt-4">
                       <InformationConfirmForm
                         information={selectedApplication as AppSheetInformation}
                         onConfirm={handleInformationConfirm}
@@ -1647,7 +1647,7 @@ export default function DashboardPage() {
                   </>
                 ) : isApplication(selectedApplication) ? (
                   <>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-700/60 w-fit">
                       <span className="text-slate-300 font-mono">No. {selectedApplication.applicationNo ?? '-'}</span>
                       <span className="text-slate-700">•</span>
                       <span>{selectedApplication.appName}</span>
@@ -1678,7 +1678,7 @@ export default function DashboardPage() {
                       ) : null
                     })()}
 
-                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                    <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">申請者情報</h3>
                       <div className="text-sm text-slate-400 space-y-1.5">
                         <p><span className="text-slate-500 mr-2">氏名:</span>{selectedApplication.applicantName}</p>
@@ -1687,9 +1687,9 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                    <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
                       <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
-                      <div className="relative border-l border-slate-800 ml-2 pl-6 space-y-4 my-2">
+                      <div className="relative border-l border-slate-700 ml-2 pl-6 space-y-4 my-2">
                         {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
                           const stepData = selectedApplication.workflow.steps?.[stepKey]
                           const approverNames = stepData?.approvers || []
@@ -1702,7 +1702,7 @@ export default function DashboardPage() {
                                 stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
                                 stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
                                 stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
-                                'border-slate-800'
+                                'border-slate-700'
                               }`} />
                               
                               <div>
@@ -1719,7 +1719,7 @@ export default function DashboardPage() {
                                   stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
                                   stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                   stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                  'bg-slate-900 text-slate-600 border-slate-800/50'
+                                  'bg-slate-900 text-slate-600 border-slate-700/50'
                                 }`}>
                                   {stepStatus}
                                 </span>
@@ -1732,11 +1732,11 @@ export default function DashboardPage() {
 
                     <div>
                       <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
-                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
+                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
                     </div>
 
                     {selectedApplication.formDetails && (
-                      <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
                         <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
                         <FormDetailsDisplay details={selectedApplication.formDetails} />
                       </div>
@@ -1745,7 +1745,7 @@ export default function DashboardPage() {
                     {attachedImages.length > 0 && (
                       <div className="print:hidden">
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
                           {attachedImages.map((url, index) => (
                             <div 
                               key={index} 
@@ -1771,7 +1771,7 @@ export default function DashboardPage() {
                     {attachedPdfs.length > 0 && (
                       <div className="print:hidden">
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
-                        <div className="space-y-3 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
+                        <div className="space-y-3 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
                           {attachedPdfs.map((pdf, index) => (
                             <a
                               key={index}
@@ -1794,20 +1794,20 @@ export default function DashboardPage() {
                     {selectedApplication.remarks && (
                       <div>
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">備考</h3>
-                        <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{selectedApplication.remarks}</p>
+                        <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap">{selectedApplication.remarks}</p>
                       </div>
                     )}
 
-                    <div className="text-xs text-slate-500 text-right border-t border-slate-800 pt-4">
+                    <div className="text-xs text-slate-500 text-right border-t border-slate-700 pt-4">
                       作成日: {selectedApplication.createdAt ? new Date(selectedApplication.createdAt.toDate()).toLocaleString('ja-JP') : '-'}
                     </div>
 
                     {approvalHistory.length > 0 && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">承認アクション履歴</h3>
                         <div className="space-y-3">
                           {approvalHistory.map((history) => (
-                            <div key={history.id} className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-3">
+                            <div key={history.id} className="bg-slate-950/40 border border-slate-700/60 rounded-lg p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-slate-200">
                                   {history.stepName}
@@ -1836,7 +1836,7 @@ export default function DashboardPage() {
                     )}
 
                     {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <ApplicationResubmitForm
                           application={selectedApplication}
                           onResubmit={handleResubmit}
@@ -1845,7 +1845,7 @@ export default function DashboardPage() {
                     )}
 
                     {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <ApplicationApprovalForm
                           application={selectedApplication}
                           user={user}
@@ -1855,10 +1855,10 @@ export default function DashboardPage() {
                     )}
 
                     {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleCirculation}
-                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
+                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           回覧を確認
                         </button>
@@ -1866,7 +1866,7 @@ export default function DashboardPage() {
                     )}
 
                     {modalSource === 'sent' && selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleDeleteApplication}
                           className="w-full bg-rose-950/30 border border-rose-500/30 hover:bg-rose-900/40 text-rose-400 font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 text-sm tracking-wide"
@@ -1877,14 +1877,14 @@ export default function DashboardPage() {
                     )}
 
                     {modalSource === 'sent' && isApplication(selectedApplication) && (
-                      <div className="border-t border-slate-800 pt-4">
+                      <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={() => {
                             setShowDetailModal(false)
                             setModalSource(null)
                             router.push(`/create?reuse=${selectedApplication.id}`)
                           }}
-                          className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
+                          className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           再利用
                         </button>
@@ -1905,7 +1905,7 @@ export default function DashboardPage() {
         >
           <button
             onClick={() => setPreviewImageUrl(null)}
-            className="absolute top-6 right-6 text-slate-400 hover:text-white bg-slate-900/80 p-2.5 rounded-full border border-slate-800 hover:border-slate-600 transition-all text-sm z-10 font-bold shadow-2xl"
+            className="absolute top-6 right-6 text-slate-400 hover:text-slate-50 bg-slate-900/80 p-2.5 rounded-full border border-slate-700 hover:border-slate-600 transition-all text-sm z-10 font-bold shadow-2xl"
           >
             ✕ 閉じる
           </button>
@@ -1958,7 +1958,7 @@ function ApplicationApprovalForm({
 
   if (!isCurrentApprover) {
     return (
-      <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
+      <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
         <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
         <div className="text-sm text-slate-400 text-center py-4">
           あなたはこの申請の承認者ではありません
@@ -1968,7 +1968,7 @@ function ApplicationApprovalForm({
   }
 
   return (
-    <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
+    <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
       <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
       <div className="space-y-4">
         <div>
@@ -1988,7 +1988,7 @@ function ApplicationApprovalForm({
             type="button"
             onClick={() => handleAction('approve')}
             disabled={processing}
-            className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {processing ? '処理中...' : '承認'}
           </button>
@@ -1996,7 +1996,7 @@ function ApplicationApprovalForm({
             type="button"
             onClick={() => handleAction('reject')}
             disabled={processing}
-            className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-amber-500 hover:to-orange-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {processing ? '処理中...' : '差し戻し'}
           </button>
@@ -2044,7 +2044,7 @@ function ApplicationResubmitForm({
       </div>
 
       {application.formDetails && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-700">
           <div>
             <label className="block text-[10px] font-semibold text-slate-400 mb-1">金額 (¥)</label>
             <input
@@ -2089,7 +2089,7 @@ function ApplicationResubmitForm({
       <button
         type="submit"
         disabled={processing}
-        className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg text-sm tracking-wide transition-all disabled:opacity-50"
+        className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-slate-50 font-bold py-2.5 px-4 rounded-lg shadow-lg text-sm tracking-wide transition-all disabled:opacity-50"
       >
         {processing ? '再申請処理中...' : '修正を完了して、差し戻し位置から再申請する'}
       </button>
@@ -2113,7 +2113,7 @@ function InformationConfirmForm({
   }
 
   return (
-    <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl">
+    <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
       <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">確認処理</h3>
       <div className="space-y-4">
         <p className="text-sm text-slate-400">
@@ -2123,7 +2123,7 @@ function InformationConfirmForm({
           type="button"
           onClick={handleConfirm}
           disabled={processing}
-          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         >
           {processing ? '処理中...' : '内容を確認しました'}
         </button>

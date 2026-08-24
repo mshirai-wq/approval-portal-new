@@ -116,14 +116,14 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       {/* 共通ヘッダー */}
-      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
+      <header className="sticky top-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-700/80 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"
+            className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-50 rounded-xl border border-slate-700/50 transition-all"
           >
             <ArrowLeft size={20} />
           </button>
@@ -142,14 +142,14 @@ export default function ExpensesPage() {
         )}
 
         {/* フィルターと検索セクション */}
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 mb-8 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+        <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-4 mb-8 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex items-center w-full sm:min-w-[200px]">
               <Filter size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none cursor-pointer text-sm"
+                className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none cursor-pointer text-sm"
               >
                 <option value="all">すべてのステータス</option>
                 <option value="承認待ち">承認待ち</option>
@@ -166,7 +166,7 @@ export default function ExpensesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="申請者、使用部門、件名でサクッと検索..."
-                className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
@@ -179,17 +179,17 @@ export default function ExpensesPage() {
           </div>
         ) : filteredExpenses.length === 0 ? (
           /* 【ここを修正】circulations から経費用の filteredExpenses に正しく修正 */
-          <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-2xl bg-slate-950/40">
+          <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-700 rounded-2xl bg-slate-950/40">
             表示条件に一致する経費申請はありません
           </div>
         ) : (
           /* メインデータカード一覧 */
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+          <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)] overflow-hidden">
             <div className="grid grid-cols-1 gap-3">
               {filteredExpenses.map((expense) => (
                 <div
                   key={expense.申請ID}
-                  className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4"
+                  className="bg-slate-950/30 border border-slate-700/60 rounded-xl p-4"
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex items-start justify-between gap-3">
@@ -223,8 +223,8 @@ export default function ExpensesPage() {
 
         {/* データが0件の時だけ表示される、原因調査パネル */}
         {!loading && filteredExpenses.length === 0 && (
-          <div className="mt-8 text-left bg-slate-950/60 border border-slate-800/80 p-5 rounded-2xl text-xs font-mono max-w-3xl mx-auto space-y-3 shadow-lg">
-            <div className="flex items-center gap-2 font-bold text-indigo-400 text-sm border-b border-slate-800 pb-2">
+          <div className="mt-8 text-left bg-slate-950/60 border border-slate-700/80 p-5 rounded-2xl text-xs font-mono max-w-3xl mx-auto space-y-3 shadow-lg">
+            <div className="flex items-center gap-2 font-bold text-indigo-400 text-sm border-b border-slate-700 pb-2">
               <span>🔍</span>
               <span>データ不一致の原因調査パネル</span>
             </div>
@@ -237,7 +237,7 @@ export default function ExpensesPage() {
             {expenses.length > 0 && (
               <div className="mt-4 pt-2 border-t border-slate-900">
                 <p className="font-bold text-slate-400 mb-2">▼ AppSheet側にある「最初の1件」の生データ状態：</p>
-                <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-400 overflow-x-auto text-[11px] leading-relaxed">
+                <pre className="bg-slate-950 p-3 rounded-xl border border-slate-700 text-slate-400 overflow-x-auto text-[11px] leading-relaxed">
                   {JSON.stringify({
                     申請ID: expenses[0]['申請ID'],
                     申請者: expenses[0]['申請者'],

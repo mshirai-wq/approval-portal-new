@@ -239,7 +239,7 @@ export default function ExpenseDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center gap-3 text-slate-400">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
         <Loader2 className="animate-spin text-indigo-500" size={32} />
         <p className="text-sm font-medium animate-pulse">データを読み込み中...</p>
       </div>
@@ -248,7 +248,7 @@ export default function ExpenseDetailPage() {
 
   if (error && !expense) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-6 rounded-2xl max-w-md w-full shadow-2xl">
           <div className="flex items-center gap-3 border-b border-rose-500/10 pb-3 mb-4">
             <AlertCircle size={22} />
@@ -268,14 +268,14 @@ export default function ExpenseDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 antialiased">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       {/* 共通ヘッダー */}
-      <header className="sticky top-0 bg-[#111827]/70 backdrop-blur-md border-b border-slate-800/80 z-40">
+      <header className="sticky top-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-700/80 z-40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button
             type="button"
             onClick={() => router.push('/expenses')}
-            className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all"
+            className="p-2 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-50 rounded-xl border border-slate-700/50 transition-all"
           >
             <ArrowLeft size={20} />
           </button>
@@ -297,8 +297,8 @@ export default function ExpenseDetailPage() {
           <div className="space-y-8">
             
             {/* 1. 基本情報カード */}
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+            <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between border-b border-slate-700 pb-4 mb-6">
                 <div className="flex items-center gap-2.5">
                   <FileText size={18} className="text-indigo-400" />
                   <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">基本情報</h2>
@@ -309,11 +309,11 @@ export default function ExpenseDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請ID</label>
-                  <p className="text-sm font-mono font-semibold text-slate-200 bg-slate-950/40 border border-slate-800/50 px-3 py-2 rounded-xl">{expense.申請ID}</p>
+                  <p className="text-sm font-mono font-semibold text-slate-200 bg-slate-950/40 border border-slate-700/50 px-3 py-2 rounded-xl">{expense.申請ID}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請日</label>
-                  <p className="text-sm font-semibold text-slate-300 bg-slate-950/40 border border-slate-800/50 px-3 py-2 rounded-xl">{formatDate(expense.日付)}</p>
+                  <p className="text-sm font-semibold text-slate-300 bg-slate-950/40 border border-slate-700/50 px-3 py-2 rounded-xl">{formatDate(expense.日付)}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 px-0.5">申請者氏名</label>
@@ -335,8 +335,8 @@ export default function ExpenseDetailPage() {
             </div>
 
             {/* 2. 経費詳細カード */}
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+            <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-2.5 border-b border-slate-700 pb-4 mb-6">
                 <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
                 <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">精算内容詳細</h2>
               </div>
@@ -344,7 +344,7 @@ export default function ExpenseDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 <div className="md:col-span-2">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">用途・内容</label>
-                  <p className="text-sm text-slate-200 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{expense.内容}</p>
+                  <p className="text-sm text-slate-200 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{expense.内容}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">実行金額</label>
@@ -352,7 +352,7 @@ export default function ExpenseDetailPage() {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">支払先・注文先</label>
-                  <p className="text-sm font-semibold text-slate-200 bg-slate-950/40 border border-slate-800/50 px-3 py-2.5 rounded-xl">{expense['支払先・注文先'] || '-'}</p>
+                  <p className="text-sm font-semibold text-slate-200 bg-slate-950/40 border border-slate-700/50 px-3 py-2.5 rounded-xl">{expense['支払先・注文先'] || '-'}</p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">支払方法</label>
@@ -369,20 +369,20 @@ export default function ExpenseDetailPage() {
               </div>
 
               {expense.備考 && (
-                <div className="mt-6 pt-4 border-t border-slate-800/60">
+                <div className="mt-6 pt-4 border-t border-slate-700/60">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">備考</label>
-                  <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-800/40 p-4 rounded-xl whitespace-pre-wrap">{expense.備考}</p>
+                  <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap">{expense.備考}</p>
                 </div>
               )}
 
               {/* 添付資料プレビューセクション */}
               {expense.添付資料 && (
-                <div className="mt-6 pt-4 border-t border-slate-800/60">
+                <div className="mt-6 pt-4 border-t border-slate-700/60">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">添付資料・証憑プレビュー</label>
                   
                   {driveFile && !imageError ? (
                     <div className="space-y-3">
-                      <div className="w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner relative">
+                      <div className="w-full bg-slate-950 border border-slate-700 rounded-xl overflow-hidden shadow-inner relative">
                         {driveFile.isImage ? (
                           <img
                             src={driveFile.imageUrl}
@@ -417,7 +417,7 @@ export default function ExpenseDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-4">
+                    <div className="bg-slate-950/40 border border-slate-700 rounded-xl p-4">
                       <p className="text-xs text-slate-500 mb-2">⚠️ プレビューを表示できません。直接Googleドライブで開いてください。</p>
                       {driveFile ? (
                         <a
@@ -442,8 +442,8 @@ export default function ExpenseDetailPage() {
 
             {/* 3. 承認情報履歴カード */}
             {(expense.承認ステータス === '承認済み' || expense.承認ステータス === '却下') && (
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+              <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center gap-2.5 border-b border-slate-700 pb-4 mb-6">
                   <Gavel size={18} className="text-slate-400" />
                   <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">最終判定情報</h2>
                 </div>
@@ -460,9 +460,9 @@ export default function ExpenseDetailPage() {
                 </div>
 
                 {expense.承認コメント && (
-                  <div className="mt-6 pt-4 border-t border-slate-800/60">
+                  <div className="mt-6 pt-4 border-t border-slate-700/60">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">判定者コメント</label>
-                    <p className="text-sm text-slate-300 bg-slate-950/30 border border-slate-800/60 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-slate-300 bg-slate-950/30 border border-slate-700/60 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">
                       {expense.承認コメント}
                     </p>
                   </div>
@@ -473,7 +473,7 @@ export default function ExpenseDetailPage() {
             {/* 4. 承認・却下実行フォーム */}
             {canApprove && (
               <div className="bg-slate-900/60 border border-indigo-500/20 rounded-2xl p-6 shadow-[0_0_30px_rgba(99,102,241,0.1)] animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-2.5 border-b border-slate-700 pb-4 mb-6">
                   <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1]"></div>
                   <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider">承認・却下アクション</h2>
                 </div>
@@ -488,7 +488,7 @@ export default function ExpenseDetailPage() {
                       onChange={(e) => setComment(e.target.value)}
                       rows={3}
                       placeholder="承認、または却下の理由や伝達事項を記入してください..."
-                      className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm leading-relaxed"
+                      className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm leading-relaxed"
                     />
                   </div>
 
@@ -497,7 +497,7 @@ export default function ExpenseDetailPage() {
                       type="button"
                       onClick={handleApprove}
                       disabled={submitting}
-                      className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-950/20 hover:shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
+                      className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-50 font-black py-3.5 px-4 rounded-xl shadow-lg shadow-lg hover:shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
                     >
                       {submitting ? (
                         <Loader2 size={16} className="animate-spin" />
@@ -510,7 +510,7 @@ export default function ExpenseDetailPage() {
                       type="button"
                       onClick={handleReject}
                       disabled={submitting}
-                      className="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black py-3.5 px-4 rounded-xl shadow-lg shadow-rose-950/20 hover:shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
+                      className="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-slate-50 font-black py-3.5 px-4 rounded-xl shadow-lg shadow-lg hover:shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-widest flex items-center justify-center gap-2 uppercase"
                     >
                       {submitting ? (
                         <Loader2 size={16} className="animate-spin" />
