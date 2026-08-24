@@ -14,12 +14,30 @@ const ThemeContext = createContext<ThemeContextType>({
   toggle: () => {}
 })
 
+function getSavedTheme(): Theme | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const saved = localStorage.getItem('theme')
+    return saved === 'light' || saved === 'dark' ? saved : null
+  } catch {
+    return null
+  }
+}
+
+function setSavedTheme(theme: Theme) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem('theme', theme)
+  } catch {
+    // ストレージが無効/満杯の場合は無視
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
-    const saved = typeof window !== 'undefined' ? (localStorage.getItem('theme') as Theme | null) : null
-    const initial = saved ?? 'dark'
+    const initial = getSavedTheme() ?? 'dark'
     setTheme(initial)
     document.documentElement.classList.toggle('light', initial === 'light')
   }, [])
@@ -27,9 +45,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', next)
-    }
+    setSavedTheme(next)
     document.documentElement.classList.toggle('light', next === 'light')
   }
 

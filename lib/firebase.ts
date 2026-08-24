@@ -1,5 +1,12 @@
 import { initializeApp, getApps } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import {
+  Auth,
+  getAuth,
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  inMemoryPersistence,
+} from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
@@ -15,6 +22,19 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
 
-export const auth = getAuth(app)
+function getOrInitializeAuth(): Auth {
+  if (getApps().length === 0) {
+    try {
+      return initializeAuth(app, {
+        persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
+      })
+    } catch {
+      return getAuth(app)
+    }
+  }
+  return getAuth(app)
+}
+
+export const auth = getOrInitializeAuth()
 export const db = getFirestore(app)
 export const storage = getStorage(app)

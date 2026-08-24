@@ -42,14 +42,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setFirebaseUser(firebaseUser)
-      
+
       if (firebaseUser) {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.email!))
           if (userDoc.exists()) {
             setUser(userDoc.data() as User)
           } else {
+            // 社員マスタに未登録の場合はサインアウトしてログイン画面へ
             setUser(null)
+            await firebaseSignOut(auth)
           }
         } catch (error) {
           console.error('Error fetching user data:', error)
@@ -58,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null)
       }
-      
+
       setLoading(false)
     })
 
