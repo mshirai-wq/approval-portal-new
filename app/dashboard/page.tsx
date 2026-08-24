@@ -28,13 +28,7 @@ interface Application {
   }[]
   imageUrl?: string       
   imageUrls?: string[]    
-  formDetails?: {
-    amount?: number
-    paymentDate?: string
-    payee?: string
-    imageUrl?: string     
-    imageUrls?: string[]  
-  }
+  formDetails?: Record<string, any>
   workflow: {
     currentStep: string
     status: string
@@ -50,6 +44,138 @@ interface Application {
 
 function isApplication(app: Application | AppSheetInformation | null): app is Application {
   return app !== null && 'workflow' in app;
+}
+
+const EXCLUDED_FORM_KEYS = new Set(['description', 'remarks', 'imageUrl', 'imageUrls'])
+
+const FORM_DETAIL_LABELS: Record<string, string> = {
+  amount: '金額',
+  paymentDate: '支払日',
+  payee: '支払先',
+  recruitmentDivision: '採用区分',
+  employmentType: '区分',
+  jobLocation: '配属現場名',
+  jobContent: '勤務内容',
+  workHours: '勤務時間',
+  workDays: '勤務曜日',
+  recruitmentUnitPrice: '募集単価',
+  postingDate: '掲載希望日',
+  recruitmentMedia: '募集媒体',
+  postingFee: '掲載費用',
+  salesAmount: '売上',
+  costAmount: '原価',
+  costRate: '原価率',
+  retireeName: '退職者氏名',
+  retireeDate: '退職（予定）日',
+  coCompanyName: '会社名',
+  coBackground: '知り得た経緯、発注予定の業務名',
+  coStartDate: '取引開始予定日',
+  salaryCustomerName: '顧客名',
+  salarySiteName: '現場名',
+  salaryEmployeeNumber: '対象者社員番号',
+  salaryEmployeeName: '対象者氏名',
+  salaryChangeDetails: '変更詳細情報',
+  salaryStartDate: '勤務変更の開始日',
+  salaryReason: '事由及び変更後の状況',
+  retirementName: '退職者氏名',
+  retirementSite: '退職者所属現場',
+  retirementJobType: '職種',
+  retirementDate: '退職日',
+  retirementReason: '退職理由',
+  obituaryType: '申請区分',
+  obituaryTargetName: '社員・お客様名',
+  obituarySite: '現場名',
+  obituaryDeceasedName: '故人名',
+  obituaryRelation: '社員との関係',
+  obituaryChiefMourner: '喪主名',
+  obituaryWakeDate: '通夜日時',
+  obituaryFuneralDate: '葬儀日時',
+  obituaryVenue: '① 通夜・葬儀会場',
+  obituaryCondolencePostal: '郵便番号',
+  obituaryCondolenceAddress: '住所',
+  obituaryCondolenceVenueName: '会場名',
+  obituaryCondolencePhone: '電話番号',
+  obituaryCondolenceAmount: '香典金額',
+  obituaryRequest: '依頼事項',
+  obituaryAttendees: '当社参列者名',
+  location: '入札執行場所',
+  date: '入札執行日',
+  time: '入札時間',
+  winnerName: '落札業者名',
+  winnerBid1: '第1回落札金額',
+  winnerBid2: '第2回落札金額',
+  ourBid1: '第1回入札金額',
+  ourBid2: '第2回入札金額',
+  prevWinnerName: '前年度落札業者',
+  prevWinnerAmount: '前年度落札金額',
+  transportTotal: '交通費合計',
+  accommodationTotal: '宿泊費合計',
+  dailyAllowanceTotal: '日当合計',
+  tripTotal: '出張旅費合計'
+}
+
+function isCurrencyField(key: string): boolean {
+  return /(?:amount|fee|price|bid|total)$/i.test(key)
+}
+
+function formatFormValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+  if (Array.isArray(value)) {
+    if (value.length === 0) return ''
+    if (typeof value[0] === 'string' || typeof value[0] === 'number') return value.join(', ')
+    return value.map((item, i) => `(${i + 1}) ${JSON.stringify(item)}`).join('\n')
+  }
+  if (typeof value === 'object') return ''
+  if (typeof value === 'number' || (typeof value === 'string' && /^-?\d+$/.test(value))) {
+    if (isCurrencyField(key) && key !== 'costRate') {
+      const num = Number(value)
+      return `¥${num.toLocaleString()}`
+    }
+    if (key === 'costRate') return `${value}%`
+    return String(value)
+  }
+  return String(value)
+}
+
+function FormDetailsDisplay({ details }: { details: Record<string, any> }) {
+  const entries = Object.entries(details).filter(([key, value]) => {
+    if (EXCLUDED_FORM_KEYS.has(key)) return false
+    if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return false
+    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return false
+    return true
+  })
+
+  return (
+    <div className="text-sm text-slate-400 space-y-2">
+      {entries.map(([key, value]) => {
+        const label = FORM_DETAIL_LABELS[key] || key
+        if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+          return (
+            <div key={key} className="border border-slate-800/50 rounded-lg p-3">
+              <span className="text-slate-500 mr-2">{label}:</span>
+              <div className="mt-1 space-y-1 pl-2">
+                {Object.entries(value).map(([subKey, subValue]) => {
+                  if (subValue === null || subValue === undefined || subValue === '' || (Array.isArray(subValue) && subValue.length === 0)) return null
+                  const subLabel = FORM_DETAIL_LABELS[subKey] || subKey
+                  const formatted = formatFormValue(subKey, subValue)
+                  return formatted ? (
+                    <p key={subKey}><span className="text-slate-600 mr-2">{subLabel}:</span>{formatted}</p>
+                  ) : null
+                })}
+              </div>
+            </div>
+          )
+        }
+        const formatted = formatFormValue(key, value)
+        return formatted ? (
+          <p key={key} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-slate-500 min-w-[8rem]">{label}:</span>
+            <span className="text-slate-200 whitespace-pre-wrap">{formatted}</span>
+          </p>
+        ) : null
+      })}
+    </div>
+  )
 }
 
 function PaginationControls({
@@ -1535,7 +1661,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2 print:hidden">
                   <button
                     type="button"
-                    onClick={() => setTimeout(() => window.print(), 100)}
+                    onClick={() => window.print()}
                     title="印刷"
                     className="text-slate-400 hover:text-white bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                   >
@@ -1691,22 +1817,12 @@ export default function DashboardPage() {
                     {selectedApplication.formDetails && (
                       <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
                         <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
-                        <div className="text-sm text-slate-400 space-y-2">
-                          {selectedApplication.formDetails.amount && (
-                            <p className="flex items-baseline"><span className="text-slate-500 mr-2 w-16">金額:</span><span className="text-xl font-bold text-cyan-400">¥{selectedApplication.formDetails.amount.toLocaleString()}</span></p>
-                          )}
-                          {selectedApplication.formDetails.paymentDate && (
-                            <p><span className="text-slate-500 mr-2 w-16 inline-block">支払日:</span>{selectedApplication.formDetails.paymentDate}</p>
-                          )}
-                          {selectedApplication.formDetails.payee && (
-                            <p><span className="text-slate-500 mr-2 w-16 inline-block">支払先:</span>{selectedApplication.formDetails.payee}</p>
-                          )}
-                        </div>
+                        <FormDetailsDisplay details={selectedApplication.formDetails} />
                       </div>
                     )}
 
                     {attachedImages.length > 0 && (
-                      <div>
+                      <div className="print:hidden">
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
                           {attachedImages.map((url, index) => (
@@ -1732,7 +1848,7 @@ export default function DashboardPage() {
                     )}
 
                     {attachedPdfs.length > 0 && (
-                      <div>
+                      <div className="print:hidden">
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
                         <div className="space-y-4 bg-slate-950/30 border border-slate-800 rounded-xl p-4">
                           {attachedPdfs.map((pdf, index) => (

@@ -56,6 +56,22 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
   </div>
 )
 
+function FileUploadField({ label, file, onChange, required = false }: { label: string; file: File | null; onChange: (file: File | null) => void; required?: boolean }) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{label} {required && <span className="text-rose-500">*</span>}</label>
+      <label className="group flex items-center justify-between w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-all">
+        <span className={`text-sm truncate ${file ? 'text-slate-200' : 'text-slate-600'}`}>{file ? file.name : 'ファイルを選択'}</span>
+        <Paperclip size={16} className="text-slate-600 group-hover:text-indigo-400" />
+        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)} />
+      </label>
+      {file && (
+        <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-400 hover:text-rose-300 mt-1">削除</button>
+      )}
+    </div>
+  )
+}
+
 // ==========================================
 // 2. 承認ルート計算ロジック（最新の業務フロー）
 // ==========================================
@@ -101,18 +117,15 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultGeneralAffairs: [tanabe, kaneda],
       stepOrder: ['部長', '本部長', '総務管理本部'],
       ...(() => {
-        // パート・アルバイト採用の場合、ドロップダウンで最終決裁者を変更
-        if (division === '設備') {
-          const gm = generalManagers.find(m => m.dept === '技術管理本部')
-          return { decisionMaker: '技術管理本部長', defaultGM: gm ? [gm.name] : [] }
-        } else if (division === '警備') {
-          const gm = generalManagers.find(m => m.dept === '警備管理本部') || generalManagers.find(m => m.dept === '技術管理本部')
-          return { decisionMaker: '警備管理本部長', defaultGM: gm ? [gm.name] : [] }
-        } else if (division === '九州') {
+        // パート・アルバイト採用の最終決裁者マッピング
+        if (division === '三保事業所' || division === '九州支店') {
           const gm = generalManagers.find(m => m.dept === '営業管理本部')
           return { decisionMaker: '営業管理本部長', defaultGM: gm ? [gm.name] : [] }
+        } else if (division === '警備員') {
+          const gm = generalManagers.find(m => m.dept === '技術管理本部')
+          return { decisionMaker: '技術管理本部長', defaultGM: gm ? [gm.name] : [] }
         }
-        // バス or 未選択：常駐管理本部
+        // 清掃 / 受付 / その他 / 未選択：常駐管理本部
         return { decisionMaker: '常駐管理本部長', defaultGM: residentGM ? [residentGM.name] : [] }
       })()
     },
@@ -270,6 +283,70 @@ function CreatePageContent() {
   const [paymentDate, setPaymentDate] = useState('')
   const [payee, setPayee] = useState('')
 
+  // 求人稟議（パート・アルバイト採用）
+  const [employmentType, setEmploymentType] = useState('')
+  const [jobLocation, setJobLocation] = useState('')
+  const [jobContent, setJobContent] = useState('')
+  const [workHours, setWorkHours] = useState('')
+  const [workDays, setWorkDays] = useState('')
+  const [recruitmentUnitPrice, setRecruitmentUnitPrice] = useState('')
+  const [postingDate, setPostingDate] = useState('')
+  const [recruitmentMedia, setRecruitmentMedia] = useState('')
+  const [postingFee, setPostingFee] = useState('')
+  const [salesAmount, setSalesAmount] = useState('')
+  const [costAmount, setCostAmount] = useState('')
+  const [costRate, setCostRate] = useState('')
+  const [retireeName, setRetireeName] = useState('')
+  const [retireeDate, setRetireeDate] = useState('')
+
+  // 協力会社登録
+  const [coCompanyName, setCoCompanyName] = useState('')
+  const [coBackground, setCoBackground] = useState('')
+  const [coStartDate, setCoStartDate] = useState('')
+  const [coRegistrationFile, setCoRegistrationFile] = useState<File | null>(null)
+  const [coFinancialStatements, setCoFinancialStatements] = useState<File | null>(null)
+  const [coInsuranceFile, setCoInsuranceFile] = useState<File | null>(null)
+  const [coAntiSocialFile, setCoAntiSocialFile] = useState<File | null>(null)
+  const [coCompanyBrochure, setCoCompanyBrochure] = useState<File | null>(null)
+  const [coLicenseFile, setCoLicenseFile] = useState<File | null>(null)
+
+  // 給与情報変更申請
+  const [salaryCustomerName, setSalaryCustomerName] = useState('')
+  const [salarySiteName, setSalarySiteName] = useState('')
+  const [salaryEmployeeNumber, setSalaryEmployeeNumber] = useState('')
+  const [salaryEmployeeName, setSalaryEmployeeName] = useState('')
+  const [salaryChangeDetails, setSalaryChangeDetails] = useState('')
+  const [salaryStartDate, setSalaryStartDate] = useState('')
+  const [salaryReason, setSalaryReason] = useState('')
+  const [salaryLaborCostFile, setSalaryLaborCostFile] = useState<File | null>(null)
+
+  // 回覧：退職者通知
+  const [retirementName, setRetirementName] = useState('')
+  const [retirementSite, setRetirementSite] = useState('')
+  const [retirementJobType, setRetirementJobType] = useState('')
+  const [retirementDate, setRetirementDate] = useState('')
+  const [retirementReason, setRetirementReason] = useState('')
+  const [retirementResignationFile, setRetirementResignationFile] = useState<File | null>(null)
+
+  // 回覧：訃報連絡
+  const [obituaryType, setObituaryType] = useState('')
+  const [obituaryTargetName, setObituaryTargetName] = useState('')
+  const [obituarySite, setObituarySite] = useState('')
+  const [obituaryDeceasedName, setObituaryDeceasedName] = useState('')
+  const [obituaryRelation, setObituaryRelation] = useState('')
+  const [obituaryChiefMourner, setObituaryChiefMourner] = useState('')
+  const [obituaryWakeDate, setObituaryWakeDate] = useState('')
+  const [obituaryFuneralDate, setObituaryFuneralDate] = useState('')
+  const [obituaryNoticeFile, setObituaryNoticeFile] = useState<File | null>(null)
+  const [obituaryVenue, setObituaryVenue] = useState('')
+  const [obituaryCondolencePostal, setObituaryCondolencePostal] = useState('')
+  const [obituaryCondolenceAddress, setObituaryCondolenceAddress] = useState('')
+  const [obituaryCondolenceVenueName, setObituaryCondolenceVenueName] = useState('')
+  const [obituaryCondolencePhone, setObituaryCondolencePhone] = useState('')
+  const [obituaryCondolenceAmount, setObituaryCondolenceAmount] = useState('')
+  const [obituaryRequest, setObituaryRequest] = useState('')
+  const [obituaryAttendees, setObituaryAttendees] = useState('')
+
   const [biddingDetails, setBiddingDetails] = useState({
     location: '', date: '', time: '', winnerName: '', winnerBid1: '', winnerBid2: '',
     ourBid1: '', ourBid2: '', prevWinnerName: '', prevWinnerAmount: '',
@@ -308,6 +385,61 @@ function CreatePageContent() {
     setMode(newMode)
     setSubType(newMode === 'approval' ? '通常申請' : '退職者通知')
     setRecruitmentDivision('')
+    setEmploymentType('')
+    setJobLocation('')
+    setJobContent('')
+    setWorkHours('')
+    setWorkDays('')
+    setRecruitmentUnitPrice('')
+    setPostingDate('')
+    setRecruitmentMedia('')
+    setPostingFee('')
+    setSalesAmount('')
+    setCostAmount('')
+    setCostRate('')
+    setRetireeName('')
+    setRetireeDate('')
+    setCoCompanyName('')
+    setCoBackground('')
+    setCoStartDate('')
+    setCoRegistrationFile(null)
+    setCoFinancialStatements(null)
+    setCoInsuranceFile(null)
+    setCoAntiSocialFile(null)
+    setCoCompanyBrochure(null)
+    setCoLicenseFile(null)
+    setSalaryCustomerName('')
+    setSalarySiteName('')
+    setSalaryEmployeeNumber('')
+    setSalaryEmployeeName('')
+    setSalaryChangeDetails('')
+    setSalaryStartDate('')
+    setSalaryReason('')
+    setSalaryLaborCostFile(null)
+    setRetirementName('')
+    setRetirementSite('')
+    setRetirementJobType('')
+    setRetirementDate('')
+    setRetirementReason('')
+    setRetirementResignationFile(null)
+    setObituaryType('')
+    setObituaryTargetName('')
+    setObituarySite('')
+    setObituaryDeceasedName('')
+    setObituaryRelation('')
+    setObituaryChiefMourner('')
+    setObituaryWakeDate('')
+    setObituaryFuneralDate('')
+    setObituaryNoticeFile(null)
+    setObituaryVenue('')
+    setObituaryCondolencePostal('')
+    setObituaryCondolenceAddress('')
+    setObituaryCondolenceVenueName('')
+    setObituaryCondolencePhone('')
+    setObituaryCondolenceAmount('')
+    setObituaryRequest('')
+    setObituaryAttendees('')
+    setFiles([])
     setActiveAccord(newMode === 'approval' ? '所属長' : '回覧先')
   }
 
@@ -418,6 +550,9 @@ function CreatePageContent() {
     if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !recruitmentDivision) {
       return setError('採用区分を選択してください')
     }
+    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !employmentType) {
+      return setError('区分を選択してください')
+    }
     setLoading(true)
     if (!firebaseUser) {
       setLoading(false)
@@ -429,8 +564,28 @@ function CreatePageContent() {
       stage = '添付ファイルアップロード'
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       let fileIndex = 0
+
+      const addFile = (file: File | null) => file && allFiles.push(file)
+      const allFiles: File[] = [...files]
+      if (mode === 'approval' && subType === '協力会社登録') {
+        addFile(coRegistrationFile)
+        addFile(coFinancialStatements)
+        addFile(coInsuranceFile)
+        addFile(coAntiSocialFile)
+        addFile(coCompanyBrochure)
+        addFile(coLicenseFile)
+      }
+      if (mode === 'approval' && subType === '給与情報変更申請') {
+        addFile(salaryLaborCostFile)
+      }
+      if (mode === 'report' && subType === '退職者通知') {
+        addFile(retirementResignationFile)
+      }
+      if (mode === 'report' && subType === '訃報連絡') {
+        addFile(obituaryNoticeFile)
+      }
       
-      for (const file of files) {
+      for (const file of allFiles) {
         let targetFile = file
         const isPdf = file.name.toLowerCase().endsWith('.pdf')
         const isImage = file.type.startsWith('image/') || (/\.(jpg|jpeg|png|gif|webp|bmp)$/i).test(file.name)
@@ -452,7 +607,24 @@ function CreatePageContent() {
 
       let formDetails: any = { description, remarks }
       if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
-        formDetails = { ...formDetails, recruitmentDivision }
+        formDetails = {
+          ...formDetails,
+          recruitmentDivision,
+          employmentType,
+          jobLocation,
+          jobContent,
+          workHours,
+          workDays,
+          recruitmentUnitPrice: recruitmentUnitPrice ? Number(recruitmentUnitPrice) : '',
+          postingDate,
+          recruitmentMedia,
+          postingFee: postingFee ? Number(postingFee) : '',
+          salesAmount: salesAmount ? Number(salesAmount) : '',
+          costAmount: costAmount ? Number(costAmount) : '',
+          costRate,
+          retireeName,
+          retireeDate
+        }
       }
       if (mode === 'approval' && subType === '通常申請') {
         formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
@@ -463,8 +635,54 @@ function CreatePageContent() {
       if (mode === 'approval' && subType === '出張旅費申請') {
         formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
       }
+      if (mode === 'approval' && subType === '協力会社登録') {
+        formDetails = { ...formDetails, coCompanyName, coBackground, coStartDate }
+      }
+      if (mode === 'approval' && subType === '給与情報変更申請') {
+        formDetails = {
+          ...formDetails,
+          salaryCustomerName,
+          salarySiteName,
+          salaryEmployeeNumber,
+          salaryEmployeeName,
+          salaryChangeDetails,
+          salaryStartDate,
+          salaryReason
+        }
+      }
       if (mode === 'report' && subType === '入札結果報告') {
         formDetails = { ...formDetails, ...biddingDetails }
+      }
+      if (mode === 'report' && subType === '退職者通知') {
+        formDetails = {
+          ...formDetails,
+          retirementName,
+          retirementSite,
+          retirementJobType,
+          retirementDate,
+          retirementReason
+        }
+      }
+      if (mode === 'report' && subType === '訃報連絡') {
+        formDetails = {
+          ...formDetails,
+          obituaryType,
+          obituaryTargetName,
+          obituarySite,
+          obituaryDeceasedName,
+          obituaryRelation,
+          obituaryChiefMourner,
+          obituaryWakeDate,
+          obituaryFuneralDate,
+          obituaryVenue,
+          obituaryCondolencePostal,
+          obituaryCondolenceAddress,
+          obituaryCondolenceVenueName,
+          obituaryCondolencePhone,
+          obituaryCondolenceAmount: obituaryCondolenceAmount ? Number(obituaryCondolenceAmount) : '',
+          obituaryRequest,
+          obituaryAttendees
+        }
       }
       
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
@@ -753,18 +971,107 @@ function CreatePageContent() {
               </div>
 
               {mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">採用区分 <span className="text-rose-500">*</span></label>
-                    <div className="relative">
-                      <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
-                        <option value="">選択してください</option>
-                        <option value="バス">バス</option>
-                        <option value="設備">設備</option>
-                        <option value="警備">警備</option>
-                        <option value="九州">九州</option>
-                      </select>
-                      <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                    <Users size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">求人詳細情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="三保事業所">三保事業所</option>
+                          <option value="九州支店">九州支店</option>
+                          <option value="警備員">警備員</option>
+                          <option value="清掃">清掃</option>
+                          <option value="受付">受付</option>
+                          <option value="その他">その他</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="新規雇用">新規雇用</option>
+                          <option value="欠員補充">欠員補充</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">配属現場名</label>
+                      <input type="text" value={jobLocation} onChange={(e) => setJobLocation(e.target.value)} placeholder="配属現場名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務内容</label>
+                      <input type="text" value={jobContent} onChange={(e) => setJobContent(e.target.value)} placeholder="例：受付業務" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務時間</label>
+                      <input type="text" value={workHours} onChange={(e) => setWorkHours(e.target.value)} placeholder="例：9:00-18:00" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務曜日</label>
+                      <input type="text" value={workDays} onChange={(e) => setWorkDays(e.target.value)} placeholder="例：月〜金" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">募集単価</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={recruitmentUnitPrice} onChange={(e) => setRecruitmentUnitPrice(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">掲載希望日</label>
+                      <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">募集媒体</label>
+                      <div className="relative">
+                        <select value={recruitmentMedia} onChange={(e) => setRecruitmentMedia(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="DOMO">DOMO</option>
+                          <option value="インディードプラス">インディードプラス</option>
+                          <option value="AIDEM">AIDEM</option>
+                          <option value="静岡新聞">静岡新聞</option>
+                          <option value="その他">その他</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">掲載費用</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={postingFee} onChange={(e) => setPostingFee(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">売上</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={salesAmount} onChange={(e) => setSalesAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">原価</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">原価率（%）</label>
+                      <input type="number" value={costRate} onChange={(e) => setCostRate(e.target.value)} placeholder="例：80" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名</label>
+                      <input type="text" value={retireeName} onChange={(e) => setRetireeName(e.target.value)} placeholder="欠員補充の場合のみ" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職（予定）日</label>
+                      <input type="date" value={retireeDate} onChange={(e) => setRetireeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                 </div>
@@ -870,6 +1177,207 @@ function CreatePageContent() {
                       <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 font-bold">¥</span>
                         <input type="number" value={biddingDetails.prevWinnerAmount} onChange={(e) => setBiddingDetails({...biddingDetails, prevWinnerAmount: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-lg font-bold text-amber-200 outline-none text-right" />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'approval' && subType === '協力会社登録' && (
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                    <Users size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">協力会社登録情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">取引開始予定日</label>
+                      <input type="date" value={coStartDate} onChange={(e) => setCoStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">知り得た経緯、発注予定の業務名</label>
+                      <textarea value={coBackground} onChange={(e) => setCoBackground(e.target.value)} rows={3} placeholder="紹介先、発注予定業務など" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <FileUploadField label="協力会社登録票" file={coRegistrationFile} onChange={setCoRegistrationFile} />
+                    <FileUploadField label="決算書（直近2年分）" file={coFinancialStatements} onChange={setCoFinancialStatements} />
+                    <FileUploadField label="賠償保険写し" file={coInsuranceFile} onChange={setCoInsuranceFile} />
+                    <FileUploadField label="反社確約書" file={coAntiSocialFile} onChange={setCoAntiSocialFile} />
+                    <FileUploadField label="会社案内" file={coCompanyBrochure} onChange={setCoCompanyBrochure} />
+                    <FileUploadField label="許認可登録写し" file={coLicenseFile} onChange={setCoLicenseFile} />
+                  </div>
+                </div>
+              )}
+
+              {mode === 'approval' && subType === '給与情報変更申請' && (
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                    <FileText size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">給与情報変更情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">顧客名</label>
+                      <input type="text" value={salaryCustomerName} onChange={(e) => setSalaryCustomerName(e.target.value)} placeholder="顧客名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現場名</label>
+                      <input type="text" value={salarySiteName} onChange={(e) => setSalarySiteName(e.target.value)} placeholder="現場名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">対象者社員番号（4桁）</label>
+                      <input type="text" value={salaryEmployeeNumber} onChange={(e) => setSalaryEmployeeNumber(e.target.value)} maxLength={4} placeholder="例：0123" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">対象者氏名</label>
+                      <input type="text" value={salaryEmployeeName} onChange={(e) => setSalaryEmployeeName(e.target.value)} placeholder="対象者氏名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">変更詳細情報（現状と変更後）</label>
+                      <textarea value={salaryChangeDetails} onChange={(e) => setSalaryChangeDetails(e.target.value)} rows={4} placeholder="現状：&#10;変更後：" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">勤務変更の開始日</label>
+                      <input type="date" value={salaryStartDate} onChange={(e) => setSalaryStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">事由及び変更後の状況</label>
+                      <textarea value={salaryReason} onChange={(e) => setSalaryReason(e.target.value)} rows={3} placeholder="事由や変更後の状況を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'report' && subType === '退職者通知' && (
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                    <Users size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">退職者通知情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 <span className="text-rose-500">*</span></label>
+                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 <span className="text-rose-500">*</span></label>
+                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'report' && subType === '訃報連絡' && (
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+                    <Users size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">訃報連絡情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="社員">社員</option>
+                          <option value="社員家族">社員家族</option>
+                          <option value="お取引先">お取引先</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    {obituaryType === '社員' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現場名</label>
+                        <input type="text" value={obituarySite} onChange={(e) => setObituarySite(e.target.value)} placeholder="社員の場合のみ" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required placeholder="例：実父" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">喪主名</label>
+                      <input type="text" value={obituaryChiefMourner} onChange={(e) => setObituaryChiefMourner(e.target.value)} placeholder="喪主名を入力" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">通夜日時</label>
+                      <input type="datetime-local" value={obituaryWakeDate} onChange={(e) => setObituaryWakeDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">葬儀日時</label>
+                      <input type="datetime-local" value={obituaryFuneralDate} onChange={(e) => setObituaryFuneralDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} />
+                      <p className="text-xs text-slate-500 mt-1">※訃報案内を添付した場合、下記①②は省略できます</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">① 通夜・葬儀会場</label>
+                      <input type="text" value={obituaryVenue} onChange={(e) => setObituaryVenue(e.target.value)} placeholder="会場名・住所など" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">② 弔電送付先</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" value={obituaryCondolencePostal} onChange={(e) => setObituaryCondolencePostal(e.target.value)} placeholder="郵便番号" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolencePhone} onChange={(e) => setObituaryCondolencePhone(e.target.value)} placeholder="電話番号" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolenceVenueName} onChange={(e) => setObituaryCondolenceVenueName(e.target.value)} placeholder="会場名" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                        <input type="text" value={obituaryCondolenceAddress} onChange={(e) => setObituaryCondolenceAddress(e.target.value)} placeholder="住所" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">香典金額</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={obituaryCondolenceAmount} onChange={(e) => setObituaryCondolenceAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="弔電依頼">弔電依頼</option>
+                          <option value="弔電・生花依頼">弔電・生花依頼</option>
+                          <option value="弔電・生花・香典依頼">弔電・生花・香典依頼</option>
+                          <option value="生花・香典依頼">生花・香典依頼</option>
+                          <option value="香典依頼">香典依頼</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">当社参列者名</label>
+                      <input type="text" value={obituaryAttendees} onChange={(e) => setObituaryAttendees(e.target.value)} placeholder="複数の場合はカンマ区切り" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                   </div>
                 </div>
