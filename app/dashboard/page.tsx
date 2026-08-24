@@ -43,6 +43,7 @@ interface Application {
     steps?: Record<string, any>
     circulations?: string[]
     stepOrder?: string[]
+    decisionMaker?: string
   }
   createdAt: any
 }
@@ -690,6 +691,9 @@ export default function DashboardPage() {
       })
 
       if (action === 'approve' && didAdvance) {
+        if (currentStepName === workflow.decisionMaker) {
+          await sendFinalDecisionNotification(selectedApplication)
+        }
         if (nextApprovers.length > 0) {
           await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
         } else if (nextStatus === '承認済み') {
@@ -788,6 +792,37 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Final approval notification error:', error)
+    }
+  }
+
+  const sendFinalDecisionNotification = async (application: any) => {
+    try {
+      const applicantEmails = await getApproversEmails([application.applicantName])
+
+      for (const email of applicantEmails) {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            subject: `【決裁完了】${application.title}`,
+            text: `「${application.title}」の申請が決裁されました。\n\n最終決裁者の承認により、決裁が完了しました。\n\nダッシュボードから詳細を確認してください。`,
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2 style="color: #10b981;">決裁完了のお知らせ</h2>
+                <p>「<strong>${application.title}</strong>」の申請が決裁されました。</p>
+                <div style="background-color: #f0fdf4; padding: 15px; margin: 15px 0; border-left: 4px solid #10b981; border-radius: 4px;">
+                  <p style="margin: 0; font-size: 12px; color: #666;">状況:</p>
+                  <p style="margin: 5px 0 0 0; font-weight: bold;">最終決裁者の承認により、決裁が完了しました。</p>
+                </div>
+                <p><a href="${window.location.origin}/dashboard" style="display: inline-block; padding: 10px 20px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">ダッシュボードを開く</a></p>
+              </div>
+            `
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Final decision notification error:', error)
     }
   }
 
