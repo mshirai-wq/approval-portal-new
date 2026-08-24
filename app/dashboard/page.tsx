@@ -223,6 +223,56 @@ function PaginationControls({
   )
 }
 
+function StatusBadge({ status, className = '' }: { status: string; className?: string }) {
+  const classes =
+    status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+    status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+    status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+    status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+    status === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border whitespace-nowrap shrink-0 ${classes} ${className}`}>
+      {status}
+    </span>
+  )
+}
+
+function ApplicationList({
+  applications,
+  onItemClick,
+  showApplicant = false,
+}: {
+  applications: Application[]
+  onItemClick: (app: Application) => void
+  showApplicant?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      {applications.map(app => (
+        <div
+          key={app.id}
+          onClick={() => onItemClick(app)}
+          className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 cursor-pointer hover:bg-slate-800/50 hover:border-slate-700 transition-all"
+        >
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-200 break-words leading-snug flex-1 min-w-0">{app.title}</h3>
+              <span className="text-xs text-slate-500 font-mono shrink-0 whitespace-nowrap">#{app.applicationNo ?? '-'}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400 mt-1">
+              {showApplicant && <span className="break-words max-w-full text-slate-300">{app.applicantName}</span>}
+              <span className="break-words">{app.subType}</span>
+              <StatusBadge status={app.workflow.status} />
+              <span className="ml-auto whitespace-nowrap text-slate-500">{app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ApplicationAccordion({
   title,
   subtitle,
@@ -276,46 +326,7 @@ function ApplicationAccordion({
               {emptyMessage}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800">
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
-                    <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {applications.map(app => (
-                    <tr
-                      key={app.id}
-                      className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                      onClick={() => onItemClick(app)}
-                    >
-                      <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
-                      <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
-                      <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
-                      <td className="py-3.5 px-4 text-sm">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                          app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                          app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                          app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                          app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                          'bg-slate-800 text-slate-400 border-slate-700'
-                        }`}>
-                          {app.workflow.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-sm text-slate-400">
-                        {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ApplicationList applications={applications} onItemClick={onItemClick} />
           )}
         </div>
       )}
@@ -1323,45 +1334,8 @@ export default function DashboardPage() {
                       あなたが送信した申請はまだありません
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/50">
-                          {myApplications.map(app => (
-                            <tr 
-                              key={app.id} 
-                              className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                              onClick={() => handleApplicationClick(app, 'sent')}
-                            >
-                              <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
-                              <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
-                              <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
-                              <td className="py-3.5 px-4 text-sm">
-                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                                  app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                  app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                  'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
-                                  {app.workflow.status}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4 text-sm text-slate-400">
-                                {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div>
+                      <ApplicationList applications={myApplications} onItemClick={(app) => handleApplicationClick(app, 'sent')} />
                       <PaginationControls
                         page={myAppsPage}
                         hasNext={myAppsHasNext}
@@ -1412,47 +1386,8 @@ export default function DashboardPage() {
                         他の社員の申請はまだありません
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="border-b border-slate-800">
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">No.</th>
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">件名</th>
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">申請者</th>
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">種別</th>
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">ステータス</th>
-                              <th className="py-3 px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase">作成日</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/50">
-                            {visibleAllApplications.map(app => (
-                              <tr
-                                key={app.id}
-                                className="hover:bg-slate-800/40 transition-colors duration-150 cursor-pointer"
-                                onClick={() => handleApplicationClick(app, 'sent')}
-                              >
-                                <td className="py-3.5 px-4 text-sm text-slate-400 font-mono">{app.applicationNo ?? '-'}</td>
-                                <td className="py-3.5 px-4 text-sm font-medium text-slate-200">{app.title}</td>
-                                <td className="py-3.5 px-4 text-sm text-slate-400">{app.applicantName}</td>
-                                <td className="py-3.5 px-4 text-sm text-slate-400">{app.subType}</td>
-                                <td className="py-3.5 px-4 text-sm">
-                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                                    app.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                    app.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                    app.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                    app.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                    'bg-slate-800 text-slate-400 border-slate-700'
-                                  }`}>
-                                    {app.workflow.status}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-4 text-sm text-slate-400">
-                                  {app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div>
+                        <ApplicationList applications={visibleAllApplications} onItemClick={(app) => handleApplicationClick(app, 'sent')} showApplicant />
                         <PaginationControls
                           page={allAppsPage}
                           hasNext={allAppsHasNext}
@@ -1684,12 +1619,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800/60 w-fit">
                       <span>情報収集データ</span>
                       <span className="text-slate-700">•</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                        (selectedApplication as AppSheetInformation).ステータス === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      }`}>
-                        {(selectedApplication as AppSheetInformation).ステータス}
-                      </span>
+                      <StatusBadge status={(selectedApplication as AppSheetInformation).ステータス} />
                     </div>
 
                     <div className="bg-slate-950/30 border border-slate-800/80 p-4 rounded-xl">
@@ -1724,15 +1654,7 @@ export default function DashboardPage() {
                       <span className="text-slate-700">•</span>
                       <span>{selectedApplication.subType}</span>
                       <span className="text-slate-700">•</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border ${
-                        selectedApplication.workflow.status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        selectedApplication.workflow.status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        selectedApplication.workflow.status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                        selectedApplication.workflow.status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                        'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
-                        {selectedApplication.workflow.status}
-                      </span>
+                      <StatusBadge status={selectedApplication.workflow.status} />
                     </div>
 
                     {(() => {

@@ -75,14 +75,14 @@ export default function ExpensesPage() {
     switch (status) {
       case '承認済み':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full tracking-wide whitespace-nowrap shrink-0">
             <CheckCircle size={12} />
             承認済み
           </span>
         )
       case '却下':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full tracking-wide whitespace-nowrap shrink-0">
             <XCircle size={12} />
             却下
           </span>
@@ -90,7 +90,7 @@ export default function ExpensesPage() {
       case '承認待ち':
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full tracking-wide whitespace-nowrap shrink-0">
             <Clock size={12} />
             {status || '承認待ち'}
           </span>
@@ -183,33 +183,27 @@ export default function ExpensesPage() {
             表示条件に一致する経費申請はありません
           </div>
         ) : (
-          /* メインデータテーブル */
+          /* メインデータカード一覧 */
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="min-w-full divide-y divide-slate-800">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4 text-left font-mono">申請ID</th>
-                    <th className="px-6 py-4 text-left">日付</th>
-                    <th className="px-6 py-4 text-left">申請者</th>
-                    <th className="px-6 py-4 text-left">使用部署</th>
-                    <th className="px-6 py-4 text-left">内容</th>
-                    <th className="px-6 py-4 text-right">実行金額</th>
-                    <th className="px-6 py-4 text-center">ステータス</th>
-                    <th className="px-6 py-4 text-center">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {filteredExpenses.map((expense) => (
-                    <tr key={expense.申請ID} className="hover:bg-slate-800/40 transition-colors duration-150">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-300 font-mono">{expense.申請ID}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-mono">{formatDate(expense.日付)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">{expense.申請者}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{expense.使用部署}</td>
-                      <td className="px-6 py-4 text-sm text-slate-300 max-w-xs truncate">{expense.内容}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-cyan-400 text-right font-mono">{formatAmount(expense.実行金額)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">{getStatusBadge(expense.承認ステータス)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+            <div className="grid grid-cols-1 gap-3">
+              {filteredExpenses.map((expense) => (
+                <div
+                  key={expense.申請ID}
+                  className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-200 break-words leading-snug">{expense.内容}</div>
+                        <div className="text-xs text-slate-400 mt-0.5 break-words">{expense.申請者} ・ {expense.使用部署}</div>
+                      </div>
+                      <span className="text-xs font-mono text-slate-500 whitespace-nowrap shrink-0">#{expense.申請ID}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs mt-1">
+                      <span className="text-slate-400 whitespace-nowrap">{formatDate(expense.日付)}</span>
+                      <span className="font-black text-cyan-400 font-mono whitespace-nowrap">{formatAmount(expense.実行金額)}</span>
+                      {getStatusBadge(expense.承認ステータス)}
+                      <div className="ml-auto">
                         <button
                           type="button"
                           onClick={() => router.push(`/expenses/${expense.申請ID}`)}
@@ -218,11 +212,11 @@ export default function ExpensesPage() {
                           <Eye size={14} />
                           詳細
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
