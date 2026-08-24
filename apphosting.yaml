@@ -1,5 +1,13 @@
 version: v1beta1
-secrets:
+
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
   - variable: GMAIL_USER
     secret: GMAIL_USER
   - variable: GMAIL_APP_PASSWORD
