@@ -241,11 +241,17 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
     }
   }
   const route = routes[subType] || routes['通常申請']
+  const isGeneralManager = generalManagers.some(m => m.name === applicantName) || applicantTitle === '本部長'
+  const defaultExec: string[] = []
+  Object.values(employeeMaster).forEach((members: any) => members.forEach((m: any) => { if (m.title === '社長') defaultExec.push(m.name) }))
   return {
     ...route,
     isDeptHead,
-    defaultDeptHead: isDeptHead ? [] : (applicantDeptHead ? [applicantDeptHead.name] : []),
-    effectiveStepOrder: isDeptHead ? route.stepOrder.filter((step: string) => step !== '部長') : route.stepOrder
+    isGeneralManager,
+    defaultDeptHead: (isDeptHead || isGeneralManager) ? [] : (applicantDeptHead ? [applicantDeptHead.name] : []),
+    defaultGM: isGeneralManager ? [] : (route.defaultGM || []),
+    defaultExec,
+    effectiveStepOrder: route.stepOrder
   }
 }
 
@@ -528,7 +534,7 @@ function CreatePageContent() {
     setLeaseMileage('')
     setLeaseEstimateFile(null)
     setFiles([])
-    setActiveAccord(newMode === 'approval' ? (currentRoute.effectiveStepOrder?.[0] || '所属長') : '回覧先')
+    setActiveAccord(newMode === 'approval' ? (getFirstActiveAccord(currentRoute) || '所属長') : '回覧先')
   }
 
   const generalManagers = useMemo(() => {
@@ -543,6 +549,29 @@ function CreatePageContent() {
   const currentRoute = useMemo(() => {
     return getApprovalRoute(subType, selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision, user?.name || '')
   }, [subType, selectedDepartment, user, employeeMaster, generalManagers, recruitmentDivision])
+
+  const getFirstActiveAccord = (route: any) => {
+    if (!route.stepOrder || route.stepOrder.length === 0) return '所属長'
+    for (const step of route.stepOrder) {
+      if (step === '部長') {
+        const list = (route.isDeptHead || route.isGeneralManager) ? [] : (route.defaultDeptHead || [])
+        if (list.length > 0) return '所属長'
+      } else if (step === '本部長') {
+        const list = route.isGeneralManager ? [] : (route.defaultGM || [])
+        if (list.length > 0) return '本部長'
+      } else if (step === '社長') {
+        if ((route.defaultExec || []).length > 0) return '社長'
+      } else if (step === '総務管理本部') {
+        if ((route.defaultGeneralAffairs || []).length > 0) return '総務管理本部'
+      } else if (step === '本部長回覧') {
+        if ((route.defaultGMForCirculation || []).length > 0) return '本部長回覧'
+      } else if (step === '決裁後回覧') {
+        if ((route.defaultPostDecisionCirculation || []).length > 0) return '決裁後回覧'
+      }
+    }
+    const first = route.stepOrder[0]
+    return first === '部長' ? '所属長' : first
+  }
 
   const transportTotal = useMemo(() =>
     tripDetails.transport.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
@@ -573,7 +602,7 @@ function CreatePageContent() {
         setTitle(data.title || '')
         setDescription(data.description || '')
         setRemarks(data.remarks || '')
-        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : (currentRoute.effectiveStepOrder?.[0] || '所属長'))
+        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : (getFirstActiveAccord(currentRoute) || '所属長'))
 
         const fd = data.formDetails || {}
         if (fd.amount !== undefined) setAmount(String(fd.amount))
@@ -612,7 +641,7 @@ function CreatePageContent() {
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
       setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
-      setActiveAccord(currentRoute.effectiveStepOrder?.[0] || '所属長')
+      setActiveAccord(getFirstActiveAccord(currentRoute) || '所属長')
     }
   }, [subType, user, employeeMaster, currentRoute, mode, reuseId])
 
@@ -801,11 +830,15 @@ function CreatePageContent() {
         if (stepKey === '決裁後回覧') return currentRoute.postDecisionCirculationLabel
         return stepKey
       }
-      let firstStepKey = mode === 'report' ? '回覧先' : dbKeyFor(currentRoute.effectiveStepOrder?.[0] || '')
+      let firstStepKey = mode === 'report' ? '回覧先' : ''
       let initialApprovers: string[] = []
 
+      const applicantName = user?.name || ''
+      const isSelfOrEmpty = (approvers: string[]) =>
+        approvers.length === 0 || (approvers.length === 1 && approvers[0] === applicantName) || approvers.every(a => a === applicantName)
+
       if (mode === 'approval') {
-        currentRoute.effectiveStepOrder.forEach((stepKey: string, index: number) => {
+        currentRoute.stepOrder.forEach((stepKey: string) => {
           let approvers: string[] = []
           const dbKey = dbKeyFor(stepKey)
 
@@ -816,19 +849,26 @@ function CreatePageContent() {
           else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
           else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
 
-          if (index === 0) {
-            initialApprovers = approvers
-            firstStepKey = dbKey
-          }
-
           const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
+          const skipped = isSelfOrEmpty(approvers)
+
           stepsObj[dbKey] = {
             approvers,
-            status: isCirculation ? '回覧待ち' : '承認待ち',
+            status: skipped ? '承認済み(スキップ)' : (isCirculation ? '回覧待ち' : '承認待ち'),
             comments: [],
             approvedBy: []
           }
+
+          if (!skipped && firstStepKey === '') {
+            firstStepKey = dbKey
+            initialApprovers = approvers
+          }
         })
+
+        if (!firstStepKey) {
+          firstStepKey = '完了'
+          initialApprovers = []
+        }
       } else if (mode === 'report') {
         firstStepKey = '回覧先'
         initialApprovers = selectedCirculation
@@ -863,11 +903,11 @@ function CreatePageContent() {
         formDetails,
         workflow: {
           currentStep: firstStepKey,
-          status: mode === 'report' ? '回覧待ち' : '承認待ち',
+          status: mode === 'report' ? '回覧待ち' : (firstStepKey === '完了' ? '承認済み' : '承認待ち'),
           currentApprovers: initialApprovers,
           allCirculators: allCirculators,
           decisionMaker: currentRoute.decisionMaker,
-          stepOrder: mode === 'approval' ? currentRoute.effectiveStepOrder.map((k: string) => dbKeyFor(k)) : ['回覧先'],
+          stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => dbKeyFor(k)) : ['回覧先'],
           steps: stepsObj,
           circulations: selectedCirculation, confirmedBy: []
         },

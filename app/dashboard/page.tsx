@@ -36,6 +36,7 @@ interface Application {
     allCirculators?: string[]
     steps?: Record<string, any>
     circulations?: string[]
+    confirmedBy?: string[]
     stepOrder?: string[]
     decisionMaker?: string
   }
@@ -796,12 +797,14 @@ export default function DashboardPage() {
         didAdvance = true
         let currentIndex = stepNames.indexOf(currentStepName)
 
+        const applicantName = selectedApplication.applicantName || ''
         while (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
           currentIndex++
           const candidateStep = stepNames[currentIndex]
           const candidateApprovers = steps[candidateStep]?.approvers || []
+          const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
 
-          if (candidateApprovers.length > 0) {
+          if (!shouldSkip) {
             nextStepName = candidateStep
             nextApprovers = candidateApprovers
             nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
@@ -895,10 +898,12 @@ export default function DashboardPage() {
       let didAdvance = false
       const skippedSteps: string[] = [currentStepName]
 
+      const applicantName = selectedApplication.applicantName || ''
       for (let i = currentIndex + 1; i < stepNames.length; i++) {
         const candidateStep = stepNames[i]
         const candidateApprovers = steps[candidateStep]?.approvers || []
-        if (candidateApprovers.length > 0) {
+        const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
+        if (!shouldSkip) {
           nextStepName = candidateStep
           nextApprovers = candidateApprovers
           nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
@@ -1240,9 +1245,11 @@ export default function DashboardPage() {
       const workflow = selectedApplication.workflow
       const currentStep = workflow.currentStep || '回覧先'
       const steps = workflow.steps || {}
-      const stepData = steps[currentStep] || { approvers: [] as string[], approvedBy: [] as string[], status: '' }
-      const allApprovers: string[] = stepData.approvers || []
-      const approvedBy: string[] = stepData.approvedBy || []
+      const circulationsList = workflow.circulations || []
+      const confirmedByList = workflow.confirmedBy || []
+      const stepData = steps[currentStep] || { approvers: circulationsList, approvedBy: confirmedByList, status: '' }
+      const allApprovers: string[] = stepData.approvers?.length ? stepData.approvers : circulationsList
+      const approvedBy: string[] = stepData.approvedBy?.length ? stepData.approvedBy : confirmedByList
 
       if (approvedBy.includes(user.name)) {
         alert('既に回覧を確認済みです')
@@ -1261,6 +1268,7 @@ export default function DashboardPage() {
         'workflow.status': nextStatus,
         'workflow.currentStep': nextStepName,
         'workflow.currentApprovers': nextApprovers,
+        'workflow.confirmedBy': newApprovedBy,
         updatedAt: serverTimestamp()
       }
       if (currentStep && steps[currentStep]) {
@@ -1874,48 +1882,82 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
-                      <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
-                      <div className="relative border-l border-slate-700 ml-2 pl-6 space-y-4 my-2">
-                        {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
-                          const stepData = selectedApplication.workflow.steps?.[stepKey]
-                          const approverNames = stepData?.approvers || []
-                          const stepStatus = stepData?.status || '未着手'
-
+                    {selectedApplication.appName === '回覧報告' ? (
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">回覧状況</h3>
+                        {(() => {
+                          const members = selectedApplication.workflow.circulations || selectedApplication.workflow.allCirculators || selectedApplication.workflow.steps?.['回覧先']?.approvers || []
+                          const confirmed = new Set<string>([
+                            ...(selectedApplication.workflow.confirmedBy || []),
+                            ...(selectedApplication.workflow.steps?.['回覧先']?.approvedBy || [])
+                          ])
+                          const total = members.length
+                          const done = members.filter((m: string) => confirmed.has(m)).length
+                          if (total === 0) {
+                            return <p className="text-sm text-slate-500">回覧先メンバーは指定されていません</p>
+                          }
                           return (
-                            <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                              <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
-                                stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
-                                stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
-                                stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
-                                stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
-                                'border-slate-700'
-                              }`} />
-                              
-                              <div>
-                                <span className="font-bold text-slate-200">{stepKey}</span>
-                                <span className="text-xs text-slate-500 ml-2">メンバー:</span>
-                                <span className="text-slate-400 font-semibold ml-1">
-                                  {Array.isArray(approverNames) ? approverNames.join(', ') : '（指定なし）'}
-                                </span>
-                              </div>
-
-                              <div className="sm:text-right">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
-                                  stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
-                                  stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                  'bg-slate-900 text-slate-600 border-slate-700/50'
-                                }`}>
-                                  {stepStatus}
-                                </span>
-                              </div>
+                            <div className="space-y-2">
+                              <p className="text-xs text-slate-500 mb-2">{done}/{total} 名が回覧済み</p>
+                              {members.map((member: string) => {
+                                const isConfirmed = confirmed.has(member)
+                                return (
+                                  <div key={member} className="flex items-center justify-between text-sm border-b border-slate-800/50 pb-2 last:border-0 last:pb-0">
+                                    <span className="text-slate-200">{member}</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${isConfirmed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                      {isConfirmed ? '回覧済み' : '回覧待ち'}
+                                    </span>
+                                  </div>
+                                )
+                              })}
                             </div>
                           )
-                        })}
+                        })()}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
+                        <div className="relative border-l border-slate-700 ml-2 pl-6 space-y-4 my-2">
+                          {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
+                            const stepData = selectedApplication.workflow.steps?.[stepKey]
+                            const approverNames = stepData?.approvers || []
+                            const stepStatus = stepData?.status || '未着手'
+
+                            return (
+                              <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                                <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
+                                  stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
+                                  stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
+                                  stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
+                                  stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
+                                  'border-slate-700'
+                                }`} />
+
+                                <div>
+                                  <span className="font-bold text-slate-200">{stepKey}</span>
+                                  <span className="text-xs text-slate-500 ml-2">メンバー:</span>
+                                  <span className="text-slate-400 font-semibold ml-1">
+                                    {Array.isArray(approverNames) ? approverNames.join(', ') : '（指定なし）'}
+                                  </span>
+                                </div>
+
+                                <div className="sm:text-right">
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                                    stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                    stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
+                                    stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    'bg-slate-900 text-slate-600 border-slate-700/50'
+                                  }`}>
+                                    {stepStatus}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
@@ -2146,10 +2188,12 @@ function ApplicationApprovalForm({
     if (!application || !user) return false
     const currentStep = application.workflow.currentStep
     const currentApprovers = application.workflow.currentApprovers || []
-    return currentStep === '部長' &&
-      application.applicantTitle === '部長' &&
+    const isRankStep = ['部長', '本部長'].some(t => currentStep.includes(t))
+    const isApplicantRank = ['部長', '本部長'].includes(application.applicantTitle || '')
+    return isRankStep &&
+      isApplicantRank &&
       application.applicantId === user.id &&
-      (currentApprovers.length === 0 || (currentApprovers.length === 1 && currentApprovers[0] === user.name))
+      (currentApprovers.length === 0 || currentApprovers.every(a => a === user.name))
   }, [application, user])
 
   const handleAction = async (action: 'approve' | 'reject' | 'skip') => {
@@ -2167,7 +2211,7 @@ function ApplicationApprovalForm({
       <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
         <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
         <p className="text-sm text-slate-400 mb-4">
-          あなたは部長クラスです。所属長の承認をスキップして次のステップへ進めます。
+          あなたは部長/本部長クラスです。自身の承認ステップをスキップして次のステップへ進めます。
         </p>
         <button
           type="button"
@@ -2175,7 +2219,7 @@ function ApplicationApprovalForm({
           disabled={processing}
           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         >
-          {processing ? '処理中...' : '所属長承認をスキップして進む'}
+          {processing ? '処理中...' : '承認ステップをスキップして進む'}
         </button>
       </div>
     )
