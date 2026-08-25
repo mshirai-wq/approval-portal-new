@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock } from 'lucide-react'
+import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car } from 'lucide-react'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -177,6 +177,14 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultPostDecisionCirculation: generalManagers.map(m => m.name),
       stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧']
     },
+    '車両リース決済': { 
+      decisionMaker: '社長', 
+      postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
+      defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
+      defaultGM: generalAffairsGM ? [generalAffairsGM.name] : [], 
+      defaultPostDecisionCirculation: [takahashi],
+      stepOrder: ['部長', '本部長', '社長', '決裁後回覧']
+    },
     '車両リース決裁': { 
       decisionMaker: '社長', 
       postDecisionCirculationLabel: '総務管理本部（回覧・確認）',
@@ -310,6 +318,20 @@ function CreatePageContent() {
   const [coCompanyBrochure, setCoCompanyBrochure] = useState<File | null>(null)
   const [coLicenseFile, setCoLicenseFile] = useState<File | null>(null)
 
+  // 車両リース決済
+  const [leaseClassification, setLeaseClassification] = useState('')
+  const [leaseVendor, setLeaseVendor] = useState('')
+  const [leaseOtherVendor, setLeaseOtherVendor] = useState('')
+  const [leaseCarNumber, setLeaseCarNumber] = useState('')
+  const [leaseRequirements, setLeaseRequirements] = useState('')
+  const [leaseCurrentAmount, setLeaseCurrentAmount] = useState('')
+  const [leaseNewAmount, setLeaseNewAmount] = useState('')
+  const [leaseTerm, setLeaseTerm] = useState('')
+  const [leaseDeliveryDate, setLeaseDeliveryDate] = useState('')
+  const [leaseExpiryDate, setLeaseExpiryDate] = useState('')
+  const [leaseMileage, setLeaseMileage] = useState('')
+  const [leaseEstimateFile, setLeaseEstimateFile] = useState<File | null>(null)
+
   // 給与情報変更申請
   const [salaryCustomerName, setSalaryCustomerName] = useState('')
   const [salarySiteName, setSalarySiteName] = useState('')
@@ -439,6 +461,18 @@ function CreatePageContent() {
     setObituaryCondolenceAmount('')
     setObituaryRequest('')
     setObituaryAttendees('')
+    setLeaseClassification('')
+    setLeaseVendor('')
+    setLeaseOtherVendor('')
+    setLeaseCarNumber('')
+    setLeaseRequirements('')
+    setLeaseCurrentAmount('')
+    setLeaseNewAmount('')
+    setLeaseTerm('')
+    setLeaseDeliveryDate('')
+    setLeaseExpiryDate('')
+    setLeaseMileage('')
+    setLeaseEstimateFile(null)
     setFiles([])
     setActiveAccord(newMode === 'approval' ? '所属長' : '回覧先')
   }
@@ -584,7 +618,10 @@ function CreatePageContent() {
       if (mode === 'report' && subType === '訃報連絡') {
         addFile(obituaryNoticeFile)
       }
-      
+      if (mode === 'approval' && subType === '車両リース決済') {
+        addFile(leaseEstimateFile)
+      }
+
       for (const file of allFiles) {
         let targetFile = file
         const isPdf = file.name.toLowerCase().endsWith('.pdf')
@@ -648,6 +685,22 @@ function CreatePageContent() {
           salaryChangeDetails,
           salaryStartDate,
           salaryReason
+        }
+      }
+      if (mode === 'approval' && subType === '車両リース決済') {
+        formDetails = {
+          ...formDetails,
+          leaseClassification,
+          leaseVendor,
+          leaseOtherVendor,
+          leaseCarNumber,
+          leaseRequirements,
+          leaseCurrentAmount: leaseCurrentAmount ? Number(leaseCurrentAmount) : '',
+          leaseNewAmount: leaseNewAmount ? Number(leaseNewAmount) : '',
+          leaseTerm,
+          leaseDeliveryDate,
+          leaseExpiryDate,
+          leaseMileage
         }
       }
       if (mode === 'report' && subType === '入札結果報告') {
@@ -950,7 +1003,7 @@ function CreatePageContent() {
                           <option value="社長決裁見積書申請（300万円以上）">社長決裁見積書申請（300万円以上）</option>
                           <option value="協力会社登録">協力会社登録</option>
                           <option value="出張旅費申請">出張旅費申請</option>
-                          <option value="車両リース決裁">車両リース決裁</option>
+                          <option value="車両リース決済">車両リース決済</option>
                           <option value="給与情報変更申請">給与情報変更申請</option>
                         </>
                       ) : (
@@ -1250,6 +1303,100 @@ function CreatePageContent() {
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">事由及び変更後の状況</label>
                       <textarea value={salaryReason} onChange={(e) => setSalaryReason(e.target.value)} rows={3} placeholder="事由や変更後の状況を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'approval' && subType === '車両リース決済' && (
+                <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
+                    <Car size={22} className="text-cyan-400" />
+                    <h3 className="text-lg font-bold text-slate-100">車両リース決済情報</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">分類 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={leaseClassification} onChange={(e) => setLeaseClassification(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="新規">新規</option>
+                          <option value="入れ替え">入れ替え</option>
+                          <option value="再リース">再リース</option>
+                          <option value="返却">返却</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者 <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={leaseVendor} onChange={(e) => { setLeaseVendor(e.target.value); if (e.target.value !== 'その他') setLeaseOtherVendor('') }} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="清水リース＆カード">清水リース＆カード</option>
+                          <option value="静銀リース">静銀リース</option>
+                          <option value="その他">その他</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    {leaseVendor === 'その他' && (
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者名（その他）</label>
+                        <input type="text" value={leaseOtherVendor} onChange={(e) => setLeaseOtherVendor(e.target.value)} placeholder="業者名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">登録車番 <span className="text-rose-500">*</span></label>
+                      <input type="text" value={leaseCarNumber} onChange={(e) => setLeaseCarNumber(e.target.value)} required placeholder="例：静岡500 あ 1234" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">用件 <span className="text-rose-500">*</span></label>
+                      <textarea value={leaseRequirements} onChange={(e) => setLeaseRequirements(e.target.value)} required rows={3} placeholder="用件を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現在リース金額（月額）</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={leaseCurrentAmount} onChange={(e) => setLeaseCurrentAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">新リース金額（月額）</label>
+                      <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
+                        <input type="number" value={leaseNewAmount} onChange={(e) => setLeaseNewAmount(e.target.value)} placeholder="0" className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none text-right" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">期間</label>
+                      <div className="relative">
+                        <select value={leaseTerm} onChange={(e) => setLeaseTerm(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                          <option value="">選択してください</option>
+                          <option value="0">0</option>
+                          <option value="12">12</option>
+                          <option value="24">24</option>
+                          <option value="36">36</option>
+                          <option value="48">48</option>
+                          <option value="60">60</option>
+                          <option value="72">72</option>
+                          <option value="84">84</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">納車希望日</label>
+                      <input type="date" value={leaseDeliveryDate} onChange={(e) => setLeaseDeliveryDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">期間満了日</label>
+                      <input type="date" value={leaseExpiryDate} onChange={(e) => setLeaseExpiryDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">走行距離</label>
+                      <input type="text" value={leaseMileage} onChange={(e) => setLeaseMileage(e.target.value)} placeholder="例：50,000km" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FileUploadField label="見積等" file={leaseEstimateFile} onChange={setLeaseEstimateFile} />
                     </div>
                   </div>
                 </div>
