@@ -122,7 +122,10 @@ const FORM_DETAIL_LABELS: Record<string, string> = {
   leaseTerm: '期間',
   leaseDeliveryDate: '納車希望日',
   leaseExpiryDate: '期間満了日',
-  leaseMileage: '走行距離'
+  leaseMileage: '走行距離',
+  name: '業者名',
+  bid1: '第1回入札金額',
+  bid2: '第2回入札金額'
 }
 
 function isCurrencyField(key: string): boolean {
@@ -134,6 +137,15 @@ function formatFormValue(key: string, value: unknown): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return ''
     if (typeof value[0] === 'string' || typeof value[0] === 'number') return value.join(', ')
+    if (typeof value[0] === 'object' && value[0] !== null && !Array.isArray(value[0])) {
+      return value.map((item, i) => {
+        const parts = Object.entries(item)
+          .filter(([_, v]) => v !== '' && v !== null && v !== undefined)
+          .map(([k, v]) => `${FORM_DETAIL_LABELS[k] || k}: ${formatFormValue(k, v)}`)
+          .join(', ')
+        return `(${i + 1}) ${parts}`
+      }).join('\n')
+    }
     return value.map((item, i) => `(${i + 1}) ${JSON.stringify(item)}`).join('\n')
   }
   if (typeof value === 'object') return ''
@@ -238,6 +250,8 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
   const classes =
     status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
     status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+    status === '回覧待ち' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+    status === '回覧済み' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
     status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
     status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
     status === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
@@ -715,7 +729,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setCompletedApplications(apps.filter(app => app.workflow.status === '承認済み'))
+      setCompletedApplications(apps.filter(app => app.workflow.status === '承認済み' || app.workflow.status === '回覧済み'))
     } catch (error) {
       console.error('Error fetching completed applications:', error)
     } finally {
@@ -1221,13 +1235,48 @@ export default function DashboardPage() {
   const handleCirculation = async () => {
     if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
+      const isReport = selectedApplication.appName === '回覧報告'
+      const workflow = selectedApplication.workflow
+      const currentStep = workflow.currentStep || '回覧先'
+      const steps = workflow.steps || {}
+      const stepData = steps[currentStep] || { approvers: [] as string[], approvedBy: [] as string[], status: '' }
+      const allApprovers: string[] = stepData.approvers || []
+      const approvedBy: string[] = stepData.approvedBy || []
+
+      if (approvedBy.includes(user.name)) {
+        alert('既に回覧を確認済みです')
+        return
+      }
+
+      const newApprovedBy = Array.from(new Set([...approvedBy, user.name]))
+      const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedBy.includes(name))
+      const completedStatus = isReport ? '回覧済み' : '承認済み'
+      const nextStatus = allApproved ? completedStatus : workflow.status
+      const nextStepName = allApproved ? '完了' : currentStep
+      const nextApprovers = allApproved ? [] : allApprovers.filter(name => !newApprovedBy.includes(name))
+      const nextStepStatus = allApproved ? completedStatus : '回覧待ち'
+
+      const updateData: any = {
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStepName,
+        'workflow.currentApprovers': nextApprovers,
+        updatedAt: serverTimestamp()
+      }
+      if (currentStep && steps[currentStep]) {
+        updateData[`workflow.steps.${currentStep}.approvedBy`] = newApprovedBy
+        updateData[`workflow.steps.${currentStep}.status`] = nextStepStatus
+      }
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+
       await addDoc(collection(db, 'circulations'), {
         applicationId: selectedApplication.id,
         userId: user.id,
         userName: user.name,
         confirmedAt: serverTimestamp()
       })
-      alert('回覧を確認しました')
+
+      alert(allApproved ? (isReport ? '全員の回覧が完了しました' : '承認が完了しました') : '回覧を確認しました')
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
@@ -1261,8 +1310,8 @@ export default function DashboardPage() {
       alert('申請者のみ取消できます')
       return
     }
-    if (selectedApplication.workflow.status === '承認済み') {
-      alert('承認済みの申請は取消できません')
+    if (['承認済み', '回覧済み'].includes(selectedApplication.workflow.status)) {
+      alert('完了済みの申請は取消できません')
       return
     }
     if (!window.confirm('この申請を取り消しますか？')) return
@@ -1988,7 +2037,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
+                    {modalSource !== 'sent' && (selectedApplication.workflow.status === '回覧待ち' || selectedApplication.workflow.status === '承認済み') && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleCirculation}
@@ -1999,7 +2048,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource === 'sent' && selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && (
+                    {selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && selectedApplication.workflow.status !== '回覧済み' && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleDeleteApplication}

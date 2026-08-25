@@ -829,6 +829,15 @@ function CreatePageContent() {
             approvedBy: []
           }
         })
+      } else if (mode === 'report') {
+        firstStepKey = '回覧先'
+        initialApprovers = selectedCirculation
+        stepsObj['回覧先'] = {
+          approvers: selectedCirculation,
+          status: '回覧待ち',
+          comments: [],
+          approvedBy: []
+        }
       }
 
       const allCirculators = Array.from(new Set([
@@ -854,7 +863,7 @@ function CreatePageContent() {
         formDetails,
         workflow: {
           currentStep: firstStepKey,
-          status: mode === 'report' ? '承認済み' : '承認待ち',
+          status: mode === 'report' ? '回覧待ち' : '承認待ち',
           currentApprovers: initialApprovers,
           allCirculators: allCirculators,
           decisionMaker: currentRoute.decisionMaker,
