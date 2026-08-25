@@ -622,9 +622,9 @@ export default function DashboardPage() {
     }
   }, [user])
 
-  const fetchAllApplications = useCallback(async (page: number) => {
+  const fetchAllApplications = useCallback(async (page: number, silent: boolean = false) => {
     if (!user || !user.canViewAllApplications) return
-    setLoadingAllApps(true)
+    if (!silent) setLoadingAllApps(true)
     try {
       const cursor = page > 1 ? allAppsCursorsRef.current[page - 2] : undefined
       let q
@@ -656,7 +656,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error fetching all applications:', error)
     } finally {
-      setLoadingAllApps(false)
+      if (!silent) setLoadingAllApps(false)
     }
   }, [user])
 
@@ -729,10 +729,14 @@ export default function DashboardPage() {
     fetchMyApplications(myAppsPage)
   }, [sendHistoryOpen, myAppsPage, fetchMyApplications])
 
-  // 全社員申請一覧の遅延読み込み
+  // 全社員申請一覧の遅延読み込み + 30秒おきの自動更新
   useEffect(() => {
     if (!allAppsOpen) return
-    fetchAllApplications(allAppsPage)
+    fetchAllApplications(allAppsPage, false)
+    const interval = setInterval(() => {
+      fetchAllApplications(allAppsPage, true)
+    }, 30000)
+    return () => clearInterval(interval)
   }, [allAppsOpen, allAppsPage, fetchAllApplications])
 
   // 差し戻し申請の件数も開く前に取得する
@@ -1405,7 +1409,11 @@ export default function DashboardPage() {
                           loading={loadingAllApps}
                           onPrev={() => setAllAppsPage(p => p - 1)}
                           onNext={() => setAllAppsPage(p => p + 1)}
-                          onRefresh={() => fetchAllApplications(allAppsPage)}
+                          onRefresh={() => {
+                            allAppsCursorsRef.current = []
+                            setAllAppsPage(1)
+                            fetchAllApplications(1, false)
+                          }}
                         />
                       </div>
                     )}
