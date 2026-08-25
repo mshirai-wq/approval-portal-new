@@ -787,6 +787,13 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  const getTimestampMs = useCallback((value: any): number => {
+    if (!value) return 0
+    if (typeof value.toDate === 'function') return value.toDate().getTime()
+    if (value instanceof Date) return value.getTime()
+    return new Date(value).getTime() || 0
+  }, [])
+
   const fetchProcessedApplications = useCallback(async () => {
     if (!user) return
     setLoadingProcessedApprovals(true)
@@ -803,13 +810,34 @@ export default function DashboardPage() {
         const snap = await getDoc(doc(db, 'applications', id))
         return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
       }))
-      setProcessedApprovals(apps.filter((a): a is Application => a !== null))
+      const appMap = new Map<string, Application>()
+      apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
+
+      // 古い申請では approvals コレクション未作成の場合があるため、ステップの approvedBy からも補完する
+      const allAppsQuery = query(
+        collection(db, 'applications'),
+        orderBy('createdAt', 'desc'),
+        limit(300)
+      )
+      const allAppsSnap = await getDocs(allAppsQuery)
+      allAppsSnap.docs.forEach(docSnap => {
+        const app = { id: docSnap.id, ...docSnap.data() } as Application
+        if (app.appName === '回覧報告') return
+        if (appMap.has(app.id)) return
+        const steps = app.workflow.steps || {}
+        const acted = Object.values(steps).some((step: any) =>
+          (step?.approvedBy || []).includes(user.name) || (step?.approvedBy || []).includes(user.id)
+        )
+        if (acted) appMap.set(app.id, app)
+      })
+
+      setProcessedApprovals(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
     } catch (error) {
       console.error('Error fetching processed approvals:', error)
     } finally {
       setLoadingProcessedApprovals(false)
     }
-  }, [user])
+  }, [user, getTimestampMs])
 
   const fetchProcessedCirculations = useCallback(async () => {
     if (!user) return
@@ -827,13 +855,34 @@ export default function DashboardPage() {
         const snap = await getDoc(doc(db, 'applications', id))
         return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
       }))
-      setProcessedCirculations(apps.filter((a): a is Application => a !== null))
+      const appMap = new Map<string, Application>()
+      apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
+
+      // 古い回覧報告で circulations コレクション未作成の場合を補完する
+      const allAppsQuery = query(
+        collection(db, 'applications'),
+        orderBy('createdAt', 'desc'),
+        limit(300)
+      )
+      const allAppsSnap = await getDocs(allAppsQuery)
+      allAppsSnap.docs.forEach(docSnap => {
+        const app = { id: docSnap.id, ...docSnap.data() } as Application
+        if (app.appName !== '回覧報告') return
+        if (appMap.has(app.id)) return
+        const confirmed = new Set([
+          ...(app.workflow.confirmedBy || []),
+          ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
+        ])
+        if (confirmed.has(user.name) || confirmed.has(user.id)) appMap.set(app.id, app)
+      })
+
+      setProcessedCirculations(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
     } catch (error) {
       console.error('Error fetching processed circulations:', error)
     } finally {
       setLoadingProcessedCirculations(false)
     }
-  }, [user])
+  }, [user, getTimestampMs])
 
   // 送信一覧の遅延読み込み
   useEffect(() => {
