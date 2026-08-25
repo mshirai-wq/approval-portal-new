@@ -14,6 +14,17 @@ service cloud.firestore {
     
     // ユーザーID一致チェック（コレクションごとのフィールド名に対応）
     // アプリではユーザーのメールアドレスを id として扱っているため、uid または email で照合する
+    function isCirculationMember(app) {
+      return request.auth != null && (
+        request.auth.uid in app.workflow.allCirculators ||
+        request.auth.token.name in app.workflow.allCirculators ||
+        request.auth.uid in app.workflow.circulations ||
+        request.auth.token.name in app.workflow.circulations ||
+        request.auth.uid in app.workflow.steps['回覧先'].approvers ||
+        request.auth.token.name in app.workflow.steps['回覧先'].approvers
+      );
+    }
+
     function isOwner(collectionName) {
       return isAuthenticated() && (
         // applications: applicantId
@@ -47,12 +58,13 @@ service cloud.firestore {
         request.resource.data.applicantId == request.auth.token.email
       );
       
-      // 更新: 申請者本人、または現在の承認者（workflow.currentApproversに含まれるユーザー名またはuid）
+      // 更新: 申請者本人、現在の承認者、または回覧報告の回覧対象メンバー
       allow update: if isAuthenticated() && (
         request.auth.uid == resource.data.applicantId ||
         request.auth.token.email == resource.data.applicantId ||
         request.auth.uid in resource.data.workflow.currentApprovers ||
-        (request.auth.token.name != null && request.auth.token.name in resource.data.workflow.currentApprovers)
+        (request.auth.token.name != null && request.auth.token.name in resource.data.workflow.currentApprovers) ||
+        (resource.data.appName == '回覧報告' && isCirculationMember(resource.data))
       );
       
       // 削除: 申請者本人のみ
