@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, getDoc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
 import { Search, Printer, FileText } from 'lucide-react'
@@ -418,11 +418,18 @@ export default function DashboardPage() {
   
   const [selectedApplication, setSelectedApplication] = useState<Application | AppSheetInformation | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
+  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'processed' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
+
+  const [processedAppsOpen, setProcessedAppsOpen] = useState(false)
+  const [processedTab, setProcessedTab] = useState<'approval' | 'circulation'>('approval')
+  const [processedApprovals, setProcessedApprovals] = useState<Application[]>([])
+  const [processedCirculations, setProcessedCirculations] = useState<Application[]>([])
+  const [loadingProcessedApprovals, setLoadingProcessedApprovals] = useState(false)
+  const [loadingProcessedCirculations, setLoadingProcessedCirculations] = useState(false)
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
@@ -609,7 +616,7 @@ export default function DashboardPage() {
     router.push('/admin/users')
   }
 
-  const handleApplicationClick = (app: Application, source: 'pending' | 'circulation' | 'sent') => {
+  const handleApplicationClick = (app: Application, source: 'pending' | 'circulation' | 'sent' | 'processed') => {
     setSelectedApplication(app)
     setShowDetailModal(true)
     setModalSource(source)
@@ -780,6 +787,54 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  const fetchProcessedApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingProcessedApprovals(true)
+    try {
+      const q = query(
+        collection(db, 'approvals'),
+        where('approverId', '==', user.id),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      )
+      const snapshot = await getDocs(q)
+      const appIds = Array.from(new Set(snapshot.docs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      const apps = await Promise.all(appIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'applications', id))
+        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
+      }))
+      setProcessedApprovals(apps.filter((a): a is Application => a !== null))
+    } catch (error) {
+      console.error('Error fetching processed approvals:', error)
+    } finally {
+      setLoadingProcessedApprovals(false)
+    }
+  }, [user])
+
+  const fetchProcessedCirculations = useCallback(async () => {
+    if (!user) return
+    setLoadingProcessedCirculations(true)
+    try {
+      const q = query(
+        collection(db, 'circulations'),
+        where('userId', '==', user.id),
+        orderBy('confirmedAt', 'desc'),
+        limit(50)
+      )
+      const snapshot = await getDocs(q)
+      const appIds = Array.from(new Set(snapshot.docs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      const apps = await Promise.all(appIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'applications', id))
+        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
+      }))
+      setProcessedCirculations(apps.filter((a): a is Application => a !== null))
+    } catch (error) {
+      console.error('Error fetching processed circulations:', error)
+    } finally {
+      setLoadingProcessedCirculations(false)
+    }
+  }, [user])
+
   // 送信一覧の遅延読み込み
   useEffect(() => {
     if (!sendHistoryOpen) return
@@ -812,6 +867,13 @@ export default function DashboardPage() {
     if (!completedAppsOpen) return
     fetchCompletedApplications()
   }, [completedAppsOpen, fetchCompletedApplications])
+
+  // 自分が承認・回覧を完了した申請の遅延読み込み
+  useEffect(() => {
+    if (!processedAppsOpen) return
+    fetchProcessedApplications()
+    fetchProcessedCirculations()
+  }, [processedAppsOpen, fetchProcessedApplications, fetchProcessedCirculations])
 
   const handleInformationClick = (info: AppSheetInformation) => {
     setSelectedApplication(info)
@@ -1689,6 +1751,68 @@ export default function DashboardPage() {
               onItemClick={(app) => handleApplicationClick(app, 'sent')}
               emptyMessage="承認完了した申請はありません"
             />
+
+            <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+              <button
+                type="button"
+                onClick={() => setProcessedAppsOpen(prev => !prev)}
+                className="w-full flex justify-between items-center group"
+                aria-expanded={processedAppsOpen}
+              >
+                <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
+                  <span>✅</span> 承認・回覧済みの申請 <span className="text-sm font-normal text-slate-500">（自分が承認または回覧を確認した申請）</span>
+                </h2>
+                <span className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${processedAppsOpen ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </button>
+              {processedAppsOpen && (
+                <div className="mt-4 space-y-4">
+                  <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700/80 text-xs font-semibold w-fit">
+                    <button
+                      onClick={() => setProcessedTab('approval')}
+                      className={`px-3 py-1.5 rounded-md transition-all ${
+                        processedTab === 'approval'
+                          ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      承認 ({processedApprovals.length})
+                    </button>
+                    <button
+                      onClick={() => setProcessedTab('circulation')}
+                      className={`px-3 py-1.5 rounded-md transition-all ${
+                        processedTab === 'circulation'
+                          ? 'bg-blue-500/20 text-blue-400 shadow-sm border border-blue-500/30'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      回覧 ({processedCirculations.length})
+                    </button>
+                  </div>
+                  {(() => {
+                    const loading = processedTab === 'approval' ? loadingProcessedApprovals : loadingProcessedCirculations
+                    const apps = processedTab === 'approval' ? processedApprovals : processedCirculations
+                    const empty = processedTab === 'approval' ? '承認した申請はありません' : '回覧を確認した申請はありません'
+                    if (loading) {
+                      return (
+                        <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 animate-pulse">
+                          読み込み中...
+                        </div>
+                      )
+                    }
+                    if (apps.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
+                          {empty}
+                        </div>
+                      )
+                    }
+                    return <ApplicationList applications={apps} onItemClick={(app) => handleApplicationClick(app, 'processed')} showApplicant />
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2142,7 +2266,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
+                    {modalSource !== 'sent' && modalSource !== 'processed' && selectedApplication.workflow.status === '承認待ち' && (
                       <div className="border-t border-slate-700 pt-4">
                         <ApplicationApprovalForm
                           application={selectedApplication}
@@ -2153,7 +2277,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && (
+                    {modalSource !== 'sent' && modalSource !== 'processed' && (
                       (selectedApplication.appName === '回覧報告' && getEffectiveStatus(selectedApplication) === '回覧待ち') ||
                       (selectedApplication.appName !== '回覧報告' && selectedApplication.workflow.status === '承認済み')
                     ) && (
