@@ -138,13 +138,14 @@ function formatFormValue(key: string, value: unknown): string {
     if (value.length === 0) return ''
     if (typeof value[0] === 'string' || typeof value[0] === 'number') return value.join(', ')
     if (typeof value[0] === 'object' && value[0] !== null && !Array.isArray(value[0])) {
-      return value.map((item, i) => {
+      const lines = value.map((item, i) => {
         const parts = Object.entries(item)
           .filter(([_, v]) => v !== '' && v !== null && v !== undefined)
           .map(([k, v]) => `${FORM_DETAIL_LABELS[k] || k}: ${formatFormValue(k, v)}`)
           .join(', ')
-        return `(${i + 1}) ${parts}`
-      }).join('\n')
+        return parts ? `(${i + 1}) ${parts}` : ''
+      }).filter(line => line !== '')
+      return lines.length > 0 ? lines.join('\n') : ''
     }
     return value.map((item, i) => `(${i + 1}) ${JSON.stringify(item)}`).join('\n')
   }
