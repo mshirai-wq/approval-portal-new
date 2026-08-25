@@ -864,6 +864,81 @@ export default function DashboardPage() {
     }
   }
 
+  const handleSkip = async (comment: string) => {
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
+    try {
+      const workflow = selectedApplication.workflow
+      const steps = workflow.steps || {}
+      const stepNames = workflow.stepOrder || Object.keys(steps)
+      const currentStepName = workflow.currentStep
+      const currentIndex = stepNames.indexOf(currentStepName)
+      if (currentIndex === -1) throw new Error('current step not found')
+
+      let nextStepName = currentStepName
+      let nextApprovers: string[] = []
+      let nextStatus = workflow.status
+      let didAdvance = false
+      const skippedSteps: string[] = [currentStepName]
+
+      for (let i = currentIndex + 1; i < stepNames.length; i++) {
+        const candidateStep = stepNames[i]
+        const candidateApprovers = steps[candidateStep]?.approvers || []
+        if (candidateApprovers.length > 0) {
+          nextStepName = candidateStep
+          nextApprovers = candidateApprovers
+          nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+          didAdvance = true
+          break
+        } else {
+          skippedSteps.push(candidateStep)
+        }
+      }
+
+      if (!didAdvance) {
+        nextStepName = '完了'
+        nextStatus = '承認済み'
+        nextApprovers = []
+      }
+
+      const updateData: any = {
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStepName,
+        'workflow.currentApprovers': nextApprovers,
+        updatedAt: serverTimestamp()
+      }
+
+      skippedSteps.forEach(step => {
+        updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
+      })
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+
+      await addDoc(collection(db, 'approvals'), {
+        applicationId: selectedApplication.id,
+        stepName: currentStepName,
+        approverId: user.id,
+        approverName: user.name,
+        action: 'skip',
+        comment,
+        createdAt: serverTimestamp()
+      })
+
+      if (nextApprovers.length > 0) {
+        await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
+      } else if (nextStatus === '承認済み') {
+        await sendFinalApprovalNotification(selectedApplication)
+      }
+
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+      setModalSource(null)
+      window.location.reload()
+    } catch (error) {
+      console.error('Skip error:', error)
+      alert('スキップに失敗しました')
+    }
+  }
+
   const handleResubmit = async (newDescription: string, newAmount: number, newPaymentDate: string, newPayee: string, newRemarks: string) => {
     if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
@@ -871,15 +946,52 @@ export default function DashboardPage() {
       const currentStep = workflow.currentStep
       const steps = workflow.steps || {}
       const originalApprovers = steps[currentStep]?.approvers || []
+      const isDeptHeadResubmit = currentStep === '部長' && user?.title === '部長' && selectedApplication.applicantTitle === '部長'
+
+      let nextStep = currentStep
+      let nextApprovers = originalApprovers
+      let nextStatus = '承認待ち'
+      const skippedSteps: string[] = []
+
+      if (isDeptHeadResubmit) {
+        const stepNames = workflow.stepOrder || Object.keys(steps)
+        const currentIndex = stepNames.indexOf(currentStep)
+        if (currentIndex !== -1) {
+          for (let i = currentIndex + 1; i < stepNames.length; i++) {
+            const candidateStep = stepNames[i]
+            const candidateApprovers = steps[candidateStep]?.approvers || []
+            if (candidateApprovers.length > 0) {
+              nextStep = candidateStep
+              nextApprovers = candidateApprovers
+              nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+              break
+            } else {
+              skippedSteps.push(candidateStep)
+            }
+          }
+          if (nextStep === currentStep) {
+            nextStep = '完了'
+            nextStatus = '承認済み'
+            nextApprovers = []
+          }
+        }
+      }
 
       const updateData: any = {
-        'workflow.status': '承認待ち',
-        'workflow.currentApprovers': originalApprovers,
-        [`workflow.steps.${currentStep}.status`]: '承認待ち',
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStep,
+        'workflow.currentApprovers': nextApprovers,
+        [`workflow.steps.${currentStep}.status`]: isDeptHeadResubmit ? '承認済み(スキップ)' : '承認待ち',
         [`workflow.steps.${currentStep}.approvedBy`]: [],
         'description': newDescription,
         'remarks': newRemarks,
         updatedAt: serverTimestamp()
+      }
+
+      if (isDeptHeadResubmit && skippedSteps.length > 0) {
+        skippedSteps.forEach(step => {
+          updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
+        })
       }
 
       if (selectedApplication.formDetails) {
@@ -900,8 +1012,10 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      if (originalApprovers.length > 0) {
-        await sendResubmitNotification(selectedApplication, user.name, originalApprovers)
+      if (nextApprovers.length > 0) {
+        await sendResubmitNotification(selectedApplication, user.name, nextApprovers)
+      } else if (nextStatus === '承認済み') {
+        await sendFinalApprovalNotification(selectedApplication)
       }
 
       alert('修正して再申請しました。差し戻し元から処理を再開します。')
@@ -1869,6 +1983,7 @@ export default function DashboardPage() {
                           application={selectedApplication}
                           user={user}
                           onApprove={handleApproval}
+                          onSkip={handleSkip}
                         />
                       </div>
                     )}
@@ -1947,11 +2062,13 @@ export default function DashboardPage() {
 function ApplicationApprovalForm({ 
   application,
   user,
-  onApprove, 
+  onApprove,
+  onSkip,
 }: { 
   application: Application
   user: any
   onApprove: (action: 'approve' | 'reject', comment: string) => void
+  onSkip?: (comment: string) => void
   onClose?: () => void
 }) {
   const [comment, setComment] = useState('')
@@ -1969,10 +2086,43 @@ function ApplicationApprovalForm({
     return currentApprovers.includes(user.name) || stepApprovers.includes(user.name)
   }, [application, user])
 
-  const handleAction = async (action: 'approve' | 'reject') => {
+  const isSkipAllowed = useMemo(() => {
+    if (!application || !user) return false
+    const currentStep = application.workflow.currentStep
+    const currentApprovers = application.workflow.currentApprovers || []
+    return currentStep === '部長' &&
+      application.applicantTitle === '部長' &&
+      application.applicantId === user.id &&
+      (currentApprovers.length === 0 || (currentApprovers.length === 1 && currentApprovers[0] === user.name))
+  }, [application, user])
+
+  const handleAction = async (action: 'approve' | 'reject' | 'skip') => {
     setProcessing(true)
-    await onApprove(action, comment)
+    if (action === 'skip' && onSkip) {
+      await onSkip(comment)
+    } else {
+      await onApprove(action as 'approve' | 'reject', comment)
+    }
     setProcessing(false)
+  }
+
+  if (isSkipAllowed) {
+    return (
+      <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
+        <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
+        <p className="text-sm text-slate-400 mb-4">
+          あなたは部長クラスです。所属長の承認をスキップして次のステップへ進めます。
+        </p>
+        <button
+          type="button"
+          onClick={() => handleAction('skip')}
+          disabled={processing}
+          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          {processing ? '処理中...' : '所属長承認をスキップして進む'}
+        </button>
+      </div>
+    )
   }
 
   if (!isCurrentApprover) {
