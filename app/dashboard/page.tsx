@@ -663,10 +663,9 @@ export default function DashboardPage() {
   const visibleAllApplications = useMemo(() => {
     if (!user) return []
     const q = allAppsSearchQuery.trim()
+    if (!q) return allApplications
+    const lowerQ = q.toLowerCase()
     return allApplications.filter(app => {
-      if (app.applicantId === user.id) return false
-      if (!q) return true
-      const lowerQ = q.toLowerCase()
       const idMatch = app.applicationNo ? String(app.applicationNo).includes(q) : false
       return (
         idMatch ||
@@ -1398,7 +1397,7 @@ export default function DashboardPage() {
                       </div>
                     ) : visibleAllApplications.length === 0 ? (
                       <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
-                        他の社員の申請はまだありません
+                        申請はまだありません
                       </div>
                     ) : (
                       <div>
