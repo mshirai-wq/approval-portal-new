@@ -19,6 +19,7 @@ interface User {
   email: string
   title: string
   department: string
+  departments?: string[]
   canViewAllApplications?: boolean
 }
 

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, useRef, Suspense } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car } from 'lucide-react'
+import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye } from 'lucide-react'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -57,17 +57,55 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
 )
 
 function FileUploadField({ label, file, onChange, required = false }: { label: string; file: File | null; onChange: (file: File | null) => void; required?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const handleBoxClick = () => {
+    if (previewUrl) {
+      window.open(previewUrl, '_blank')
+    } else {
+      inputRef.current?.click()
+    }
+  }
+
   return (
     <div>
       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{label} {required && <span className="text-rose-500">*</span>}</label>
-      <label className="group flex items-center justify-between w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-all">
+      <button
+        type="button"
+        onClick={handleBoxClick}
+        className={`group flex items-center justify-between w-full px-4 py-6 border rounded-xl transition-all text-left ${
+          file
+            ? 'bg-slate-900/60 border-indigo-500/30 hover:border-indigo-500/60 cursor-pointer'
+            : 'bg-slate-950 border-slate-700 border-dashed hover:border-indigo-500/40 cursor-pointer'
+        }`}
+      >
         <span className={`text-sm truncate ${file ? 'text-slate-200' : 'text-slate-600'}`}>{file ? file.name : 'ファイルを選択'}</span>
-        <Paperclip size={16} className="text-slate-600 group-hover:text-indigo-400" />
-        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)} />
-      </label>
+        {file ? <Eye size={18} className="text-indigo-400 shrink-0" /> : <Paperclip size={18} className="text-slate-600 group-hover:text-indigo-400 shrink-0" />}
+      </button>
       {file && (
-        <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-400 hover:text-rose-300 mt-1">削除</button>
+        <div className="flex items-center gap-3 mt-2">
+          <button type="button" onClick={() => inputRef.current?.click()} className="text-xs text-indigo-400 hover:text-indigo-300">変更</button>
+          <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-400 hover:text-rose-300">削除</button>
+        </div>
       )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+      />
     </div>
   )
 }
@@ -270,6 +308,15 @@ function CreatePageContent() {
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
 
   const [mode, setMode] = useState<'approval' | 'report'>('approval')
+  const [departmentOverride, setDepartmentOverride] = useState<string | null>(null)
+  const selectedDepartment = departmentOverride ?? user?.department ?? ''
+
+  const userDepartments = useMemo(() => {
+    const depts = new Set<string>()
+    if (user?.department) depts.add(user.department)
+    ;(user as any)?.departments?.forEach((d: string) => depts.add(d))
+    return Array.from(depts)
+  }, [user])
 
   const [selectedDeptHead, setSelectedDeptHead] = useState<string[]>([])
   const [selectedGM, setSelectedGM] = useState<string[]>([])
@@ -486,8 +533,8 @@ function CreatePageContent() {
   }, [employeeMaster])
 
   const currentRoute = useMemo(() => {
-    return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision)
-  }, [subType, user, employeeMaster, generalManagers, recruitmentDivision])
+    return getApprovalRoute(subType, selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision)
+  }, [subType, selectedDepartment, user, employeeMaster, generalManagers, recruitmentDivision])
 
   const transportTotal = useMemo(() =>
     tripDetails.transport.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
@@ -532,7 +579,7 @@ function CreatePageContent() {
         const wf = data.workflow || {}
         const steps = wf.steps || {}
         const stepOrder = wf.stepOrder || []
-        const route = getApprovalRoute(data.subType || '', user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '')
+        const route = getApprovalRoute(data.subType || '', data.applicantDept || selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '')
 
         setSelectedDeptHead(steps['部長']?.approvers || [])
         setSelectedExec(steps['社長']?.approvers || [])
@@ -548,7 +595,7 @@ function CreatePageContent() {
       } catch (err) { console.error('Error loading reuse application:', err) }
     }
     loadOriginal()
-  }, [reuseId, user, employeeMaster, generalManagers])
+  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers])
 
   useEffect(() => {
     if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId) {
@@ -564,7 +611,7 @@ function CreatePageContent() {
   useEffect(() => {
     if (employeeMaster && Object.keys(employeeMaster).length > 0) {
       const presidentList: string[] = []
-      Object.entries(employeeMaster).forEach(([dept, members]) => {
+      Object.values(employeeMaster).forEach((members) => {
         members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
       })
       if (presidentList.length > 0) { setSelectedExec(presidentList) }
@@ -795,7 +842,7 @@ function CreatePageContent() {
 
       const applicationData = {
         appName, subType, title, description, remarks,
-        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '', applicantName: user?.name || '', applicantDept: selectedDepartment || user?.department || '', applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
         workflow: {
@@ -943,7 +990,7 @@ function CreatePageContent() {
           {Object.entries(employeeMaster).map(([dept, members]) => {
             let filtered = members
             if (filterType === '社長') filtered = members.filter(m => m.title.includes('社長'))
-            else if (filterType === '部長' && user) { if (dept !== user.department) return null; filtered = members.filter(m => m.title.includes('部長')) }
+            else if (filterType === '部長' && user) { if (dept !== selectedDepartment && dept !== user.department) return null; filtered = members.filter(m => m.title.includes('部長')) }
             else if (filterType === '本部長') filtered = members.filter(m => m.title.includes('本部長'))
             else if (filterType === '総務') { if (dept !== '総務管理本部') return null; filtered = searchQuery ? members.filter(m => m.name.includes(searchQuery)) : members }
             else if (filterType === '回覧') filtered = searchQuery ? members.filter(m => m.name.includes(searchQuery)) : members
@@ -1022,6 +1069,26 @@ function CreatePageContent() {
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="件名を入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 outline-none" />
                 </div>
               </div>
+
+              {userDepartments.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">申請者 <span className="text-rose-500">*</span></label>
+                    <div className="w-full px-4 py-3 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200">{user?.name || '未設定'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">所属 <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <select value={selectedDepartment} onChange={(e) => setDepartmentOverride(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        {userDepartments.map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && (
                 <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">

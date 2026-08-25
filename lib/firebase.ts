@@ -6,6 +6,7 @@ import {
   indexedDBLocalPersistence,
   browserLocalPersistence,
   inMemoryPersistence,
+  browserPopupRedirectResolver,
 } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
@@ -30,7 +31,10 @@ function getOrInitializeAuth(): Auth {
     : [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
 
   try {
-    return initializeAuth(app, { persistence })
+    return initializeAuth(app, {
+      persistence,
+      popupRedirectResolver: isSSR ? undefined : browserPopupRedirectResolver,
+    })
   } catch {
     return getAuth(app)
   }
