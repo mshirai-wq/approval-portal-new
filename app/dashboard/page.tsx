@@ -1310,7 +1310,11 @@ export default function DashboardPage() {
       alert('申請者のみ取消できます')
       return
     }
-    if (['承認済み', '回覧済み'].includes(selectedApplication.workflow.status)) {
+    if (selectedApplication.workflow.status === '取り消し') {
+      alert('既に取り消し済みです')
+      return
+    }
+    if (selectedApplication.appName !== '回覧報告' && ['承認済み', '回覧済み'].includes(selectedApplication.workflow.status)) {
       alert('完了済みの申請は取消できません')
       return
     }
@@ -2048,7 +2052,9 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && selectedApplication.workflow.status !== '回覧済み' && (
+                    {selectedApplication.applicantId === user.id &&
+                      selectedApplication.workflow.status !== '取り消し' &&
+                      (selectedApplication.appName === '回覧報告' || (selectedApplication.workflow.status !== '承認済み' && selectedApplication.workflow.status !== '回覧済み')) && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleDeleteApplication}
