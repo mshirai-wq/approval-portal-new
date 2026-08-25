@@ -11,6 +11,13 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
-    ]
+    ],
+    "frameworksBackend": {
+      "region": "us-central1",
+      "minInstances": 0,
+      "maxInstances": 2,
+      "memory": "256MiB",
+      "concurrency": 80
+    }
   }
 }
