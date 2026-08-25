@@ -120,7 +120,7 @@ function getRelatedGM(dept: string, generalManagers: any[]) {
   return generalManagers.find(m => m.dept === dept)
 }
 
-function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[], division: string = '') {
+function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[], division: string = '', applicantName: string = '') {
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   
@@ -140,6 +140,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   
   const applicantDeptMembers = employeeMaster[applicantDept] || []
   const applicantDeptHead = applicantDeptMembers.find(m => m.title === '部長')
+  const isDeptHead = (applicantDeptHead && applicantDeptHead.name === applicantName) || (applicantTitle === '部長' && !applicantDeptHead)
 
   const routes: any = {
     '通常申請': { 
@@ -239,7 +240,13 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       stepOrder: ['部長', '本部長', '社長', '総務管理本部']
     }
   }
-  return routes[subType] || routes['通常申請']
+  const route = routes[subType] || routes['通常申請']
+  return {
+    ...route,
+    isDeptHead,
+    defaultDeptHead: isDeptHead ? [] : (applicantDeptHead ? [applicantDeptHead.name] : []),
+    effectiveStepOrder: isDeptHead ? route.stepOrder.filter((step: string) => step !== '部長') : route.stepOrder
+  }
 }
 
 // 【維持】白井さんが追加した高性能な画像自動圧縮・リサイズロジック
@@ -521,7 +528,7 @@ function CreatePageContent() {
     setLeaseMileage('')
     setLeaseEstimateFile(null)
     setFiles([])
-    setActiveAccord(newMode === 'approval' ? '所属長' : '回覧先')
+    setActiveAccord(newMode === 'approval' ? (currentRoute.effectiveStepOrder?.[0] || '所属長') : '回覧先')
   }
 
   const generalManagers = useMemo(() => {
@@ -532,8 +539,9 @@ function CreatePageContent() {
     return gmList
   }, [employeeMaster])
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const currentRoute = useMemo(() => {
-    return getApprovalRoute(subType, selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision)
+    return getApprovalRoute(subType, selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision, user?.name || '')
   }, [subType, selectedDepartment, user, employeeMaster, generalManagers, recruitmentDivision])
 
   const transportTotal = useMemo(() =>
@@ -565,7 +573,7 @@ function CreatePageContent() {
         setTitle(data.title || '')
         setDescription(data.description || '')
         setRemarks(data.remarks || '')
-        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : '所属長')
+        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : (currentRoute.effectiveStepOrder?.[0] || '所属長'))
 
         const fd = data.formDetails || {}
         if (fd.amount !== undefined) setAmount(String(fd.amount))
@@ -579,7 +587,7 @@ function CreatePageContent() {
         const wf = data.workflow || {}
         const steps = wf.steps || {}
         const stepOrder = wf.stepOrder || []
-        const route = getApprovalRoute(data.subType || '', data.applicantDept || selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '')
+        const route = getApprovalRoute(data.subType || '', data.applicantDept || selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '', user?.name || '')
 
         setSelectedDeptHead(steps['部長']?.approvers || [])
         setSelectedExec(steps['社長']?.approvers || [])
@@ -595,16 +603,16 @@ function CreatePageContent() {
       } catch (err) { console.error('Error loading reuse application:', err) }
     }
     loadOriginal()
-  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers])
+  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers, currentRoute])
 
   useEffect(() => {
     if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId) {
-      setSelectedDeptHead(currentRoute.defaultDeptHead || [])
+      setSelectedDeptHead(currentRoute.isDeptHead ? [] : (currentRoute.defaultDeptHead || []))
       setSelectedGM(currentRoute.defaultGM || [])
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
       setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
-      setActiveAccord('所属長')
+      setActiveAccord(currentRoute.effectiveStepOrder?.[0] || '所属長')
     }
   }, [subType, user, employeeMaster, currentRoute, mode, reuseId])
 
@@ -788,26 +796,25 @@ function CreatePageContent() {
       const appName = mode === 'approval' ? '稟議' : '回覧報告'
 
       const stepsObj: any = {}
-      let firstStepKey = mode === 'report' ? '回覧先' : currentRoute.stepOrder[0]
+      const dbKeyFor = (stepKey: string) => {
+        if (stepKey === '本部長') return currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
+        if (stepKey === '決裁後回覧') return currentRoute.postDecisionCirculationLabel
+        return stepKey
+      }
+      let firstStepKey = mode === 'report' ? '回覧先' : dbKeyFor(currentRoute.effectiveStepOrder?.[0] || '')
       let initialApprovers: string[] = []
 
       if (mode === 'approval') {
-        currentRoute.stepOrder.forEach((stepKey: string, index: number) => {
+        currentRoute.effectiveStepOrder.forEach((stepKey: string, index: number) => {
           let approvers: string[] = []
-          let dbKey = stepKey
+          const dbKey = dbKeyFor(stepKey)
 
           if (stepKey === '部長') approvers = selectedDeptHead
-          else if (stepKey === '本部長') {
-            approvers = selectedGM
-            dbKey = currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
-          }
+          else if (stepKey === '本部長') approvers = selectedGM
           else if (stepKey === '社長') approvers = selectedExec
           else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
           else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
-          else if (stepKey === '決裁後回覧') {
-            approvers = selectedPostDecisionCirculation
-            dbKey = currentRoute.postDecisionCirculationLabel
-          }
+          else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
 
           if (index === 0) {
             initialApprovers = approvers
@@ -851,7 +858,7 @@ function CreatePageContent() {
           currentApprovers: initialApprovers,
           allCirculators: allCirculators,
           decisionMaker: currentRoute.decisionMaker,
-          stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => k === '本部長' ? (currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker) : k === '決裁後回覧' ? currentRoute.postDecisionCirculationLabel : k) : ['回覧先'],
+          stepOrder: mode === 'approval' ? currentRoute.effectiveStepOrder.map((k: string) => dbKeyFor(k)) : ['回覧先'],
           steps: stepsObj,
           circulations: selectedCirculation, confirmedBy: []
         },
@@ -1739,7 +1746,7 @@ function CreatePageContent() {
               <div className="bg-slate-950/40 border border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
                 {mode === 'approval' ? (
                   <>
-                    {currentRoute.stepOrder.map((stepKey: string) => {
+                    {currentRoute.effectiveStepOrder.map((stepKey: string) => {
                       if (stepKey === '部長') {
                         return (
                           <AccordItem key={stepKey} title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>
