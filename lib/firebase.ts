@@ -23,16 +23,17 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
 
 function getOrInitializeAuth(): Auth {
-  if (getApps().length === 0) {
-    try {
-      return initializeAuth(app, {
-        persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
-      })
-    } catch {
-      return getAuth(app)
-    }
+  // SSR では indexedDB が使えないため、メモリ内永続化にフォールバックする
+  const isSSR = typeof window === 'undefined'
+  const persistence = isSSR
+    ? inMemoryPersistence
+    : [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+
+  try {
+    return initializeAuth(app, { persistence })
+  } catch {
+    return getAuth(app)
   }
-  return getAuth(app)
 }
 
 export const auth = getOrInitializeAuth()

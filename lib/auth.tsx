@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { 
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -38,14 +38,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const authResolved = useRef(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      authResolved.current = true
       setFirebaseUser(firebaseUser)
 
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.email!))
+          const userDoc = await Promise.race([
+            getDoc(doc(db, 'users', firebaseUser.email!)),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Firestore timeout')), 10000)
+            )
+          ])
           if (userDoc.exists()) {
             setUser(userDoc.data() as User)
           } else {
@@ -64,7 +71,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    // iPad Safari 等で onAuthStateChanged が発火しない場合のフォールバック
+    const timeout = setTimeout(() => {
+      if (!authResolved.current) {
+        console.warn('Auth state resolution timed out')
+        setLoading(false)
+      }
+    }, 15000)
+
+    return () => {
+      clearTimeout(timeout)
+      unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {

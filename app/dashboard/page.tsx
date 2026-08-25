@@ -540,13 +540,14 @@ export default function DashboardPage() {
     const loadExpenses = async () => {
       if (!user?.email) return
       try {
-        const exps = await getExpenses(undefined)
+        // 経費一覧ページと同じ条件で取得（承認待ち＆自分宛て）
+        const exps = await getExpenses('承認待ち', user.email)
         // フロントエンドで承認待ちかつ自分宛てのデータをフィルタリング
         const filtered = exps.filter(exp => {
           const status = (exp.承認ステータス || '').trim()
           const approverEmail = (exp.承認者メールアドレス || '').trim().toLowerCase()
           const myEmail = user.email.trim().toLowerCase()
-          return status === '承認待ち' && approverEmail === myEmail
+          return status === '承認待ち' && approverEmail.includes(myEmail)
         })
         setExpenses(filtered)
       } catch (error) {
