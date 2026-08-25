@@ -798,14 +798,20 @@ export default function DashboardPage() {
     if (!user) return
     setLoadingProcessedApprovals(true)
     try {
-      const q = query(
-        collection(db, 'approvals'),
-        where('approverId', '==', user.id),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      )
-      const snapshot = await getDocs(q)
-      const appIds = Array.from(new Set(snapshot.docs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      let approvalDocs: any[] = []
+      try {
+        const q = query(
+          collection(db, 'approvals'),
+          where('approverId', '==', user.id),
+          orderBy('createdAt', 'desc'),
+          limit(50)
+        )
+        const snapshot = await getDocs(q)
+        approvalDocs = snapshot.docs
+      } catch (queryError) {
+        console.warn('approval collection query failed (missing index?), falling back to document scan:', queryError)
+      }
+      const appIds = Array.from(new Set(approvalDocs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
       const apps = await Promise.all(appIds.map(async (id) => {
         const snap = await getDoc(doc(db, 'applications', id))
         return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
@@ -814,22 +820,26 @@ export default function DashboardPage() {
       apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
 
       // 古い申請では approvals コレクション未作成の場合があるため、ステップの approvedBy からも補完する
-      const allAppsQuery = query(
-        collection(db, 'applications'),
-        orderBy('createdAt', 'desc'),
-        limit(300)
-      )
-      const allAppsSnap = await getDocs(allAppsQuery)
-      allAppsSnap.docs.forEach(docSnap => {
-        const app = { id: docSnap.id, ...docSnap.data() } as Application
-        if (app.appName === '回覧報告') return
-        if (appMap.has(app.id)) return
-        const steps = app.workflow.steps || {}
-        const acted = Object.values(steps).some((step: any) =>
-          (step?.approvedBy || []).includes(user.name) || (step?.approvedBy || []).includes(user.id)
+      try {
+        const allAppsQuery = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          limit(300)
         )
-        if (acted) appMap.set(app.id, app)
-      })
+        const allAppsSnap = await getDocs(allAppsQuery)
+        allAppsSnap.docs.forEach(docSnap => {
+          const app = { id: docSnap.id, ...docSnap.data() } as Application
+          if (app.appName === '回覧報告') return
+          if (appMap.has(app.id)) return
+          const steps = app.workflow.steps || {}
+          const acted = Object.values(steps).some((step: any) =>
+            (step?.approvedBy || []).includes(user.name) || (step?.approvedBy || []).includes(user.id)
+          )
+          if (acted) appMap.set(app.id, app)
+        })
+      } catch (scanError) {
+        console.error('Error scanning applications for processed approvals:', scanError)
+      }
 
       setProcessedApprovals(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
     } catch (error) {
@@ -843,14 +853,20 @@ export default function DashboardPage() {
     if (!user) return
     setLoadingProcessedCirculations(true)
     try {
-      const q = query(
-        collection(db, 'circulations'),
-        where('userId', '==', user.id),
-        orderBy('confirmedAt', 'desc'),
-        limit(50)
-      )
-      const snapshot = await getDocs(q)
-      const appIds = Array.from(new Set(snapshot.docs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      let circulationDocs: any[] = []
+      try {
+        const q = query(
+          collection(db, 'circulations'),
+          where('userId', '==', user.id),
+          orderBy('confirmedAt', 'desc'),
+          limit(50)
+        )
+        const snapshot = await getDocs(q)
+        circulationDocs = snapshot.docs
+      } catch (queryError) {
+        console.warn('circulation collection query failed (missing index?), falling back to document scan:', queryError)
+      }
+      const appIds = Array.from(new Set(circulationDocs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
       const apps = await Promise.all(appIds.map(async (id) => {
         const snap = await getDoc(doc(db, 'applications', id))
         return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
@@ -859,22 +875,26 @@ export default function DashboardPage() {
       apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
 
       // 古い回覧報告で circulations コレクション未作成の場合を補完する
-      const allAppsQuery = query(
-        collection(db, 'applications'),
-        orderBy('createdAt', 'desc'),
-        limit(300)
-      )
-      const allAppsSnap = await getDocs(allAppsQuery)
-      allAppsSnap.docs.forEach(docSnap => {
-        const app = { id: docSnap.id, ...docSnap.data() } as Application
-        if (app.appName !== '回覧報告') return
-        if (appMap.has(app.id)) return
-        const confirmed = new Set([
-          ...(app.workflow.confirmedBy || []),
-          ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
-        ])
-        if (confirmed.has(user.name) || confirmed.has(user.id)) appMap.set(app.id, app)
-      })
+      try {
+        const allAppsQuery = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          limit(300)
+        )
+        const allAppsSnap = await getDocs(allAppsQuery)
+        allAppsSnap.docs.forEach(docSnap => {
+          const app = { id: docSnap.id, ...docSnap.data() } as Application
+          if (app.appName !== '回覧報告') return
+          if (appMap.has(app.id)) return
+          const confirmed = new Set([
+            ...(app.workflow.confirmedBy || []),
+            ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
+          ])
+          if (confirmed.has(user.name) || confirmed.has(user.id)) appMap.set(app.id, app)
+        })
+      } catch (scanError) {
+        console.error('Error scanning applications for processed circulations:', scanError)
+      }
 
       setProcessedCirculations(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
     } catch (error) {
