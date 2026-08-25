@@ -111,7 +111,18 @@ const FORM_DETAIL_LABELS: Record<string, string> = {
   transportTotal: '交通費合計',
   accommodationTotal: '宿泊費合計',
   dailyAllowanceTotal: '日当合計',
-  tripTotal: '出張旅費合計'
+  tripTotal: '出張旅費合計',
+  leaseClassification: '分類',
+  leaseVendor: '業者',
+  leaseOtherVendor: '業者名（その他）',
+  leaseCarNumber: '登録車番',
+  leaseRequirements: '用件',
+  leaseCurrentAmount: '現在リース金額（月額）',
+  leaseNewAmount: '新リース金額（月額）',
+  leaseTerm: '期間',
+  leaseDeliveryDate: '納車希望日',
+  leaseExpiryDate: '期間満了日',
+  leaseMileage: '走行距離'
 }
 
 function isCurrencyField(key: string): boolean {
