@@ -47,6 +47,25 @@ function isApplication(app: Application | AppSheetInformation | null): app is Ap
   return app !== null && 'workflow' in app;
 }
 
+function getEffectiveStatus(app: Application): string {
+  const status = app.workflow.status
+  if (status === '下書き' || status === '取り消し') return status
+  if (app.appName !== '回覧報告') return status
+  const members: string[] =
+    (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
+    (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
+    app.workflow.steps?.['回覧先']?.approvers || []
+  if (members.length === 0) {
+    if (status === '承認済み') return '回覧待ち'
+    return status
+  }
+  const confirmed = new Set<string>([
+    ...(app.workflow.confirmedBy || []),
+    ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
+  ])
+  return members.every(m => confirmed.has(m)) ? '回覧済み' : '回覧待ち'
+}
+
 const EXCLUDED_FORM_KEYS = new Set(['description', 'remarks', 'imageUrl', 'imageUrls'])
 
 const FORM_DETAIL_LABELS: Record<string, string> = {
@@ -257,6 +276,7 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
     status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
     status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
     status === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+    status === '下書き' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
     'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border whitespace-nowrap shrink-0 ${classes} ${className}`}>
@@ -290,7 +310,7 @@ function ApplicationList({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400 mt-1">
               {showApplicant && <span className="break-words max-w-full text-slate-300">{app.applicantName}</span>}
               <span className="break-words">{app.subType}</span>
-              <StatusBadge status={app.workflow.status} />
+              <StatusBadge status={getEffectiveStatus(app)} />
               <span className="ml-auto whitespace-nowrap text-slate-500">{app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}</span>
             </div>
           </div>
@@ -389,6 +409,9 @@ export default function DashboardPage() {
   const [completedApplications, setCompletedApplications] = useState<Application[]>([])
   const [completedAppsOpen, setCompletedAppsOpen] = useState(false)
   const [loadingCompletedApps, setLoadingCompletedApps] = useState(false)
+  const [draftApplications, setDraftApplications] = useState<Application[]>([])
+  const [draftAppsOpen, setDraftAppsOpen] = useState(false)
+  const [loadingDraftApps, setLoadingDraftApps] = useState(false)
   const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
   const [informations, setInformations] = useState<AppSheetInformation[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -507,26 +530,19 @@ export default function DashboardPage() {
       } as Application))
 
       const filtered = apps.filter(app => {
-        const status = app.workflow.status
-        const currentStep = app.workflow.currentStep
-        const steps = app.workflow.steps || {}
-        const stepData = currentStep ? steps[currentStep] : null
-        const circulationsList = app.workflow.circulations || []
-        const allCirculators = app.workflow.allCirculators || []
+        const status = getEffectiveStatus(app)
 
         // 承認段階（承認待ち）の申請は回覧一覧に出さない
         // 自分が承認者の場合は承認待ち一覧で表示される
         if (status === '承認待ち') return false
 
-        // 回覧段階： currentStep が回覧ステップで、自分がその回覧対象になっている場合
+        // 回覧段階：自分がその回覧対象になっている場合
         if (status === '回覧待ち') {
-          const currentApprovers = app.workflow.currentApprovers || (stepData?.approvers || [])
-          return currentApprovers.includes(user.name) || (stepData?.approvers || []).includes(user.name)
-        }
-
-        // 全承認完了後や回覧報告： circulations / allCirculators に自分が含まれる
-        if (status === '承認済み') {
-          return circulationsList.includes(user.name) || allCirculators.includes(user.name)
+          const members =
+            (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
+            (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
+            app.workflow.steps?.['回覧先']?.approvers || []
+          return members.includes(user.name)
         }
 
         return false
@@ -627,7 +643,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setMyApplications(apps)
+      setMyApplications(apps.filter(app => app.workflow.status !== '下書き'))
       if (docs.length >= 30) {
         myAppsCursorsRef.current[page - 1] = docs[29]
       }
@@ -636,6 +652,30 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     } finally {
       setLoadingMyApps(false)
+    }
+  }, [user])
+
+  const fetchDraftApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingDraftApps(true)
+    try {
+      const q = query(
+        collection(db, 'applications'),
+        where('applicantId', '==', user?.id || user?.email),
+        orderBy('createdAt', 'desc'),
+        limit(31)
+      )
+      const snapshot = await getDocs(q)
+      const docs = snapshot.docs
+      const apps = docs.slice(0, 30).map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setDraftApplications(apps.filter(app => app.workflow.status === '下書き'))
+    } catch (error) {
+      console.error('Error fetching draft applications:', error)
+    } finally {
+      setLoadingDraftApps(false)
     }
   }, [user])
 
@@ -680,9 +720,10 @@ export default function DashboardPage() {
   const visibleAllApplications = useMemo(() => {
     if (!user) return []
     const q = allAppsSearchQuery.trim()
-    if (!q) return allApplications
+    const nonDraft = allApplications.filter(app => app.workflow.status !== '下書き')
+    if (!q) return nonDraft
     const lowerQ = q.toLowerCase()
-    return allApplications.filter(app => {
+    return nonDraft.filter(app => {
       const idMatch = app.applicationNo ? String(app.applicationNo).includes(q) : false
       return (
         idMatch ||
@@ -731,7 +772,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setCompletedApplications(apps.filter(app => app.workflow.status === '承認済み' || app.workflow.status === '回覧済み'))
+      setCompletedApplications(apps.filter(app => ['承認済み', '回覧済み'].includes(getEffectiveStatus(app))))
     } catch (error) {
       console.error('Error fetching completed applications:', error)
     } finally {
@@ -744,6 +785,12 @@ export default function DashboardPage() {
     if (!sendHistoryOpen) return
     fetchMyApplications(myAppsPage)
   }, [sendHistoryOpen, myAppsPage, fetchMyApplications])
+
+  // 下書き一覧の遅延読み込み
+  useEffect(() => {
+    if (!draftAppsOpen) return
+    fetchDraftApplications()
+  }, [draftAppsOpen, fetchDraftApplications])
 
   // 全社員申請一覧の遅延読み込み + 30秒おきの自動更新
   useEffect(() => {
@@ -1246,9 +1293,19 @@ export default function DashboardPage() {
       const currentStep = workflow.currentStep || '回覧先'
       const steps = workflow.steps || {}
       const circulationsList = workflow.circulations || []
+      const allCirculatorsList = workflow.allCirculators || []
       const confirmedByList = workflow.confirmedBy || []
+      const currentApproversList = workflow.currentApprovers || []
       const stepData = steps[currentStep] || { approvers: circulationsList, approvedBy: confirmedByList, status: '' }
-      const allApprovers: string[] = stepData.approvers?.length ? stepData.approvers : circulationsList
+      const allApprovers: string[] = stepData.approvers?.length
+        ? stepData.approvers
+        : circulationsList.length
+        ? circulationsList
+        : allCirculatorsList.length
+        ? allCirculatorsList
+        : currentApproversList.length
+        ? currentApproversList
+        : []
       const approvedBy: string[] = stepData.approvedBy?.length ? stepData.approvedBy : confirmedByList
 
       if (approvedBy.includes(user.name)) {
@@ -1259,7 +1316,7 @@ export default function DashboardPage() {
       const newApprovedBy = Array.from(new Set([...approvedBy, user.name]))
       const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedBy.includes(name))
       const completedStatus = isReport ? '回覧済み' : '承認済み'
-      const nextStatus = allApproved ? completedStatus : workflow.status
+      const nextStatus = allApproved ? completedStatus : (isReport ? '回覧待ち' : workflow.status)
       const nextStepName = allApproved ? '完了' : currentStep
       const nextApprovers = allApproved ? [] : allApprovers.filter(name => !newApprovedBy.includes(name))
       const nextStepStatus = allApproved ? completedStatus : '回覧待ち'
@@ -1499,6 +1556,18 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            <ApplicationAccordion
+              title="下書き"
+              subtitle="（保存中の申請・回覧報告）"
+              isOpen={draftAppsOpen}
+              onToggle={() => setDraftAppsOpen(prev => !prev)}
+              loading={loadingDraftApps}
+              applications={draftApplications}
+              onItemClick={(app) => router.push('/create?draft=' + app.id)}
+              emptyMessage="下書きはありません"
+              showCount
+            />
 
             <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               <button
@@ -1849,7 +1918,7 @@ export default function DashboardPage() {
                       <span className="text-slate-700">•</span>
                       <span>{selectedApplication.subType}</span>
                       <span className="text-slate-700">•</span>
-                      <StatusBadge status={selectedApplication.workflow.status} />
+                      <StatusBadge status={getEffectiveStatus(selectedApplication)} />
                     </div>
 
                     {(() => {
@@ -2084,7 +2153,10 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && (selectedApplication.workflow.status === '回覧待ち' || selectedApplication.workflow.status === '承認済み') && (
+                    {modalSource !== 'sent' && (
+                      (selectedApplication.appName === '回覧報告' && getEffectiveStatus(selectedApplication) === '回覧待ち') ||
+                      (selectedApplication.appName !== '回覧報告' && selectedApplication.workflow.status === '承認済み')
+                    ) && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleCirculation}

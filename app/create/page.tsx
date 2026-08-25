@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye } from 'lucide-react'
+import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye, Save } from 'lucide-react'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -316,6 +316,7 @@ function CreatePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const reuseId = searchParams.get('reuse')
+  const draftId = searchParams.get('draft')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
@@ -589,6 +590,134 @@ function CreatePageContent() {
     transportTotal + accommodationTotal + dailyAllowanceTotal,
   [transportTotal, accommodationTotal, dailyAllowanceTotal])
 
+  const applyDraftData = useCallback((data: any) => {
+    const fd = data.formDetails || {}
+    const presidentList: string[] = []
+    Object.values(employeeMaster).forEach((members) => {
+      members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
+    })
+
+    setMode(data.appName === '回覧報告' ? 'report' : 'approval')
+    setSubType(data.subType || '')
+    setDepartmentOverride(data.applicantDept || null)
+    setTitle(data.title || '')
+    setDescription(fd.description != null ? String(fd.description) : '')
+    setRemarks(fd.remarks != null ? String(fd.remarks) : '')
+
+    setAmount(String(fd.amount ?? ''))
+    setPaymentDate(String(fd.paymentDate ?? ''))
+    setPayee(String(fd.payee ?? ''))
+    setRecruitmentDivision(String(fd.recruitmentDivision ?? ''))
+    setEmploymentType(String(fd.employmentType ?? ''))
+    setJobLocation(String(fd.jobLocation ?? ''))
+    setJobContent(String(fd.jobContent ?? ''))
+    setWorkHours(String(fd.workHours ?? ''))
+    setWorkDays(String(fd.workDays ?? ''))
+    setRecruitmentUnitPrice(String(fd.recruitmentUnitPrice ?? ''))
+    setPostingDate(String(fd.postingDate ?? ''))
+    setRecruitmentMedia(String(fd.recruitmentMedia ?? ''))
+    setPostingFee(String(fd.postingFee ?? ''))
+    setSalesAmount(String(fd.salesAmount ?? ''))
+    setCostAmount(String(fd.costAmount ?? ''))
+    setCostRate(String(fd.costRate ?? ''))
+    setRetireeName(String(fd.retireeName ?? ''))
+    setRetireeDate(String(fd.retireeDate ?? ''))
+
+    setCoCompanyName(String(fd.coCompanyName ?? ''))
+    setCoBackground(String(fd.coBackground ?? ''))
+    setCoStartDate(String(fd.coStartDate ?? ''))
+
+    setLeaseClassification(String(fd.leaseClassification ?? ''))
+    setLeaseVendor(String(fd.leaseVendor ?? ''))
+    setLeaseOtherVendor(String(fd.leaseOtherVendor ?? ''))
+    setLeaseCarNumber(String(fd.leaseCarNumber ?? ''))
+    setLeaseRequirements(String(fd.leaseRequirements ?? ''))
+    setLeaseCurrentAmount(String(fd.leaseCurrentAmount ?? ''))
+    setLeaseNewAmount(String(fd.leaseNewAmount ?? ''))
+    setLeaseTerm(String(fd.leaseTerm ?? ''))
+    setLeaseDeliveryDate(String(fd.leaseDeliveryDate ?? ''))
+    setLeaseExpiryDate(String(fd.leaseExpiryDate ?? ''))
+    setLeaseMileage(String(fd.leaseMileage ?? ''))
+
+    setSalaryCustomerName(String(fd.salaryCustomerName ?? ''))
+    setSalarySiteName(String(fd.salarySiteName ?? ''))
+    setSalaryEmployeeNumber(String(fd.salaryEmployeeNumber ?? ''))
+    setSalaryEmployeeName(String(fd.salaryEmployeeName ?? ''))
+    setSalaryChangeDetails(String(fd.salaryChangeDetails ?? ''))
+    setSalaryStartDate(String(fd.salaryStartDate ?? ''))
+    setSalaryReason(String(fd.salaryReason ?? ''))
+
+    setRetirementName(String(fd.retirementName ?? ''))
+    setRetirementSite(String(fd.retirementSite ?? ''))
+    setRetirementJobType(String(fd.retirementJobType ?? ''))
+    setRetirementDate(String(fd.retirementDate ?? ''))
+    setRetirementReason(String(fd.retirementReason ?? ''))
+
+    setObituaryType(String(fd.obituaryType ?? ''))
+    setObituaryTargetName(String(fd.obituaryTargetName ?? ''))
+    setObituarySite(String(fd.obituarySite ?? ''))
+    setObituaryDeceasedName(String(fd.obituaryDeceasedName ?? ''))
+    setObituaryRelation(String(fd.obituaryRelation ?? ''))
+    setObituaryChiefMourner(String(fd.obituaryChiefMourner ?? ''))
+    setObituaryWakeDate(String(fd.obituaryWakeDate ?? ''))
+    setObituaryFuneralDate(String(fd.obituaryFuneralDate ?? ''))
+    setObituaryVenue(String(fd.obituaryVenue ?? ''))
+    setObituaryCondolencePostal(String(fd.obituaryCondolencePostal ?? ''))
+    setObituaryCondolenceAddress(String(fd.obituaryCondolenceAddress ?? ''))
+    setObituaryCondolenceVenueName(String(fd.obituaryCondolenceVenueName ?? ''))
+    setObituaryCondolencePhone(String(fd.obituaryCondolencePhone ?? ''))
+    setObituaryCondolenceAmount(String(fd.obituaryCondolenceAmount ?? ''))
+    setObituaryRequest(String(fd.obituaryRequest ?? ''))
+    setObituaryAttendees(String(fd.obituaryAttendees ?? ''))
+
+    if (data.subType === '入札結果報告') {
+      const { description: _description, remarks: _remarks, ...bidRest } = fd
+      void _description; void _remarks
+      setBiddingDetails(prev => ({ ...prev, ...bidRest }))
+    }
+    if (data.subType === '出張旅費申請' && fd.tripDetails) {
+      setTripDetails(prev => ({
+        ...prev,
+        ...fd.tripDetails,
+        transport: fd.tripDetails.transport && fd.tripDetails.transport.length ? fd.tripDetails.transport : prev.transport
+      }))
+    }
+
+    const route = getApprovalRoute(
+      data.subType || '',
+      data.applicantDept || user?.department || '',
+      user?.title || '',
+      employeeMaster,
+      generalManagers,
+      fd.recruitmentDivision || '',
+      user?.name || ''
+    )
+
+    const wf = data.workflow || {}
+    const steps = wf.steps || {}
+    const stepOrder = wf.stepOrder || []
+    if (data.appName === '回覧報告') {
+      setSelectedCirculation(wf.circulations || [])
+    } else {
+      setSelectedDeptHead(steps['部長']?.approvers || [])
+      setSelectedExec(steps['社長']?.approvers?.length ? steps['社長'].approvers : presidentList)
+      const gmKey = stepOrder.find((k: string) => k === '本部長' || k === route.decisionMaker) || '本部長'
+      setSelectedGM(steps[gmKey]?.approvers || [])
+      const gaKey = stepOrder.find((k: string) => k === '総務管理本部' || k === route.generalAffairsLabel) || '総務管理本部'
+      setSelectedGeneralAffairs(steps[gaKey]?.approvers || [])
+      const gmCircKey = stepOrder.find((k: string) => k === '本部長回覧') || '本部長回覧'
+      setSelectedGMForCirculation(steps[gmCircKey]?.approvers || [])
+      const postKey = route.postDecisionCirculationLabel && stepOrder.find((k: string) => k === route.postDecisionCirculationLabel)
+      setSelectedPostDecisionCirculation(postKey ? steps[postKey]?.approvers || [] : [])
+      setSelectedCirculation(wf.circulations || [])
+    }
+
+    const firstActive = route.stepOrder && route.stepOrder.length > 0
+      ? (route.stepOrder[0] === '部長' ? '所属長' : route.stepOrder[0])
+      : '所属長'
+    setActiveAccord(data.appName === '回覧報告' ? '回覧先' : firstActive)
+  }, [employeeMaster, user, generalManagers])
+
   useEffect(() => {
     const loadOriginal = async () => {
       if (!reuseId || !user || Object.keys(employeeMaster).length === 0) return
@@ -635,7 +764,24 @@ function CreatePageContent() {
   }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers, currentRoute])
 
   useEffect(() => {
-    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId) {
+    let mounted = true
+    if (!draftId || !user || Object.keys(employeeMaster).length === 0) return
+    const loadDraft = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'applications', draftId))
+        if (!mounted) return
+        if (!snap.exists()) return
+        const data = snap.data() as any
+        if ((data.applicantId !== user.id && data.applicantId !== user.email) || data.workflow?.status !== '下書き') return
+        applyDraftData(data)
+      } catch (err) { console.error('Error loading draft:', err) }
+    }
+    loadDraft()
+    return () => { mounted = false }
+  }, [draftId, user, employeeMaster, applyDraftData])
+
+  useEffect(() => {
+    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId && !draftId) {
       setSelectedDeptHead(currentRoute.isDeptHead ? [] : (currentRoute.defaultDeptHead || []))
       setSelectedGM(currentRoute.defaultGM || [])
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
@@ -643,17 +789,17 @@ function CreatePageContent() {
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
       setActiveAccord(getFirstActiveAccord(currentRoute) || '所属長')
     }
-  }, [subType, user, employeeMaster, currentRoute, mode, reuseId])
+  }, [subType, user, employeeMaster, currentRoute, mode, reuseId, draftId])
 
   useEffect(() => {
-    if (employeeMaster && Object.keys(employeeMaster).length > 0) {
+    if (employeeMaster && Object.keys(employeeMaster).length > 0 && !draftId) {
       const presidentList: string[] = []
       Object.values(employeeMaster).forEach((members) => {
         members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
       })
       if (presidentList.length > 0) { setSelectedExec(presidentList) }
     }
-  }, [employeeMaster])
+  }, [employeeMaster, draftId])
 
   const toggleMemberSelection = (member: string, list: string[], setList: (list: string[]) => void) => {
     if (list.includes(member)) setList(list.filter(m => m !== member))
@@ -661,6 +807,182 @@ function CreatePageContent() {
   }
 
   const removeFile = (indexToRemove: number) => setFiles(files.filter((_, index) => index !== indexToRemove))
+
+  const buildFormDetails = () => {
+    let formDetails: any = { description, remarks }
+    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
+      formDetails = {
+        ...formDetails,
+        recruitmentDivision,
+        employmentType,
+        jobLocation,
+        jobContent,
+        workHours,
+        workDays,
+        recruitmentUnitPrice: recruitmentUnitPrice ? Number(recruitmentUnitPrice) : '',
+        postingDate,
+        recruitmentMedia,
+        postingFee: postingFee ? Number(postingFee) : '',
+        salesAmount: salesAmount ? Number(salesAmount) : '',
+        costAmount: costAmount ? Number(costAmount) : '',
+        costRate,
+        retireeName,
+        retireeDate
+      }
+    }
+    if (mode === 'approval' && subType === '通常申請') {
+      formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
+    }
+    if (mode === 'approval' && subType === '代表者印捺印申請') {
+      formDetails = { ...formDetails, amount: Number(amount) || 0 }
+    }
+    if (mode === 'approval' && subType === '出張旅費申請') {
+      formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
+    }
+    if (mode === 'approval' && subType === '協力会社登録') {
+      formDetails = { ...formDetails, coCompanyName, coBackground, coStartDate }
+    }
+    if (mode === 'approval' && subType === '給与情報変更申請') {
+      formDetails = {
+        ...formDetails,
+        salaryCustomerName,
+        salarySiteName,
+        salaryEmployeeNumber,
+        salaryEmployeeName,
+        salaryChangeDetails,
+        salaryStartDate,
+        salaryReason
+      }
+    }
+    if (mode === 'approval' && subType === '車両リース決済') {
+      formDetails = {
+        ...formDetails,
+        leaseClassification,
+        leaseVendor,
+        leaseOtherVendor,
+        leaseCarNumber,
+        leaseRequirements,
+        leaseCurrentAmount: leaseCurrentAmount ? Number(leaseCurrentAmount) : '',
+        leaseNewAmount: leaseNewAmount ? Number(leaseNewAmount) : '',
+        leaseTerm,
+        leaseDeliveryDate,
+        leaseExpiryDate,
+        leaseMileage
+      }
+    }
+    if (mode === 'report' && subType === '入札結果報告') {
+      formDetails = { ...formDetails, ...biddingDetails }
+    }
+    if (mode === 'report' && subType === '退職者通知') {
+      formDetails = {
+        ...formDetails,
+        retirementName,
+        retirementSite,
+        retirementJobType,
+        retirementDate,
+        retirementReason
+      }
+    }
+    if (mode === 'report' && subType === '訃報連絡') {
+      formDetails = {
+        ...formDetails,
+        obituaryType,
+        obituaryTargetName,
+        obituarySite,
+        obituaryDeceasedName,
+        obituaryRelation,
+        obituaryChiefMourner,
+        obituaryWakeDate,
+        obituaryFuneralDate,
+        obituaryVenue,
+        obituaryCondolencePostal,
+        obituaryCondolenceAddress,
+        obituaryCondolenceVenueName,
+        obituaryCondolencePhone,
+        obituaryCondolenceAmount: obituaryCondolenceAmount ? Number(obituaryCondolenceAmount) : '',
+        obituaryRequest,
+        obituaryAttendees
+      }
+    }
+    return formDetails
+  }
+
+  const buildWorkflow = () => {
+    const dbKeyFor = (stepKey: string) => {
+      if (stepKey === '本部長') return currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
+      if (stepKey === '決裁後回覧') return currentRoute.postDecisionCirculationLabel
+      return stepKey
+    }
+    let firstStepKey = mode === 'report' ? '回覧先' : ''
+    let initialApprovers: string[] = []
+
+    const applicantName = user?.name || ''
+    const isSelfOrEmpty = (approvers: string[]) =>
+      approvers.length === 0 || (approvers.length === 1 && approvers[0] === applicantName) || approvers.every(a => a === applicantName)
+
+    const stepsObj: any = {}
+
+    if (mode === 'approval') {
+      (currentRoute.stepOrder || []).forEach((stepKey: string) => {
+        let approvers: string[] = []
+        const dbKey = dbKeyFor(stepKey)
+
+        if (stepKey === '部長') approvers = selectedDeptHead
+        else if (stepKey === '本部長') approvers = selectedGM
+        else if (stepKey === '社長') approvers = selectedExec
+        else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
+        else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
+        else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
+
+        const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
+        const skipped = isSelfOrEmpty(approvers)
+
+        stepsObj[dbKey] = {
+          approvers,
+          status: skipped ? '承認済み(スキップ)' : (isCirculation ? '回覧待ち' : '承認待ち'),
+          comments: [],
+          approvedBy: []
+        }
+
+        if (!skipped && firstStepKey === '') {
+          firstStepKey = dbKey
+          initialApprovers = approvers
+        }
+      })
+
+      if (!firstStepKey) {
+        firstStepKey = '完了'
+        initialApprovers = []
+      }
+    } else if (mode === 'report') {
+      firstStepKey = '回覧先'
+      initialApprovers = selectedCirculation
+      stepsObj['回覧先'] = {
+        approvers: selectedCirculation,
+        status: '回覧待ち',
+        comments: [],
+        approvedBy: []
+      }
+    }
+
+    const allCirculators = Array.from(new Set([
+      ...selectedCirculation,
+      ...(mode === 'approval' ? selectedGeneralAffairs : []),
+      ...(mode === 'approval' ? selectedGMForCirculation : []),
+      ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
+    ]))
+
+    return {
+      currentStep: firstStepKey,
+      status: mode === 'report' ? '回覧待ち' : (firstStepKey === '完了' ? '承認済み' : '承認待ち'),
+      currentApprovers: initialApprovers,
+      allCirculators,
+      decisionMaker: currentRoute.decisionMaker,
+      stepOrder: mode === 'approval' ? (currentRoute.stepOrder || []).map((k: string) => dbKeyFor(k)) : ['回覧先'],
+      steps: stepsObj,
+      circulations: selectedCirculation, confirmedBy: []
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -679,12 +1001,17 @@ function CreatePageContent() {
     let stage = '申請処理開始'
 
     try {
+      let existingNo: number | null = null
+      if (draftId) {
+        const draftSnap = await getDoc(doc(db, 'applications', draftId))
+        if (draftSnap.exists()) existingNo = draftSnap.data()?.applicationNo ?? null
+      }
       stage = '添付ファイルアップロード'
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       let fileIndex = 0
 
-      const addFile = (file: File | null) => file && allFiles.push(file)
       const allFiles: File[] = [...files]
+      const addFile = (file: File | null) => file && allFiles.push(file)
       if (mode === 'approval' && subType === '協力会社登録') {
         addFile(coRegistrationFile)
         addFile(coFinancialStatements)
@@ -726,169 +1053,8 @@ function CreatePageContent() {
         fileIndex++
       }
 
-      let formDetails: any = { description, remarks }
-      if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
-        formDetails = {
-          ...formDetails,
-          recruitmentDivision,
-          employmentType,
-          jobLocation,
-          jobContent,
-          workHours,
-          workDays,
-          recruitmentUnitPrice: recruitmentUnitPrice ? Number(recruitmentUnitPrice) : '',
-          postingDate,
-          recruitmentMedia,
-          postingFee: postingFee ? Number(postingFee) : '',
-          salesAmount: salesAmount ? Number(salesAmount) : '',
-          costAmount: costAmount ? Number(costAmount) : '',
-          costRate,
-          retireeName,
-          retireeDate
-        }
-      }
-      if (mode === 'approval' && subType === '通常申請') {
-        formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
-      }
-      if (mode === 'approval' && subType === '代表者印捺印申請') {
-        formDetails = { ...formDetails, amount: Number(amount) || 0 }
-      }
-      if (mode === 'approval' && subType === '出張旅費申請') {
-        formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
-      }
-      if (mode === 'approval' && subType === '協力会社登録') {
-        formDetails = { ...formDetails, coCompanyName, coBackground, coStartDate }
-      }
-      if (mode === 'approval' && subType === '給与情報変更申請') {
-        formDetails = {
-          ...formDetails,
-          salaryCustomerName,
-          salarySiteName,
-          salaryEmployeeNumber,
-          salaryEmployeeName,
-          salaryChangeDetails,
-          salaryStartDate,
-          salaryReason
-        }
-      }
-      if (mode === 'approval' && subType === '車両リース決済') {
-        formDetails = {
-          ...formDetails,
-          leaseClassification,
-          leaseVendor,
-          leaseOtherVendor,
-          leaseCarNumber,
-          leaseRequirements,
-          leaseCurrentAmount: leaseCurrentAmount ? Number(leaseCurrentAmount) : '',
-          leaseNewAmount: leaseNewAmount ? Number(leaseNewAmount) : '',
-          leaseTerm,
-          leaseDeliveryDate,
-          leaseExpiryDate,
-          leaseMileage
-        }
-      }
-      if (mode === 'report' && subType === '入札結果報告') {
-        formDetails = { ...formDetails, ...biddingDetails }
-      }
-      if (mode === 'report' && subType === '退職者通知') {
-        formDetails = {
-          ...formDetails,
-          retirementName,
-          retirementSite,
-          retirementJobType,
-          retirementDate,
-          retirementReason
-        }
-      }
-      if (mode === 'report' && subType === '訃報連絡') {
-        formDetails = {
-          ...formDetails,
-          obituaryType,
-          obituaryTargetName,
-          obituarySite,
-          obituaryDeceasedName,
-          obituaryRelation,
-          obituaryChiefMourner,
-          obituaryWakeDate,
-          obituaryFuneralDate,
-          obituaryVenue,
-          obituaryCondolencePostal,
-          obituaryCondolenceAddress,
-          obituaryCondolenceVenueName,
-          obituaryCondolencePhone,
-          obituaryCondolenceAmount: obituaryCondolenceAmount ? Number(obituaryCondolenceAmount) : '',
-          obituaryRequest,
-          obituaryAttendees
-        }
-      }
-      
-      const appName = mode === 'approval' ? '稟議' : '回覧報告'
-
-      const stepsObj: any = {}
-      const dbKeyFor = (stepKey: string) => {
-        if (stepKey === '本部長') return currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
-        if (stepKey === '決裁後回覧') return currentRoute.postDecisionCirculationLabel
-        return stepKey
-      }
-      let firstStepKey = mode === 'report' ? '回覧先' : ''
-      let initialApprovers: string[] = []
-
-      const applicantName = user?.name || ''
-      const isSelfOrEmpty = (approvers: string[]) =>
-        approvers.length === 0 || (approvers.length === 1 && approvers[0] === applicantName) || approvers.every(a => a === applicantName)
-
-      if (mode === 'approval') {
-        currentRoute.stepOrder.forEach((stepKey: string) => {
-          let approvers: string[] = []
-          const dbKey = dbKeyFor(stepKey)
-
-          if (stepKey === '部長') approvers = selectedDeptHead
-          else if (stepKey === '本部長') approvers = selectedGM
-          else if (stepKey === '社長') approvers = selectedExec
-          else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
-          else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
-          else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
-
-          const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
-          const skipped = isSelfOrEmpty(approvers)
-
-          stepsObj[dbKey] = {
-            approvers,
-            status: skipped ? '承認済み(スキップ)' : (isCirculation ? '回覧待ち' : '承認待ち'),
-            comments: [],
-            approvedBy: []
-          }
-
-          if (!skipped && firstStepKey === '') {
-            firstStepKey = dbKey
-            initialApprovers = approvers
-          }
-        })
-
-        if (!firstStepKey) {
-          firstStepKey = '完了'
-          initialApprovers = []
-        }
-      } else if (mode === 'report') {
-        firstStepKey = '回覧先'
-        initialApprovers = selectedCirculation
-        stepsObj['回覧先'] = {
-          approvers: selectedCirculation,
-          status: '回覧待ち',
-          comments: [],
-          approvedBy: []
-        }
-      }
-
-      const allCirculators = Array.from(new Set([
-        ...selectedCirculation,
-        ...(mode === 'approval' ? selectedGeneralAffairs : []),
-        ...(mode === 'approval' ? selectedGMForCirculation : []),
-        ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
-      ]))
-      
-      stage = '申請データ登録'
-      const applicationNo = await runTransaction(db, async (transaction) => {
+      stage = '申請番号取得'
+      const applicationNo = existingNo ?? await runTransaction(db, async (transaction) => {
         const counterRef = doc(db, 'counters', 'applications')
         const counterDoc = await transaction.get(counterRef)
         const nextNo = (counterDoc.exists() ? (counterDoc.data().nextNumber || 0) : 0) + 1
@@ -896,36 +1062,78 @@ function CreatePageContent() {
         return nextNo
       })
 
-      const applicationData = {
+      stage = '申請データ登録'
+      const appName = mode === 'approval' ? '稟議' : '回覧報告'
+      const formDetails = buildFormDetails()
+      const workflow = buildWorkflow()
+      const baseData: any = {
         appName, subType, title, description, remarks,
-        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '', applicantName: user?.name || '', applicantDept: selectedDepartment || user?.department || '', applicantTitle: user?.title || '',
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '',
+        applicantName: user?.name || '',
+        applicantDept: selectedDepartment || user?.department || '',
+        applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
-        workflow: {
-          currentStep: firstStepKey,
-          status: mode === 'report' ? '回覧待ち' : (firstStepKey === '完了' ? '承認済み' : '承認待ち'),
-          currentApprovers: initialApprovers,
-          allCirculators: allCirculators,
-          decisionMaker: currentRoute.decisionMaker,
-          stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => dbKeyFor(k)) : ['回覧先'],
-          steps: stepsObj,
-          circulations: selectedCirculation, confirmedBy: []
-        },
+        workflow,
         attachments: uploadedAttachments,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp()
       }
 
-      await addDoc(collection(db, 'applications'), applicationData)
-      
-      // 【マージ成功】稟議申請と回覧報告それぞれで、適切な通知メールを一斉送信する
-      if (mode === 'approval' && initialApprovers.length > 0) {
-        await sendNewApplicationNotification(applicationData, initialApprovers)
-      } else if (mode === 'report' && selectedCirculation.length > 0) {
-        await sendNewReportNotification(applicationData, selectedCirculation)
+      if (draftId) {
+        await updateDoc(doc(db, 'applications', draftId), baseData)
+      } else {
+        await addDoc(collection(db, 'applications'), { ...baseData, createdAt: serverTimestamp() })
       }
-      
+
+      if (mode === 'approval' && workflow.currentApprovers.length > 0) {
+        await sendNewApplicationNotification(baseData, workflow.currentApprovers)
+      } else if (mode === 'report' && selectedCirculation.length > 0) {
+        await sendNewReportNotification(baseData, selectedCirculation)
+      }
+
       router.push('/dashboard')
     } catch (err: any) { setError(`${stage}で失敗しました: ${err.message} (code: ${err.code || 'unknown'})`) } finally { setLoading(false) }
+  }
+
+  const handleSaveDraft = async () => {
+    if (!user || !firebaseUser) {
+      return setError('ログイン情報が取得できません。再度ログインしてください。')
+    }
+    setLoading(true)
+    try {
+      let existingNo: number | null = null
+      let existingAttachments: any[] | undefined
+      if (draftId) {
+        const draftSnap = await getDoc(doc(db, 'applications', draftId))
+        if (draftSnap.exists()) {
+          const draftData = draftSnap.data() as any
+          existingNo = draftData.applicationNo ?? null
+          existingAttachments = draftData.attachments
+        }
+      }
+      const appName = mode === 'approval' ? '稟議' : '回覧報告'
+      const formDetails = buildFormDetails()
+      const workflow = buildWorkflow()
+      workflow.status = '下書き'
+      const baseData: any = {
+        appName, subType, title, description, remarks,
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '',
+        applicantName: user?.name || '',
+        applicantDept: selectedDepartment || user?.department || '',
+        applicantTitle: user?.title || '',
+        applicationNo: existingNo,
+        formDetails,
+        workflow,
+        attachments: existingAttachments || [],
+        updatedAt: serverTimestamp()
+      }
+      if (draftId) {
+        await updateDoc(doc(db, 'applications', draftId), baseData)
+      } else {
+        await addDoc(collection(db, 'applications'), { ...baseData, createdAt: serverTimestamp() })
+      }
+      router.push('/dashboard')
+    } catch (err: any) { setError(`下書き保存に失敗しました: ${err.message}`) } finally { setLoading(false) }
   }
 
   const sendNewApplicationNotification = async (applicationData: any, initialApprovers: string[]) => {
@@ -1847,8 +2055,11 @@ function CreatePageContent() {
               </div>
             </section>
 
-            <div className="flex gap-4 pt-6 border-t border-slate-700/80">
+            <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-slate-700/80">
               <button type="button" onClick={() => router.push('/dashboard')} className="flex-1 bg-slate-800/40 text-slate-400 font-bold py-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:text-slate-50 transition-all text-sm tracking-widest uppercase">キャンセル</button>
+              <button type="button" onClick={handleSaveDraft} disabled={loading} className="flex-1 bg-slate-700/50 text-slate-200 font-bold py-3 rounded-xl border border-slate-600/50 hover:bg-slate-700 hover:text-slate-50 transition-all text-sm tracking-widest uppercase flex items-center justify-center gap-2 disabled:opacity-50">
+                {loading ? <div className="w-4 h-4 border-2 border-slate-50/20 border-t-slate-50 rounded-full animate-spin"></div> : <><Save size={18} /> 一時保存</>}
+              </button>
               <button type="submit" disabled={loading} className="flex-[2] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-50 font-black py-4 rounded-xl shadow-lg transition-all text-base tracking-[0.2em] flex items-center justify-center gap-3 uppercase disabled:opacity-50">
                 {loading ? <div className="w-5 h-5 border-2 border-slate-50/20 border-t-slate-50 rounded-full animate-spin"></div> : <><Send size={18} /> {mode === 'approval' ? '申請を送信する' : '回覧を開始する'}</>}
               </button>
