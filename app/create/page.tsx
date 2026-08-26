@@ -7,6 +7,7 @@ import { collection, addDoc, updateDoc, serverTimestamp, getDocs, query, where, 
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye, Save } from 'lucide-react'
+import { FIELD_DEFINITIONS, isFieldRequired, getFieldLabel, mergeFieldConfig, FieldConfig } from '@/lib/fieldConfig'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -320,6 +321,7 @@ function CreatePageContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
+  const [fieldConfig, setFieldConfig] = useState<FieldConfig>({})
 
   const [mode, setMode] = useState<'approval' | 'report'>('approval')
   const [departmentOverride, setDepartmentOverride] = useState<string | null>(null)
@@ -343,6 +345,7 @@ function CreatePageContent() {
   const [activeAccord, setActiveAccord] = useState('所属長')
 
   const [subType, setSubType] = useState<string>('通常申請')
+  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key), [fieldConfig, subType])
   const [recruitmentDivision, setRecruitmentDivision] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -462,6 +465,20 @@ function CreatePageContent() {
 
   useEffect(() => {
     fetchEmployeeMaster()
+  }, [])
+
+  useEffect(() => {
+    const fetchFieldConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
+        const saved = snap.exists() ? (snap.data() as { configs?: FieldConfig }).configs : null
+        setFieldConfig(mergeFieldConfig(saved))
+      } catch (err) {
+        console.error('Error fetching field config:', err)
+        setFieldConfig(mergeFieldConfig(null))
+      }
+    }
+    fetchFieldConfig()
   }, [])
 
   const handleModeChange = (newMode: 'approval' | 'report') => {
@@ -987,12 +1004,115 @@ function CreatePageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
-    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !recruitmentDivision) {
-      return setError('採用区分を選択してください')
+
+    const getFieldValue = (key: string): any => {
+      switch (key) {
+        case 'amount': return amount
+        case 'paymentDate': return paymentDate
+        case 'payee': return payee
+        case 'description': return description
+        case 'remarks': return remarks
+        case 'attachments': return files.length > 0
+        case 'recruitmentDivision': return recruitmentDivision
+        case 'employmentType': return employmentType
+        case 'jobLocation': return jobLocation
+        case 'jobContent': return jobContent
+        case 'workHours': return workHours
+        case 'workDays': return workDays
+        case 'recruitmentUnitPrice': return recruitmentUnitPrice
+        case 'postingDate': return postingDate
+        case 'recruitmentMedia': return recruitmentMedia
+        case 'postingFee': return postingFee
+        case 'salesAmount': return salesAmount
+        case 'costAmount': return costAmount
+        case 'costRate': return costRate
+        case 'retireeName': return retireeName
+        case 'retireeDate': return retireeDate
+        case 'coCompanyName': return coCompanyName
+        case 'coStartDate': return coStartDate
+        case 'coBackground': return coBackground
+        case 'coRegistrationFile': return !!coRegistrationFile
+        case 'coFinancialStatements': return !!coFinancialStatements
+        case 'coInsuranceFile': return !!coInsuranceFile
+        case 'coAntiSocialFile': return !!coAntiSocialFile
+        case 'coCompanyBrochure': return !!coCompanyBrochure
+        case 'coLicenseFile': return !!coLicenseFile
+        case 'tripStartDate': return tripDetails.startDate
+        case 'tripEndDate': return tripDetails.endDate
+        case 'transport': return tripDetails.transport.some(t => t.method.trim() || t.amount.trim())
+        case 'accommodationNights': return tripDetails.accommodationNights
+        case 'accommodationUnitPrice': return tripDetails.accommodationUnitPrice
+        case 'businessHours': return tripDetails.businessHours
+        case 'dailyAllowanceDays': return tripDetails.dailyAllowanceDays
+        case 'dailyAllowanceUnitPrice': return tripDetails.dailyAllowanceUnitPrice
+        case 'leaseClassification': return leaseClassification
+        case 'leaseVendor': return leaseVendor
+        case 'leaseOtherVendor': return leaseVendor === 'その他' ? leaseOtherVendor : 'skip'
+        case 'leaseCarNumber': return leaseCarNumber
+        case 'leaseRequirements': return leaseRequirements
+        case 'leaseCurrentAmount': return leaseCurrentAmount
+        case 'leaseNewAmount': return leaseNewAmount
+        case 'leaseTerm': return leaseTerm
+        case 'leaseDeliveryDate': return leaseDeliveryDate
+        case 'leaseExpiryDate': return leaseExpiryDate
+        case 'leaseMileage': return leaseMileage
+        case 'leaseEstimateFile': return !!leaseEstimateFile
+        case 'salaryCustomerName': return salaryCustomerName
+        case 'salarySiteName': return salarySiteName
+        case 'salaryEmployeeNumber': return salaryEmployeeNumber
+        case 'salaryEmployeeName': return salaryEmployeeName
+        case 'salaryChangeDetails': return salaryChangeDetails
+        case 'salaryStartDate': return salaryStartDate
+        case 'salaryReason': return salaryReason
+        case 'salaryLaborCostFile': return !!salaryLaborCostFile
+        case 'retirementName': return retirementName
+        case 'retirementSite': return retirementSite
+        case 'retirementJobType': return retirementJobType
+        case 'retirementDate': return retirementDate
+        case 'retirementReason': return retirementReason
+        case 'retirementResignationFile': return !!retirementResignationFile
+        case 'obituaryType': return obituaryType
+        case 'obituaryTargetName': return obituaryTargetName
+        case 'obituarySite': return obituaryType === '社員' ? obituarySite : 'skip'
+        case 'obituaryDeceasedName': return obituaryDeceasedName
+        case 'obituaryRelation': return obituaryRelation
+        case 'obituaryChiefMourner': return obituaryChiefMourner
+        case 'obituaryWakeDate': return obituaryWakeDate
+        case 'obituaryFuneralDate': return obituaryFuneralDate
+        case 'obituaryNoticeFile': return !!obituaryNoticeFile
+        case 'obituaryVenue': return obituaryVenue
+        case 'obituaryCondolencePostal': return obituaryCondolencePostal
+        case 'obituaryCondolencePhone': return obituaryCondolencePhone
+        case 'obituaryCondolenceVenueName': return obituaryCondolenceVenueName
+        case 'obituaryCondolenceAddress': return obituaryCondolenceAddress
+        case 'obituaryCondolenceAmount': return obituaryCondolenceAmount
+        case 'obituaryRequest': return obituaryRequest
+        case 'obituaryAttendees': return obituaryAttendees
+        case 'biddingLocation': return biddingDetails.location
+        case 'biddingDate': return biddingDetails.date
+        case 'biddingTime': return biddingDetails.time
+        case 'winnerName': return biddingDetails.winnerName
+        case 'winnerBid1': return biddingDetails.winnerBid1
+        case 'winnerBid2': return biddingDetails.winnerBid2
+        case 'ourBid1': return biddingDetails.ourBid1
+        case 'ourBid2': return biddingDetails.ourBid2
+        case 'participants': return biddingDetails.participants.some(p => p.name.trim())
+        case 'prevWinnerName': return biddingDetails.prevWinnerName
+        case 'prevWinnerAmount': return biddingDetails.prevWinnerAmount
+        default: return ''
+      }
     }
-    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !employmentType) {
-      return setError('区分を選択してください')
+
+    for (const field of (FIELD_DEFINITIONS[subType] || [])) {
+      if (!isFieldRequired(fieldConfig, subType, field.key)) continue
+      const value = getFieldValue(field.key)
+      if (value === 'skip') continue
+      const isEmpty = typeof value === 'boolean' ? !value : String(value).trim() === ''
+      if (isEmpty) {
+        return setError(`${getFieldLabel(subType, field.key)}を入力してください`)
+      }
     }
+
     setLoading(true)
     if (!firebaseUser) {
       setLoading(false)
@@ -1362,9 +1482,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 {isRequired('recruitmentDivision') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required={isRequired('recruitmentDivision')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="三保事業所">三保事業所</option>
                           <option value="九州支店">九州支店</option>
@@ -1377,9 +1497,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 {isRequired('employmentType') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required={isRequired('employmentType')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="新規雇用">新規雇用</option>
                           <option value="欠員補充">欠員補充</option>
@@ -1574,8 +1694,8 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 {isRequired('coCompanyName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required={isRequired('coCompanyName')} placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">取引開始予定日</label>
@@ -1587,12 +1707,12 @@ function CreatePageContent() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <FileUploadField label="協力会社登録票" file={coRegistrationFile} onChange={setCoRegistrationFile} />
-                    <FileUploadField label="決算書（直近2年分）" file={coFinancialStatements} onChange={setCoFinancialStatements} />
-                    <FileUploadField label="賠償保険写し" file={coInsuranceFile} onChange={setCoInsuranceFile} />
-                    <FileUploadField label="反社確約書" file={coAntiSocialFile} onChange={setCoAntiSocialFile} />
-                    <FileUploadField label="会社案内" file={coCompanyBrochure} onChange={setCoCompanyBrochure} />
-                    <FileUploadField label="許認可登録写し" file={coLicenseFile} onChange={setCoLicenseFile} />
+                    <FileUploadField label="協力会社登録票" file={coRegistrationFile} onChange={setCoRegistrationFile} required={isRequired('coRegistrationFile')} />
+                    <FileUploadField label="決算書（直近2年分）" file={coFinancialStatements} onChange={setCoFinancialStatements} required={isRequired('coFinancialStatements')} />
+                    <FileUploadField label="賠償保険写し" file={coInsuranceFile} onChange={setCoInsuranceFile} required={isRequired('coInsuranceFile')} />
+                    <FileUploadField label="反社確約書" file={coAntiSocialFile} onChange={setCoAntiSocialFile} required={isRequired('coAntiSocialFile')} />
+                    <FileUploadField label="会社案内" file={coCompanyBrochure} onChange={setCoCompanyBrochure} required={isRequired('coCompanyBrochure')} />
+                    <FileUploadField label="許認可登録写し" file={coLicenseFile} onChange={setCoLicenseFile} required={isRequired('coLicenseFile')} />
                   </div>
                 </div>
               )}
@@ -1629,7 +1749,7 @@ function CreatePageContent() {
                       <input type="date" value={salaryStartDate} onChange={(e) => setSalaryStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} />
+                      <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} required={isRequired('salaryLaborCostFile')} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">事由及び変更後の状況</label>
@@ -1647,9 +1767,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">分類 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">分類 {isRequired('leaseClassification') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={leaseClassification} onChange={(e) => setLeaseClassification(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={leaseClassification} onChange={(e) => setLeaseClassification(e.target.value)} required={isRequired('leaseClassification')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="新規">新規</option>
                           <option value="入れ替え">入れ替え</option>
@@ -1660,9 +1780,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者 {isRequired('leaseVendor') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={leaseVendor} onChange={(e) => { setLeaseVendor(e.target.value); if (e.target.value !== 'その他') setLeaseOtherVendor('') }} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={leaseVendor} onChange={(e) => { setLeaseVendor(e.target.value); if (e.target.value !== 'その他') setLeaseOtherVendor('') }} required={isRequired('leaseVendor')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="清水リース＆カード">清水リース＆カード</option>
                           <option value="静銀リース">静銀リース</option>
@@ -1678,12 +1798,12 @@ function CreatePageContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">登録車番 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={leaseCarNumber} onChange={(e) => setLeaseCarNumber(e.target.value)} required placeholder="例：静岡500 あ 1234" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">登録車番 {isRequired('leaseCarNumber') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={leaseCarNumber} onChange={(e) => setLeaseCarNumber(e.target.value)} required={isRequired('leaseCarNumber')} placeholder="例：静岡500 あ 1234" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">用件 <span className="text-rose-500">*</span></label>
-                      <textarea value={leaseRequirements} onChange={(e) => setLeaseRequirements(e.target.value)} required rows={3} placeholder="用件を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">用件 {isRequired('leaseRequirements') && <span className="text-rose-500">*</span>}</label>
+                      <textarea value={leaseRequirements} onChange={(e) => setLeaseRequirements(e.target.value)} required={isRequired('leaseRequirements')} rows={3} placeholder="用件を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現在リース金額（月額）</label>
@@ -1727,7 +1847,7 @@ function CreatePageContent() {
                       <input type="text" value={leaseMileage} onChange={(e) => setLeaseMileage(e.target.value)} placeholder="例：50,000km" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <FileUploadField label="見積等" file={leaseEstimateFile} onChange={setLeaseEstimateFile} />
+                      <FileUploadField label="見積等" file={leaseEstimateFile} onChange={setLeaseEstimateFile} required={isRequired('leaseEstimateFile')} />
                     </div>
                   </div>
                 </div>
@@ -1741,27 +1861,27 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 {isRequired('retirementName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required={isRequired('retirementName')} placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 {isRequired('retirementSite') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required={isRequired('retirementSite')} placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 {isRequired('retirementJobType') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required={isRequired('retirementJobType')} placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 <span className="text-rose-500">*</span></label>
-                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 {isRequired('retirementDate') && <span className="text-rose-500">*</span>}</label>
+                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required={isRequired('retirementDate')} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 <span className="text-rose-500">*</span></label>
-                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 {isRequired('retirementReason') && <span className="text-rose-500">*</span>}</label>
+                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required={isRequired('retirementReason')} rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} />
+                      <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} required={isRequired('retirementResignationFile')} />
                     </div>
                   </div>
                 </div>
@@ -1775,9 +1895,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 {isRequired('obituaryType') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required={isRequired('obituaryType')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="社員">社員</option>
                           <option value="社員家族">社員家族</option>
@@ -1787,8 +1907,8 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 {isRequired('obituaryTargetName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required={isRequired('obituaryTargetName')} placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     {obituaryType === '社員' && (
                       <div>
@@ -1797,12 +1917,12 @@ function CreatePageContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 {isRequired('obituaryDeceasedName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required={isRequired('obituaryDeceasedName')} placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required placeholder="例：実父" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 {isRequired('obituaryRelation') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required={isRequired('obituaryRelation')} placeholder="例：実父" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">喪主名</label>
@@ -1817,7 +1937,7 @@ function CreatePageContent() {
                       <input type="datetime-local" value={obituaryFuneralDate} onChange={(e) => setObituaryFuneralDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} />
+                      <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} required={isRequired('obituaryNoticeFile')} />
                       <p className="text-xs text-slate-500 mt-1">※訃報案内を添付した場合、下記①②は省略できます</p>
                     </div>
                     <div className="md:col-span-2">
@@ -1840,9 +1960,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 {isRequired('obituaryRequest') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required={isRequired('obituaryRequest')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="弔電依頼">弔電依頼</option>
                           <option value="弔電・生花依頼">弔電・生花依頼</option>
@@ -1862,23 +1982,23 @@ function CreatePageContent() {
               )}
 
               <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明 {isRequired('description') && <span className="text-rose-500">*</span>}</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} required={isRequired('description')} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
               </div>
             </section>
 
             {mode === 'approval' && subType === '通常申請' && (
               <section className="bg-slate-950/40 border border-slate-700 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-300">
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">金額</label>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">金額 {isRequired('amount') && <span className="text-rose-500">*</span>}</label>
                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required={isRequired('amount')} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
                   </div>
                 </div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日</label>
-                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none"/>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日 {isRequired('paymentDate') && <span className="text-rose-500">*</span>}</label>
+                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required={isRequired('paymentDate')} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none"/>
                 </div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払先</label>
-                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl outline-none"/>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払先 {isRequired('payee') && <span className="text-rose-500">*</span>}</label>
+                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} required={isRequired('payee')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl outline-none"/>
                 </div>
               </section>
             )}
@@ -1886,9 +2006,9 @@ function CreatePageContent() {
             {mode === 'approval' && subType === '代表者印捺印申請' && (
               <section className='space-y-6 bg-slate-950/40 border border-slate-700 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
                 <div>
-                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額</label>
+                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額 {isRequired('amount') && <span className="text-rose-500">*</span>}</label>
                   <div className='relative'><span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none' />
+                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} required={isRequired('amount')} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none' />
                   </div>
                 </div>
               </section>
@@ -1979,11 +2099,11 @@ function CreatePageContent() {
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
               <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考</label>
-                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考 {isRequired('remarks') && <span className="text-rose-500">*</span>}</label>
+                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} required={isRequired('remarks')} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル</label>
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル {isRequired('attachments') && <span className="text-rose-500">*</span>}</label>
                 <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-700 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
                   <Paperclip size={24} className="text-slate-600 group-hover:text-indigo-400 mb-2" />
                   <span className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">選択してアップロード</span>
