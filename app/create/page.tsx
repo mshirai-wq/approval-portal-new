@@ -260,6 +260,42 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   }
 }
 
+function findEmployeeByName(master: EmployeeMaster, target: string): Employee | null {
+  for (const members of Object.values(master)) {
+    const exact = members.find(m => m.name === target)
+    if (exact) return exact
+  }
+  for (const members of Object.values(master)) {
+    const partial = members.find(m => m.name.includes(target))
+    if (partial) return partial
+  }
+  return null
+}
+
+function getDefaultReportCirculators(subType: string, master: EmployeeMaster): string[] {
+  const list = new Set<string>()
+  if (subType === '退職者通知') {
+    const residentMembers = master['常駐管理本部'] || []
+    const exclude = new Set(['村上努', '榊原有'])
+    residentMembers.filter(m => !exclude.has(m.name)).forEach(m => list.add(m.name))
+    for (const name of ['三浦暢子', '川上沙織', '朝倉千晶']) {
+      const found = findEmployeeByName(master, name)
+      if (found) list.add(found.name)
+    }
+  } else if (subType === '訃報連絡') {
+    for (const members of Object.values(master)) {
+      for (const m of members) {
+        if (m.title === '社長' || m.title === '本部長') list.add(m.name)
+      }
+    }
+    for (const name of ['三浦暢子', '朝倉千晶', '金田麻里江', '田邉洋']) {
+      const found = findEmployeeByName(master, name)
+      if (found) list.add(found.name)
+    }
+  }
+  return Array.from(list)
+}
+
 // 【維持】白井さんが追加した高性能な画像自動圧縮・リサイズロジック
 const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
   return new Promise((resolve) => {
@@ -602,6 +638,7 @@ function CreatePageContent() {
     setFiles([])
     setCustomValues({})
     setCustomFiles({})
+    setSelectedCirculation(newMode === 'report' ? getDefaultReportCirculators('退職者通知', employeeMaster) : [])
     setActiveAccord(newMode === 'approval' ? (getFirstActiveAccord(currentRoute) || '所属長') : '回覧先')
   }
 
@@ -609,7 +646,17 @@ function CreatePageContent() {
     setSubType(newSubType)
     setCustomValues({})
     setCustomFiles({})
+    if (mode === 'report') {
+      setSelectedCirculation(getDefaultReportCirculators(newSubType, employeeMaster))
+    }
   }
+
+  useEffect(() => {
+    if (mode !== 'report' || Object.keys(employeeMaster).length === 0) return
+    if (draftId || reuseId) return
+    if (subType !== '退職者通知' && subType !== '訃報連絡') return
+    setSelectedCirculation(getDefaultReportCirculators(subType, employeeMaster))
+  }, [mode, subType, employeeMaster, draftId, reuseId])
 
   const generalManagers = useMemo(() => {
     const gmList: (Employee & { dept: string })[] = []
