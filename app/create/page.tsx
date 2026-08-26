@@ -458,7 +458,7 @@ function CreatePageContent() {
     dailyAllowanceUnitPrice: ''
   })
 
-  const fetchEmployeeMaster = async () => {
+  const fetchEmployeeMaster = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
       const master: EmployeeMaster = {}
@@ -469,13 +469,15 @@ function CreatePageContent() {
       })
       setEmployeeMaster(master)
     } catch (err) { console.error('Error fetching employee master:', err) }
-  }
-
-  useEffect(() => {
-    fetchEmployeeMaster()
   }, [])
 
   useEffect(() => {
+    if (!firebaseUser) return
+    fetchEmployeeMaster()
+  }, [firebaseUser, fetchEmployeeMaster])
+
+  useEffect(() => {
+    if (!firebaseUser) return
     const fetchFieldConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
@@ -491,7 +493,7 @@ function CreatePageContent() {
       }
     }
     fetchFieldConfig()
-  }, [])
+  }, [firebaseUser])
 
   // 管理画面で非表示にしたデフォルト項目を DOM から非表示にする
   useEffect(() => {
