@@ -55,10 +55,13 @@ export default function FieldSettingsPage() {
   const [newFieldBySubType, setNewFieldBySubType] = useState<Record<string, { label: string; type: NonNullable<FieldDef['type']> }>>({})
 
   useEffect(() => {
-    if (!authLoading && user && !isAdmin) {
+    if (authLoading) return
+    if (!user) {
+      router.push('/login')
+    } else if (!isAdmin) {
       router.push('/dashboard')
     }
-  }, [user, authLoading, isAdmin, router])
+  }, [authLoading, user, isAdmin, router])
 
   useEffect(() => {
     if (authLoading || !user || !isAdmin) return
