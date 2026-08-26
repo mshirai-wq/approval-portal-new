@@ -2,9 +2,13 @@ export interface FieldDef {
   key: string
   label: string
   default: boolean
+  type?: 'text' | 'number' | 'date' | 'textarea' | 'file'
+  custom?: boolean
 }
 
 export type FieldConfig = Record<string, Record<string, boolean>>
+
+export type CustomFieldDefinitions = Record<string, FieldDef[]>
 
 // 各申請種別で管理者が「必須/任意」を変更できる入力項目
 export const FIELD_DEFINITIONS: Record<string, FieldDef[]> = {
@@ -180,30 +184,55 @@ export function mergeFieldConfig(saved: FieldConfig | null | undefined): FieldCo
   const config = getDefaultFieldConfig()
   if (!saved) return config
   for (const [subType, subConfig] of Object.entries(saved)) {
-    if (config[subType]) {
-      for (const [key, value] of Object.entries(subConfig)) {
-        if (config[subType][key] !== undefined) {
-          config[subType][key] = !!value
-        }
-      }
+    if (!config[subType]) config[subType] = {}
+    for (const [key, value] of Object.entries(subConfig)) {
+      config[subType][key] = !!value
     }
   }
   return config
 }
 
+export function getEffectiveFields(subType: string, customFields?: CustomFieldDefinitions | null): FieldDef[] {
+  return [
+    ...(FIELD_DEFINITIONS[subType] || []),
+    ...((customFields || {})[subType] || [])
+  ]
+}
+
 export function isFieldRequired(
   config: FieldConfig | null | undefined,
   subType: string,
-  key: string
+  key: string,
+  customFields?: CustomFieldDefinitions | null
 ): boolean {
-  const defs = FIELD_DEFINITIONS[subType]
-  const def = defs?.find(f => f.key === key)
+  const def = getEffectiveFields(subType, customFields).find(f => f.key === key)
   if (!def) return false
   const subConfig = config?.[subType]
   if (subConfig && key in subConfig) return !!subConfig[key]
   return def.default
 }
 
-export function getFieldLabel(subType: string, key: string): string {
-  return FIELD_DEFINITIONS[subType]?.find(f => f.key === key)?.label || key
+export function getFieldLabel(subType: string, key: string, customFields?: CustomFieldDefinitions | null): string {
+  return getEffectiveFields(subType, customFields).find(f => f.key === key)?.label || key
+}
+
+export function getDefaultCustomFields(): CustomFieldDefinitions {
+  return {}
+}
+
+export function mergeCustomFields(saved: CustomFieldDefinitions | null | undefined): CustomFieldDefinitions {
+  const merged = getDefaultCustomFields()
+  if (!saved) return merged
+  for (const [subType, fields] of Object.entries(saved)) {
+    if (Array.isArray(fields)) {
+      merged[subType] = fields.map(f => ({
+        key: f.key,
+        label: f.label,
+        default: !!f.default,
+        type: f.type || 'text',
+        custom: true,
+      }))
+    }
+  }
+  return merged
 }

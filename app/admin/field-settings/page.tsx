@@ -5,8 +5,25 @@ import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { db } from '@/lib/firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { FIELD_DEFINITIONS, FieldConfig, getDefaultFieldConfig, mergeFieldConfig } from '@/lib/fieldConfig'
-import { ArrowLeft, Save, Shield, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { FIELD_DEFINITIONS, FieldConfig, FieldDef, CustomFieldDefinitions, getDefaultFieldConfig, mergeFieldConfig, mergeCustomFields, getDefaultCustomFields } from '@/lib/fieldConfig'
+import { ArrowLeft, Save, Shield, AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react'
+
+const FIELD_TYPES: { value: NonNullable<FieldDef['type']>; label: string }[] = [
+  { value: 'text', label: 'テキスト' },
+  { value: 'number', label: '数値' },
+  { value: 'date', label: '日付' },
+  { value: 'textarea', label: '複数行テキスト' },
+  { value: 'file', label: 'ファイル' },
+]
+
+function generateKey(label: string): string {
+  const base = label
+    .normalize('NFKC')
+    .replace(/[\s・／/\\()（）［］\[\]]+/g, '_')
+    .replace(/[^a-zA-Z0-9_\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '')
+    .slice(0, 20)
+  return base ? `custom_${base}_${Date.now().toString(36).slice(-4)}` : `custom_${Date.now().toString(36)}`
+}
 
 export default function FieldSettingsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -30,9 +47,11 @@ export default function FieldSettingsPage() {
   ], [])
 
   const [config, setConfig] = useState<FieldConfig>(getDefaultFieldConfig())
+  const [customFields, setCustomFields] = useState<CustomFieldDefinitions>(getDefaultCustomFields())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [newFieldBySubType, setNewFieldBySubType] = useState<Record<string, { label: string; type: NonNullable<FieldDef['type']> }>>({})
 
   useEffect(() => {
     if (!authLoading && user && !isAdmin) {
@@ -45,8 +64,9 @@ export default function FieldSettingsPage() {
     const fetchConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
-        const saved = snap.exists() ? (snap.data() as { configs?: FieldConfig }).configs : null
-        setConfig(mergeFieldConfig(saved))
+        const data = snap.exists() ? snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions } : {}
+        setConfig(mergeFieldConfig(data.configs))
+        setCustomFields(mergeCustomFields(data.customFields))
       } catch (err) {
         console.error('Error fetching field config:', err)
         setMessage({ type: 'error', text: '設定の読み込みに失敗しました。デフォルト値を表示しています。' })
@@ -67,12 +87,65 @@ export default function FieldSettingsPage() {
     }))
   }
 
+  const addCustomField = (subType: string) => {
+    const newField = newFieldBySubType[subType]
+    if (!newField?.label.trim()) return
+    const key = generateKey(newField.label)
+    setCustomFields(prev => ({
+      ...prev,
+      [subType]: [
+        ...(prev[subType] || []),
+        { key, label: newField.label.trim(), default: false, type: newField.type, custom: true }
+      ]
+    }))
+    setConfig(prev => ({
+      ...prev,
+      [subType]: {
+        ...prev[subType],
+        [key]: false
+      }
+    }))
+    setNewFieldBySubType(prev => ({ ...prev, [subType]: { label: '', type: 'text' } }))
+  }
+
+  const removeCustomField = (subType: string, index: number) => {
+    setCustomFields(prev => {
+      const fields = [...(prev[subType] || [])]
+      const removed = fields.splice(index, 1)[0]
+      if (removed) {
+        setConfig(cfg => {
+          const sub = { ...cfg[subType] }
+          delete sub[removed.key]
+          return { ...cfg, [subType]: sub }
+        })
+      }
+      return { ...prev, [subType]: fields }
+    })
+  }
+
+  const updateCustomFieldLabel = (subType: string, index: number, label: string) => {
+    setCustomFields(prev => {
+      const fields = [...(prev[subType] || [])]
+      if (fields[index]) fields[index] = { ...fields[index], label }
+      return { ...prev, [subType]: fields }
+    })
+  }
+
+  const updateCustomFieldType = (subType: string, index: number, type: NonNullable<FieldDef['type']>) => {
+    setCustomFields(prev => {
+      const fields = [...(prev[subType] || [])]
+      if (fields[index]) fields[index] = { ...fields[index], type }
+      return { ...prev, [subType]: fields }
+    })
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setMessage(null)
     try {
       await setDoc(doc(db, 'settings', 'fieldConfig'), {
         configs: config,
+        customFields,
         updatedAt: serverTimestamp()
       })
       setMessage({ type: 'success', text: '必須項目設定を保存しました' })
@@ -125,22 +198,25 @@ export default function FieldSettingsPage() {
         )}
 
         <p className="text-sm text-slate-400">
-          各申請種別ごとに、送信時に必須とする入力項目を ON/OFF で切り替えられます。保存すると作成画面に即時反映されます。
+          各申請種別ごとに、送信時に必須とする入力項目を ON/OFF で切り替えられます。「追加項目」から自由に入力欄を追加・削除できます。保存すると作成画面に即時反映されます。
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {subTypeOrder.map(subType => {
-            const fields = FIELD_DEFINITIONS[subType] || []
+            const defaultFields = FIELD_DEFINITIONS[subType] || []
+            const customList = customFields[subType] || []
+            const newField = newFieldBySubType[subType] || { label: '', type: 'text' as NonNullable<FieldDef['type']> }
+
             return (
               <section key={subType} className="bg-slate-900/40 border border-slate-700 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between">
                   <h2 className="font-bold text-slate-100 text-sm">{subType}</h2>
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                    {fields.length} 項目
+                    {defaultFields.length + customList.length} 項目
                   </span>
                 </div>
                 <div className="divide-y divide-slate-800">
-                  {fields.map(field => (
+                  {defaultFields.map(field => (
                     <label key={field.key} className="flex items-center justify-between px-5 py-3 hover:bg-slate-800/40 transition-colors cursor-pointer">
                       <span className="text-sm text-slate-300">{field.label}</span>
                       <div className="relative inline-flex items-center">
@@ -154,6 +230,76 @@ export default function FieldSettingsPage() {
                       </div>
                     </label>
                   ))}
+                  {customList.map((field, index) => (
+                    <div key={field.key} className="px-5 py-3 hover:bg-slate-800/40 transition-colors">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <input
+                          type="text"
+                          value={field.label}
+                          onChange={(e) => updateCustomFieldLabel(subType, index, e.target.value)}
+                          className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                          placeholder="項目名"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomField(subType, index)}
+                          className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="削除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <select
+                          value={field.type || 'text'}
+                          onChange={(e) => updateCustomFieldType(subType, index, e.target.value as NonNullable<FieldDef['type']>)}
+                          className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+                        >
+                          {FIELD_TYPES.map(t => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!config[subType]?.[field.key]}
+                            onChange={() => toggleField(subType, field.key)}
+                            className="rounded border-slate-600 bg-slate-950 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          必須
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="px-5 py-3 bg-slate-900/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newField.label}
+                        onChange={(e) => setNewFieldBySubType(prev => ({ ...prev, [subType]: { ...newField, label: e.target.value } }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomField(subType) } }}
+                        placeholder="新しい項目名"
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                      />
+                      <select
+                        value={newField.type}
+                        onChange={(e) => setNewFieldBySubType(prev => ({ ...prev, [subType]: { ...newField, type: e.target.value as NonNullable<FieldDef['type']> } }))}
+                        className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-indigo-500"
+                      >
+                        {FIELD_TYPES.map(t => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addCustomField(subType)}
+                      className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-indigo-400 border border-dashed border-indigo-500/30 rounded-lg hover:bg-indigo-500/10 transition-colors"
+                    >
+                      <Plus size={16} />
+                      追加項目
+                    </button>
+                  </div>
                 </div>
               </section>
             )

@@ -7,7 +7,7 @@ import { collection, addDoc, updateDoc, serverTimestamp, getDocs, query, where, 
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye, Save } from 'lucide-react'
-import { FIELD_DEFINITIONS, isFieldRequired, getFieldLabel, mergeFieldConfig, FieldConfig } from '@/lib/fieldConfig'
+import { isFieldRequired, getFieldLabel, mergeFieldConfig, getEffectiveFields, mergeCustomFields, FieldConfig, CustomFieldDefinitions } from '@/lib/fieldConfig'
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -322,6 +322,9 @@ function CreatePageContent() {
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({})
+  const [customFields, setCustomFields] = useState<CustomFieldDefinitions>({})
+  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+  const [customFiles, setCustomFiles] = useState<Record<string, File | null>>({})
 
   const [mode, setMode] = useState<'approval' | 'report'>('approval')
   const [departmentOverride, setDepartmentOverride] = useState<string | null>(null)
@@ -345,7 +348,7 @@ function CreatePageContent() {
   const [activeAccord, setActiveAccord] = useState('所属長')
 
   const [subType, setSubType] = useState<string>('通常申請')
-  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key), [fieldConfig, subType])
+  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key, customFields), [fieldConfig, subType, customFields])
   const [recruitmentDivision, setRecruitmentDivision] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -471,11 +474,13 @@ function CreatePageContent() {
     const fetchFieldConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
-        const saved = snap.exists() ? (snap.data() as { configs?: FieldConfig }).configs : null
-        setFieldConfig(mergeFieldConfig(saved))
+        const data = snap.exists() ? (snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions }) : {}
+        setFieldConfig(mergeFieldConfig(data.configs))
+        setCustomFields(mergeCustomFields(data.customFields))
       } catch (err) {
         console.error('Error fetching field config:', err)
         setFieldConfig(mergeFieldConfig(null))
+        setCustomFields(mergeCustomFields(null))
       }
     }
     fetchFieldConfig()
@@ -552,7 +557,15 @@ function CreatePageContent() {
     setLeaseMileage('')
     setLeaseEstimateFile(null)
     setFiles([])
+    setCustomValues({})
+    setCustomFiles({})
     setActiveAccord(newMode === 'approval' ? (getFirstActiveAccord(currentRoute) || '所属長') : '回覧先')
+  }
+
+  const handleSubTypeChange = (newSubType: string) => {
+    setSubType(newSubType)
+    setCustomValues({})
+    setCustomFiles({})
   }
 
   const generalManagers = useMemo(() => {
@@ -606,6 +619,16 @@ function CreatePageContent() {
   const tripTotal = useMemo(() =>
     transportTotal + accommodationTotal + dailyAllowanceTotal,
   [transportTotal, accommodationTotal, dailyAllowanceTotal])
+
+  const loadCustomValues = useCallback((fd: Record<string, any>) => {
+    const next: Record<string, string> = {}
+    for (const [key, value] of Object.entries(fd)) {
+      if (key.startsWith('custom_') && (typeof value === 'string' || typeof value === 'number')) {
+        next[key] = String(value ?? '')
+      }
+    }
+    setCustomValues(next)
+  }, [])
 
   const applyDraftData = useCallback((data: any) => {
     const fd = data.formDetails || {}
@@ -687,6 +710,9 @@ function CreatePageContent() {
     setObituaryRequest(String(fd.obituaryRequest ?? ''))
     setObituaryAttendees(String(fd.obituaryAttendees ?? ''))
 
+    setCustomFiles({})
+    loadCustomValues(fd)
+
     if (data.subType === '入札結果報告') {
       const { description: _description, remarks: _remarks, ...bidRest } = fd
       void _description; void _remarks
@@ -733,7 +759,7 @@ function CreatePageContent() {
       ? (route.stepOrder[0] === '部長' ? '所属長' : route.stepOrder[0])
       : '所属長'
     setActiveAccord(data.appName === '回覧報告' ? '回覧先' : firstActive)
-  }, [employeeMaster, user, generalManagers])
+  }, [employeeMaster, user, generalManagers, loadCustomValues])
 
   useEffect(() => {
     const loadOriginal = async () => {
@@ -758,6 +784,8 @@ function CreatePageContent() {
         if (data.subType === '入札結果報告') {
           setBiddingDetails(prev => ({ ...prev, ...fd }))
         }
+        setCustomFiles({})
+        loadCustomValues(fd)
 
         const wf = data.workflow || {}
         const steps = wf.steps || {}
@@ -778,7 +806,7 @@ function CreatePageContent() {
       } catch (err) { console.error('Error loading reuse application:', err) }
     }
     loadOriginal()
-  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers, currentRoute])
+  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers, currentRoute, loadCustomValues])
 
   useEffect(() => {
     let mounted = true
@@ -921,7 +949,12 @@ function CreatePageContent() {
         obituaryAttendees
       }
     }
-    return formDetails
+    const customEntries: Record<string, any> = {}
+    for (const [key, value] of Object.entries(customValues)) {
+      const field = getEffectiveFields(subType, customFields).find(f => f.key === key)
+      customEntries[key] = field?.type === 'number' && value !== '' ? Number(value) : value
+    }
+    return { ...formDetails, ...customEntries }
   }
 
   const buildWorkflow = () => {
@@ -1099,17 +1132,19 @@ function CreatePageContent() {
         case 'participants': return biddingDetails.participants.some(p => p.name.trim())
         case 'prevWinnerName': return biddingDetails.prevWinnerName
         case 'prevWinnerAmount': return biddingDetails.prevWinnerAmount
-        default: return ''
+        default:
+          if (customFiles[key]) return !!customFiles[key]
+          return customValues[key] ?? ''
       }
     }
 
-    for (const field of (FIELD_DEFINITIONS[subType] || [])) {
-      if (!isFieldRequired(fieldConfig, subType, field.key)) continue
+    for (const field of getEffectiveFields(subType, customFields)) {
+      if (!isFieldRequired(fieldConfig, subType, field.key, customFields)) continue
       const value = getFieldValue(field.key)
       if (value === 'skip') continue
       const isEmpty = typeof value === 'boolean' ? !value : String(value).trim() === ''
       if (isEmpty) {
-        return setError(`${getFieldLabel(subType, field.key)}を入力してください`)
+        return setError(`${getFieldLabel(subType, field.key, customFields)}を入力してください`)
       }
     }
 
@@ -1151,6 +1186,12 @@ function CreatePageContent() {
       }
       if (mode === 'approval' && subType === '車両リース決済') {
         addFile(leaseEstimateFile)
+      }
+      for (const field of getEffectiveFields(subType, customFields)) {
+        if (field.custom && field.type === 'file' && customFiles[field.key]) {
+          const customFile = customFiles[field.key]
+          if (customFile) allFiles.push(customFile)
+        }
       }
 
       for (const file of allFiles) {
@@ -1423,7 +1464,7 @@ function CreatePageContent() {
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">書類種別</label>
                   <div className="relative">
-                    <select value={subType} onChange={(e) => setSubType(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                    <select value={subType} onChange={(e) => handleSubTypeChange(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                       {mode === 'approval' ? (
                         <>
                           <option value="通常申請">通常申請</option>
@@ -2117,6 +2158,49 @@ function CreatePageContent() {
                 ))}</div>
               </div>
             </div>
+
+            {getEffectiveFields(subType, customFields).filter(f => f.custom).length > 0 && (
+              <section className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
+                  <FileText size={22} className="text-cyan-400" />
+                  <h3 className="text-lg font-bold text-slate-100">追加項目</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {getEffectiveFields(subType, customFields).filter(f => f.custom).map(field => (
+                    <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">
+                        {field.label} {isRequired(field.key) && <span className="text-rose-500">*</span>}
+                      </label>
+                      {field.type === 'textarea' ? (
+                        <textarea
+                          value={customValues[field.key] || ''}
+                          onChange={(e) => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          required={isRequired(field.key)}
+                          rows={3}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none"
+                        />
+                      ) : field.type === 'file' ? (
+                        <FileUploadField
+                          label={field.label}
+                          file={customFiles[field.key] || null}
+                          onChange={(file) => setCustomFiles(prev => ({ ...prev, [field.key]: file }))}
+                          required={isRequired(field.key)}
+                        />
+                      ) : (
+                        <input
+                          type={field.type === 'number' ? 'number' : field.type || 'text'}
+                          value={customValues[field.key] || ''}
+                          onChange={(e) => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          required={isRequired(field.key)}
+                          style={field.type === 'date' ? { colorScheme: 'dark' } : undefined}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="space-y-4">
               <h3 className="text-sm font-black text-slate-300 uppercase tracking-[0.2em] flex items-center gap-3 mb-6"><Users size={18} className="text-indigo-500" /> {mode === 'approval' ? '承認・回覧経路の設定' : '回覧先の選択'}</h3>
