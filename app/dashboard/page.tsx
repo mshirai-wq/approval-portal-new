@@ -66,6 +66,17 @@ function getEffectiveStatus(app: Application): string {
   return members.every(m => confirmed.has(m)) ? '回覧済み' : '回覧待ち'
 }
 
+function isPostDecisionCirculationStep(app: Application, userName?: string): boolean {
+  if (app.appName === '回覧報告' || !userName) return false
+  const steps = app.workflow.steps || {}
+  const stepOrder = app.workflow.stepOrder || Object.keys(steps)
+  const currentStep = app.workflow.currentStep
+  const stepData = steps[currentStep]
+  return stepOrder[stepOrder.length - 1] === currentStep &&
+    stepData?.status === '回覧待ち' &&
+    ((stepData?.approvers || []).includes(userName) || (app.workflow.currentApprovers || []).includes(userName))
+}
+
 const EXCLUDED_FORM_KEYS = new Set(['description', 'remarks', 'imageUrl', 'imageUrls'])
 
 const FORM_DETAIL_LABELS: Record<string, string> = {
@@ -2348,7 +2359,10 @@ export default function DashboardPage() {
 
                     {modalSource !== 'sent' && modalSource !== 'processed' && (
                       (selectedApplication.appName === '回覧報告' && getEffectiveStatus(selectedApplication) === '回覧待ち') ||
-                      (selectedApplication.appName !== '回覧報告' && selectedApplication.workflow.status === '承認済み')
+                      (selectedApplication.appName !== '回覧報告' && (
+                        selectedApplication.workflow.status === '承認済み' ||
+                        isPostDecisionCirculationStep(selectedApplication, user?.name)
+                      ))
                     ) && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
