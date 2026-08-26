@@ -3,10 +3,10 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, getDoc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, getDoc, serverTimestamp, limit, getDocs, startAfter, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
-import { Search, Printer, FileText } from 'lucide-react'
+import { Search, Printer, FileText, Trash2 } from 'lucide-react'
 
 // 型定義の拡張
 interface Application {
@@ -300,10 +300,12 @@ function ApplicationList({
   applications,
   onItemClick,
   showApplicant = false,
+  onDelete,
 }: {
   applications: Application[]
   onItemClick: (app: Application) => void
   showApplicant?: boolean
+  onDelete?: (app: Application) => void
 }) {
   return (
     <div className="space-y-3">
@@ -316,7 +318,24 @@ function ApplicationList({
           <div className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-200 break-words leading-snug flex-1 min-w-0">{app.title}</h3>
-              <span className="text-xs text-slate-500 font-mono shrink-0 whitespace-nowrap">#{app.applicationNo ?? '-'}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (window.confirm('下書きを削除しますか？削除したデータは元に戻せません。')) {
+                        onDelete(app)
+                      }
+                    }}
+                    className="p-1.5 rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
+                    title="削除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                <span className="text-xs text-slate-500 font-mono whitespace-nowrap">#{app.applicationNo ?? '-'}</span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400 mt-1">
               {showApplicant && <span className="break-words max-w-full text-slate-300">{app.applicantName}</span>}
@@ -339,6 +358,7 @@ function ApplicationAccordion({
   loading,
   applications,
   onItemClick,
+  onDelete,
   emptyMessage,
   showCount = false
 }: {
@@ -349,6 +369,7 @@ function ApplicationAccordion({
   loading: boolean
   applications: Application[]
   onItemClick: (app: Application) => void
+  onDelete?: (app: Application) => void
   emptyMessage: string
   showCount?: boolean
 }) {
@@ -384,7 +405,7 @@ function ApplicationAccordion({
               {emptyMessage}
             </div>
           ) : (
-            <ApplicationList applications={applications} onItemClick={onItemClick} />
+            <ApplicationList applications={applications} onItemClick={onItemClick} onDelete={onDelete} />
           )}
         </div>
       )}
@@ -703,6 +724,25 @@ export default function DashboardPage() {
       console.error('Error fetching draft applications:', error)
     } finally {
       setLoadingDraftApps(false)
+    }
+  }, [user])
+
+  const handleDeleteDraft = useCallback(async (app: Application) => {
+    if (!user) return
+    if (app.applicantId !== user.id && app.applicantId !== user.email) {
+      alert('削除権限がありません')
+      return
+    }
+    if (app.workflow.status !== '下書き') {
+      alert('下書き状態の申請のみ削除できます')
+      return
+    }
+    try {
+      await deleteDoc(doc(db, 'applications', app.id))
+      setDraftApplications(prev => prev.filter(a => a.id !== app.id))
+    } catch (error) {
+      console.error('Error deleting draft application:', error)
+      alert('削除に失敗しました')
     }
   }, [user])
 
@@ -1716,6 +1756,7 @@ export default function DashboardPage() {
               loading={loadingDraftApps}
               applications={draftApplications}
               onItemClick={(app) => router.push('/create?draft=' + app.id)}
+              onDelete={handleDeleteDraft}
               emptyMessage="下書きはありません"
               showCount
             />
@@ -2164,6 +2205,67 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
+                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
+                    </div>
+
+                    {selectedApplication.formDetails && (
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
+                        <FormDetailsDisplay details={selectedApplication.formDetails} />
+                      </div>
+                    )}
+
+                    {attachedImages.length > 0 && (
+                      <div className="print:hidden">
+                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
+                          {attachedImages.map((url, index) => (
+                            <div 
+                              key={index} 
+                              onClick={() => setPreviewImageUrl(url)}
+                              className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px] cursor-pointer hover:border-indigo-500/50 transition-all duration-200"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img 
+                                src={url} 
+                                alt={`添付画像-${index + 1}`} 
+                                className="max-w-full max-h-48 object-contain rounded transition-transform duration-200 group-hover:scale-[1.02]"
+                                loading="lazy"
+                              />
+                              <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
+                                画像 {index + 1} (拡大可)
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {attachedPdfs.length > 0 && (
+                      <div className="print:hidden">
+                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
+                        <div className="space-y-3 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
+                          {attachedPdfs.map((pdf, index) => (
+                            <a
+                              key={index}
+                              href={pdf.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-950 px-4 py-3 hover:border-indigo-500/40 transition-all"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <FileText size={18} className="text-slate-400 shrink-0" />
+                                <span className="text-sm text-slate-300 truncate">{pdf.name}</span>
+                              </div>
+                              <span className="text-sm text-cyan-400 whitespace-nowrap">開く</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedApplication.appName === '回覧報告' ? (
                       <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
                         <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">回覧状況</h3>
@@ -2237,67 +2339,6 @@ export default function DashboardPage() {
                               </div>
                             )
                           })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">詳細説明</h3>
-                      <p className="text-sm text-slate-400 bg-slate-950/20 border border-slate-700/40 p-4 rounded-xl whitespace-pre-wrap leading-relaxed">{selectedApplication.description}</p>
-                    </div>
-
-                    {selectedApplication.formDetails && (
-                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
-                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">詳細情報</h3>
-                        <FormDetailsDisplay details={selectedApplication.formDetails} />
-                      </div>
-                    )}
-
-                    {attachedImages.length > 0 && (
-                      <div className="print:hidden">
-                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付写真</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
-                          {attachedImages.map((url, index) => (
-                            <div 
-                              key={index} 
-                              onClick={() => setPreviewImageUrl(url)}
-                              className="group relative rounded-lg overflow-hidden border border-slate-700/50 bg-slate-950 flex items-center justify-center p-2 min-h-[160px] cursor-pointer hover:border-indigo-500/50 transition-all duration-200"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img 
-                                src={url} 
-                                alt={`添付画像-${index + 1}`} 
-                                className="max-w-full max-h-48 object-contain rounded transition-transform duration-200 group-hover:scale-[1.02]"
-                                loading="lazy"
-                              />
-                              <div className="absolute bottom-1 right-2 bg-black/60 text-[10px] text-slate-400 px-1.5 py-0.5 rounded">
-                                画像 {index + 1} (拡大可)
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {attachedPdfs.length > 0 && (
-                      <div className="print:hidden">
-                        <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">添付書類（PDF）</h3>
-                        <div className="space-y-3 bg-slate-950/30 border border-slate-700 rounded-xl p-4">
-                          {attachedPdfs.map((pdf, index) => (
-                            <a
-                              key={index}
-                              href={pdf.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="group flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-950 px-4 py-3 hover:border-indigo-500/40 transition-all"
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <FileText size={18} className="text-slate-400 shrink-0" />
-                                <span className="text-sm text-slate-300 truncate">{pdf.name}</span>
-                              </div>
-                              <span className="text-sm text-cyan-400 whitespace-nowrap">開く</span>
-                            </a>
-                          ))}
                         </div>
                       </div>
                     )}
