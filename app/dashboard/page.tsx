@@ -556,10 +556,19 @@ export default function DashboardPage() {
 
         // 回覧段階：自分がその回覧対象になっている場合
         if (status === '回覧待ち') {
-          const members =
-            (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
-            (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
-            app.workflow.steps?.['回覧先']?.approvers || []
+          if (app.appName === '回覧報告') {
+            const members =
+              (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
+              (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
+              app.workflow.steps?.['回覧先']?.approvers || []
+            return members.includes(user.name)
+          }
+          // 稟議の場合は現在のステップの currentApprovers / 承認者リストを回覧対象とする
+          const currentStep = app.workflow.currentStep
+          const stepData = currentStep ? app.workflow.steps?.[currentStep] : null
+          const members = app.workflow.currentApprovers?.length
+            ? app.workflow.currentApprovers
+            : (stepData?.approvers || [])
           return members.includes(user.name)
         }
 
