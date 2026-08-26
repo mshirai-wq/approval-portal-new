@@ -69,11 +69,9 @@ function getEffectiveStatus(app: Application): string {
 function isPostDecisionCirculationStep(app: Application, userName?: string): boolean {
   if (app.appName === '回覧報告' || !userName) return false
   const steps = app.workflow.steps || {}
-  const stepOrder = app.workflow.stepOrder || Object.keys(steps)
   const currentStep = app.workflow.currentStep
   const stepData = steps[currentStep]
-  return stepOrder[stepOrder.length - 1] === currentStep &&
-    stepData?.status === '回覧待ち' &&
+  return stepData?.status === '回覧待ち' &&
     ((stepData?.approvers || []).includes(userName) || (app.workflow.currentApprovers || []).includes(userName))
 }
 
@@ -1483,6 +1481,7 @@ export default function DashboardPage() {
       const workflow = selectedApplication.workflow
       const currentStep = workflow.currentStep || '回覧先'
       const steps = workflow.steps || {}
+      const stepOrder = workflow.stepOrder || Object.keys(steps)
       const circulationsList = workflow.circulations || []
       const allCirculatorsList = workflow.allCirculators || []
       const confirmedByList = workflow.confirmedBy || []
@@ -1497,7 +1496,7 @@ export default function DashboardPage() {
         : currentApproversList.length
         ? currentApproversList
         : []
-      const approvedBy: string[] = stepData.approvedBy?.length ? stepData.approvedBy : confirmedByList
+      const approvedBy: string[] = stepData.approvedBy !== undefined ? stepData.approvedBy : confirmedByList
 
       if (approvedBy.includes(user.name)) {
         alert('既に回覧を確認済みです')
@@ -1507,10 +1506,36 @@ export default function DashboardPage() {
       const newApprovedBy = Array.from(new Set([...approvedBy, user.name]))
       const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedBy.includes(name))
       const completedStatus = isReport ? '回覧済み' : '承認済み'
-      const nextStatus = allApproved ? completedStatus : (isReport ? '回覧待ち' : workflow.status)
-      const nextStepName = allApproved ? '完了' : currentStep
-      const nextApprovers = allApproved ? [] : allApprovers.filter(name => !newApprovedBy.includes(name))
+
+      let nextStepName = currentStep
+      let nextStatus = workflow.status
+      let nextApprovers = allApprovers.filter(name => !newApprovedBy.includes(name))
       const nextStepStatus = allApproved ? completedStatus : '回覧待ち'
+
+      if (allApproved) {
+        const applicantName = selectedApplication.applicantName || ''
+        const currentIndex = stepOrder.indexOf(currentStep)
+        let advanced = false
+        for (let i = currentIndex + 1; i < stepOrder.length; i++) {
+          const candidate = stepOrder[i]
+          const candidateStepData = steps[candidate]
+          const candidateApprovers = candidateStepData?.approvers || []
+          const candidateApprovedBy = candidateStepData?.approvedBy || []
+          const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
+          if (!shouldSkip) {
+            nextStepName = candidate
+            nextApprovers = candidateApprovers.filter((a: string) => !candidateApprovedBy.includes(a))
+            nextStatus = candidateStepData?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            advanced = true
+            break
+          }
+        }
+        if (!advanced) {
+          nextStepName = '完了'
+          nextStatus = '承認済み'
+          nextApprovers = []
+        }
+      }
 
       const updateData: any = {
         'workflow.status': nextStatus,
@@ -1533,7 +1558,15 @@ export default function DashboardPage() {
         confirmedAt: serverTimestamp()
       })
 
-      alert(allApproved ? (isReport ? '全員の回覧が完了しました' : '承認が完了しました') : '回覧を確認しました')
+      alert(
+        allApproved
+          ? isReport
+            ? '全員の回覧が完了しました'
+            : nextStepName === '完了'
+            ? '承認が完了しました'
+            : '次の確認ステップに進みました'
+          : '回覧を確認しました'
+      )
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
