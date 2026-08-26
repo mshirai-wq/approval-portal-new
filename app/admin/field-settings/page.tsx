@@ -95,11 +95,6 @@ export default function FieldSettingsPage() {
       keys.add(key)
       return { ...prev, [subType]: Array.from(keys) }
     })
-    setConfig(prev => {
-      const sub = { ...prev[subType] }
-      delete sub[key]
-      return { ...prev, [subType]: sub }
-    })
   }
 
   const restoreDefaultField = (subType: string, key: string) => {
@@ -242,7 +237,7 @@ export default function FieldSettingsPage() {
                 </div>
                 <div className="divide-y divide-slate-800">
                   {defaultFields.map(field => (
-                    <label key={field.key} className="flex items-center justify-between px-5 py-3 hover:bg-slate-800/40 transition-colors cursor-pointer">
+                    <div key={field.key} className="flex items-center justify-between px-5 py-3 hover:bg-slate-800/40 transition-colors">
                       <span className="text-sm text-slate-300">{field.label}</span>
                       <div className="flex items-center gap-3">
                         <button
@@ -253,7 +248,7 @@ export default function FieldSettingsPage() {
                         >
                           <Trash2 size={16} />
                         </button>
-                        <div className="relative inline-flex items-center">
+                        <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={!!config[subType]?.[field.key]}
@@ -261,9 +256,9 @@ export default function FieldSettingsPage() {
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-slate-700 peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-                        </div>
+                        </label>
                       </div>
-                    </label>
+                    </div>
                   ))}
                   {customList.map((field, index) => (
                     <div key={field.key} className="px-5 py-3 hover:bg-slate-800/40 transition-colors">

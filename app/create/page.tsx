@@ -1964,7 +1964,7 @@ function CreatePageContent() {
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 {isRequired('retirementReason') && <span className="text-rose-500">*</span>}</label>
                       <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required={isRequired('retirementReason')} rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2" data-field-key="retirementResignationFile">
                       <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} required={isRequired('retirementResignationFile')} />
                     </div>
                   </div>
@@ -2065,7 +2065,7 @@ function CreatePageContent() {
                 </div>
               )}
 
-              <div>
+              <div data-field-key="description">
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明 {isRequired('description') && <span className="text-rose-500">*</span>}</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} required={isRequired('description')} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
               </div>
@@ -2182,11 +2182,11 @@ function CreatePageContent() {
             )}
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-              <div>
+              <div data-field-key="remarks">
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考 {isRequired('remarks') && <span className="text-rose-500">*</span>}</label>
                 <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} required={isRequired('remarks')} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
               </div>
-              <div>
+              <div data-field-key="attachments">
                 <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル {isRequired('attachments') && <span className="text-rose-500">*</span>}</label>
                 <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-700 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
                   <Paperclip size={24} className="text-slate-600 group-hover:text-indigo-400 mb-2" />
