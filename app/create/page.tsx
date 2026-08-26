@@ -507,18 +507,24 @@ function CreatePageContent() {
 
     const normalize = (s: string) => s.replace(/\s/g, '').replace(/[＊*％%：:（(・].*$/, '')
 
-    const allCandidates = Array.from(document.querySelectorAll('label, h4, [data-field-key]')) as HTMLElement[]
+    const allCandidates = Array.from(document.querySelectorAll('#create-form label, #create-form h4, #create-form [data-field-key]')) as HTMLElement[]
+
+    const hideTargets = new Set<HTMLElement>()
 
     for (const el of allCandidates) {
       const fieldKey = el.getAttribute('data-field-key')
       const text = normalize(el.textContent || '')
       const shouldHide = (fieldKey && hiddenKeys.includes(fieldKey)) || hiddenLabels.has(text)
+      const target = (el.getAttribute('data-field-key') ? el : el.parentElement) as HTMLElement | null
+      if (shouldHide && target) {
+        hideTargets.add(target)
+      }
+    }
 
-      const target = el.getAttribute('data-field-key') ? el : el.parentElement
-      if (target && target.tagName === 'DIV') {
-        (target as HTMLElement).style.display = shouldHide ? 'none' : ''
-      } else {
-        el.style.display = shouldHide ? 'none' : ''
+    for (const el of allCandidates) {
+      const target = (el.getAttribute('data-field-key') ? el : el.parentElement) as HTMLElement | null
+      if (target) {
+        target.style.display = hideTargets.has(target) ? 'none' : ''
       }
     }
   }, [subType, hiddenDefaults])
@@ -1495,7 +1501,7 @@ function CreatePageContent() {
         <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
           {error && <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-5 py-4 rounded-xl mb-8 text-sm font-medium animate-in zoom-in duration-300">⚠️ {error}</div>}
 
-          <form onSubmit={handleSubmit} className="space-y-10">
+          <form id="create-form" onSubmit={handleSubmit} className="space-y-10">
             <section className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
