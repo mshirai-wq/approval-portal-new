@@ -1672,12 +1672,20 @@ export default function DashboardPage() {
           </h1>
           <div className="flex items-center gap-6">
             {user?.email === 'm.shirai@yunia.co.jp' && (
-              <button
-                onClick={handleAdminUsers}
-                className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
-              >
-                社員マスタ管理
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAdminUsers}
+                  className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                >
+                  社員マスタ管理
+                </button>
+                <button
+                  onClick={() => router.push('/admin/field-settings')}
+                  className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                >
+                  必須項目設定
+                </button>
+              </div>
             )}
             <span className="text-sm text-slate-300 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
               <strong className="text-slate-200 font-semibold">{user.name}</strong> 

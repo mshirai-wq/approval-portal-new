@@ -41,6 +41,7 @@ export default function FieldSettingsPage() {
   }, [user, authLoading, isAdmin, router])
 
   useEffect(() => {
+    if (authLoading || !user || !isAdmin) return
     const fetchConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
@@ -54,7 +55,7 @@ export default function FieldSettingsPage() {
       }
     }
     fetchConfig()
-  }, [])
+  }, [authLoading, user, isAdmin])
 
   const toggleField = (subType: string, key: string) => {
     setConfig(prev => ({

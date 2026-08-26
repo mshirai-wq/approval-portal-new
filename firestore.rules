@@ -36,6 +36,12 @@ service cloud.firestore {
       );
     }
     
+    // 設定ドキュメント（必須項目設定）
+    match /settings/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // ユーザー作成・更新権限（管理者のみ全ユーザー編集可能）
     match /users/{userId} {
       allow read: if isAuthenticated();
