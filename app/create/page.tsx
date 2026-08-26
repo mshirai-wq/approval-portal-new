@@ -7,7 +7,11 @@ import { collection, addDoc, updateDoc, serverTimestamp, getDocs, query, where, 
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye, Save } from 'lucide-react'
-import { isFieldRequired, getFieldLabel, mergeFieldConfig, getEffectiveFields, mergeCustomFields, FieldConfig, CustomFieldDefinitions } from '@/lib/fieldConfig'
+import { FIELD_DEFINITIONS, isFieldRequired, getFieldLabel, mergeFieldConfig, getEffectiveFields, mergeCustomFields, mergeHiddenDefaults, filterFormDetailsByEffectiveKeys, FieldConfig, CustomFieldDefinitions, HiddenDefaults } from '@/lib/fieldConfig'
+
+function normalizeLabelText(s: string): string {
+  return s.replace(/\s/g, '').replace(/[＊*％%：:（(・].*$/,'')
+}
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -323,6 +327,7 @@ function CreatePageContent() {
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({})
   const [customFields, setCustomFields] = useState<CustomFieldDefinitions>({})
+  const [hiddenDefaults, setHiddenDefaults] = useState<HiddenDefaults>({})
   const [customValues, setCustomValues] = useState<Record<string, string>>({})
   const [customFiles, setCustomFiles] = useState<Record<string, File | null>>({})
 
@@ -348,7 +353,7 @@ function CreatePageContent() {
   const [activeAccord, setActiveAccord] = useState('所属長')
 
   const [subType, setSubType] = useState<string>('通常申請')
-  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key, customFields), [fieldConfig, subType, customFields])
+  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key, customFields, hiddenDefaults), [fieldConfig, subType, customFields, hiddenDefaults])
   const [recruitmentDivision, setRecruitmentDivision] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -474,17 +479,47 @@ function CreatePageContent() {
     const fetchFieldConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
-        const data = snap.exists() ? (snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions }) : {}
+        const data = snap.exists() ? (snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions; hiddenDefaults?: HiddenDefaults }) : {}
         setFieldConfig(mergeFieldConfig(data.configs))
         setCustomFields(mergeCustomFields(data.customFields))
+        setHiddenDefaults(mergeHiddenDefaults(data.hiddenDefaults))
       } catch (err) {
         console.error('Error fetching field config:', err)
         setFieldConfig(mergeFieldConfig(null))
         setCustomFields(mergeCustomFields(null))
+        setHiddenDefaults(mergeHiddenDefaults(null))
       }
     }
     fetchFieldConfig()
   }, [])
+
+  // 管理画面で非表示にしたデフォルト項目を DOM から非表示にする
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hiddenKeys = hiddenDefaults?.[subType] || []
+    const hiddenLabels = new Set(
+      (FIELD_DEFINITIONS[subType] || [])
+        .filter(f => hiddenKeys.includes(f.key))
+        .map(f => normalizeLabelText(f.label))
+    )
+
+    const normalize = (s: string) => s.replace(/\s/g, '').replace(/[＊*％%：:（(・].*$/, '')
+
+    const allCandidates = Array.from(document.querySelectorAll('label, h4, [data-field-key]')) as HTMLElement[]
+
+    for (const el of allCandidates) {
+      const fieldKey = el.getAttribute('data-field-key')
+      const text = normalize(el.textContent || '')
+      const shouldHide = (fieldKey && hiddenKeys.includes(fieldKey)) || hiddenLabels.has(text)
+
+      const target = el.getAttribute('data-field-key') ? el : el.parentElement
+      if (target && target.tagName === 'DIV') {
+        (target as HTMLElement).style.display = shouldHide ? 'none' : ''
+      } else {
+        el.style.display = shouldHide ? 'none' : ''
+      }
+    }
+  }, [subType, hiddenDefaults])
 
   const handleModeChange = (newMode: 'approval' | 'report') => {
     setMode(newMode)
@@ -951,10 +986,10 @@ function CreatePageContent() {
     }
     const customEntries: Record<string, any> = {}
     for (const [key, value] of Object.entries(customValues)) {
-      const field = getEffectiveFields(subType, customFields).find(f => f.key === key)
+      const field = getEffectiveFields(subType, customFields, hiddenDefaults).find(f => f.key === key)
       customEntries[key] = field?.type === 'number' && value !== '' ? Number(value) : value
     }
-    return { ...formDetails, ...customEntries }
+    return filterFormDetailsByEffectiveKeys({ ...formDetails, ...customEntries }, subType, customFields, hiddenDefaults)
   }
 
   const buildWorkflow = () => {
@@ -1138,13 +1173,13 @@ function CreatePageContent() {
       }
     }
 
-    for (const field of getEffectiveFields(subType, customFields)) {
-      if (!isFieldRequired(fieldConfig, subType, field.key, customFields)) continue
+    for (const field of getEffectiveFields(subType, customFields, hiddenDefaults)) {
+      if (!isFieldRequired(fieldConfig, subType, field.key, customFields, hiddenDefaults)) continue
       const value = getFieldValue(field.key)
       if (value === 'skip') continue
       const isEmpty = typeof value === 'boolean' ? !value : String(value).trim() === ''
       if (isEmpty) {
-        return setError(`${getFieldLabel(subType, field.key, customFields)}を入力してください`)
+        return setError(`${getFieldLabel(subType, field.key, customFields, hiddenDefaults)}を入力してください`)
       }
     }
 
@@ -1187,7 +1222,7 @@ function CreatePageContent() {
       if (mode === 'approval' && subType === '車両リース決済') {
         addFile(leaseEstimateFile)
       }
-      for (const field of getEffectiveFields(subType, customFields)) {
+      for (const field of getEffectiveFields(subType, customFields, hiddenDefaults)) {
         if (field.custom && field.type === 'file' && customFiles[field.key]) {
           const customFile = customFiles[field.key]
           if (customFile) allFiles.push(customFile)
@@ -1687,7 +1722,7 @@ function CreatePageContent() {
                       <input type="number" value={biddingDetails.ourBid2} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid2: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-field-key="participants">
                     {biddingDetails.participants.map((p, idx) => (
                       <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                         <div className="flex items-center gap-3">
@@ -2159,14 +2194,14 @@ function CreatePageContent() {
               </div>
             </div>
 
-            {getEffectiveFields(subType, customFields).filter(f => f.custom).length > 0 && (
+            {getEffectiveFields(subType, customFields, hiddenDefaults).filter(f => f.custom).length > 0 && (
               <section className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
                   <FileText size={22} className="text-cyan-400" />
                   <h3 className="text-lg font-bold text-slate-100">追加項目</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {getEffectiveFields(subType, customFields).filter(f => f.custom).map(field => (
+                  {getEffectiveFields(subType, customFields, hiddenDefaults).filter(f => f.custom).map(field => (
                     <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">
                         {field.label} {isRequired(field.key) && <span className="text-rose-500">*</span>}

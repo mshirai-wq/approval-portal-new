@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { db } from '@/lib/firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { FIELD_DEFINITIONS, FieldConfig, FieldDef, CustomFieldDefinitions, getDefaultFieldConfig, mergeFieldConfig, mergeCustomFields, getDefaultCustomFields } from '@/lib/fieldConfig'
+import { FIELD_DEFINITIONS, FieldConfig, FieldDef, CustomFieldDefinitions, HiddenDefaults, getDefaultFieldConfig, mergeFieldConfig, mergeCustomFields, mergeHiddenDefaults, getDefaultCustomFields } from '@/lib/fieldConfig'
 import { ArrowLeft, Save, Shield, AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react'
 
 const FIELD_TYPES: { value: NonNullable<FieldDef['type']>; label: string }[] = [
@@ -48,6 +48,7 @@ export default function FieldSettingsPage() {
 
   const [config, setConfig] = useState<FieldConfig>(getDefaultFieldConfig())
   const [customFields, setCustomFields] = useState<CustomFieldDefinitions>(getDefaultCustomFields())
+  const [hiddenDefaults, setHiddenDefaults] = useState<HiddenDefaults>(mergeHiddenDefaults(null))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -64,9 +65,10 @@ export default function FieldSettingsPage() {
     const fetchConfig = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
-        const data = snap.exists() ? snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions } : {}
+        const data = snap.exists() ? snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions; hiddenDefaults?: HiddenDefaults } : {}
         setConfig(mergeFieldConfig(data.configs))
         setCustomFields(mergeCustomFields(data.customFields))
+        setHiddenDefaults(mergeHiddenDefaults(data.hiddenDefaults))
       } catch (err) {
         console.error('Error fetching field config:', err)
         setMessage({ type: 'error', text: '設定の読み込みに失敗しました。デフォルト値を表示しています。' })
@@ -85,6 +87,26 @@ export default function FieldSettingsPage() {
         [key]: !prev[subType][key]
       }
     }))
+  }
+
+  const deleteDefaultField = (subType: string, key: string) => {
+    setHiddenDefaults(prev => {
+      const keys = new Set(prev[subType] || [])
+      keys.add(key)
+      return { ...prev, [subType]: Array.from(keys) }
+    })
+    setConfig(prev => {
+      const sub = { ...prev[subType] }
+      delete sub[key]
+      return { ...prev, [subType]: sub }
+    })
+  }
+
+  const restoreDefaultField = (subType: string, key: string) => {
+    setHiddenDefaults(prev => {
+      const keys = (prev[subType] || []).filter(k => k !== key)
+      return { ...prev, [subType]: keys }
+    })
   }
 
   const addCustomField = (subType: string) => {
@@ -146,6 +168,7 @@ export default function FieldSettingsPage() {
       await setDoc(doc(db, 'settings', 'fieldConfig'), {
         configs: config,
         customFields,
+        hiddenDefaults,
         updatedAt: serverTimestamp()
       })
       setMessage({ type: 'success', text: '必須項目設定を保存しました' })
@@ -198,12 +221,14 @@ export default function FieldSettingsPage() {
         )}
 
         <p className="text-sm text-slate-400">
-          各申請種別ごとに、送信時に必須とする入力項目を ON/OFF で切り替えられます。「追加項目」から自由に入力欄を追加・削除できます。保存すると作成画面に即時反映されます。
+          各申請種別ごとに、送信時に必須とする入力項目を ON/OFF で切り替えられます。元からある項目を削除すると作成画面に表示されなくなります。「追加項目」から自由に入力欄を追加・削除できます。保存すると作成画面に即時反映されます。
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {subTypeOrder.map(subType => {
-            const defaultFields = FIELD_DEFINITIONS[subType] || []
+            const hiddenKeys = new Set(hiddenDefaults[subType] || [])
+            const defaultFields = (FIELD_DEFINITIONS[subType] || []).filter(f => !hiddenKeys.has(f.key))
+            const restoredFields = (FIELD_DEFINITIONS[subType] || []).filter(f => hiddenKeys.has(f.key))
             const customList = customFields[subType] || []
             const newField = newFieldBySubType[subType] || { label: '', type: 'text' as NonNullable<FieldDef['type']> }
 
@@ -219,14 +244,24 @@ export default function FieldSettingsPage() {
                   {defaultFields.map(field => (
                     <label key={field.key} className="flex items-center justify-between px-5 py-3 hover:bg-slate-800/40 transition-colors cursor-pointer">
                       <span className="text-sm text-slate-300">{field.label}</span>
-                      <div className="relative inline-flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={!!config[subType]?.[field.key]}
-                          onChange={() => toggleField(subType, field.key)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-700 peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => deleteDefaultField(subType, field.key)}
+                          className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="削除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <div className="relative inline-flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={!!config[subType]?.[field.key]}
+                            onChange={() => toggleField(subType, field.key)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-slate-700 peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+                        </div>
                       </div>
                     </label>
                   ))}
@@ -271,6 +306,24 @@ export default function FieldSettingsPage() {
                       </div>
                     </div>
                   ))}
+                  {restoredFields.length > 0 && (
+                    <div className="px-5 py-3 bg-slate-900/30 border-t border-dashed border-slate-800">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">削除済み（元に戻す）</p>
+                      <div className="flex flex-wrap gap-2">
+                        {restoredFields.map(field => (
+                          <button
+                            key={field.key}
+                            type="button"
+                            onClick={() => restoreDefaultField(subType, field.key)}
+                            className="text-xs px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                          >
+                            {field.label} を戻す
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="px-5 py-3 bg-slate-900/30">
                     <div className="flex items-center gap-2 mb-2">
                       <input

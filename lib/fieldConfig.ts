@@ -10,6 +10,8 @@ export type FieldConfig = Record<string, Record<string, boolean>>
 
 export type CustomFieldDefinitions = Record<string, FieldDef[]>
 
+export type HiddenDefaults = Record<string, string[]>
+
 // 各申請種別で管理者が「必須/任意」を変更できる入力項目
 export const FIELD_DEFINITIONS: Record<string, FieldDef[]> = {
   '通常申請': [
@@ -192,9 +194,10 @@ export function mergeFieldConfig(saved: FieldConfig | null | undefined): FieldCo
   return config
 }
 
-export function getEffectiveFields(subType: string, customFields?: CustomFieldDefinitions | null): FieldDef[] {
+export function getEffectiveFields(subType: string, customFields?: CustomFieldDefinitions | null, hiddenDefaults?: HiddenDefaults | null): FieldDef[] {
+  const hidden = new Set((hiddenDefaults || {})[subType] || [])
   return [
-    ...(FIELD_DEFINITIONS[subType] || []),
+    ...(FIELD_DEFINITIONS[subType] || []).filter(f => !hidden.has(f.key)),
     ...((customFields || {})[subType] || [])
   ]
 }
@@ -203,17 +206,18 @@ export function isFieldRequired(
   config: FieldConfig | null | undefined,
   subType: string,
   key: string,
-  customFields?: CustomFieldDefinitions | null
+  customFields?: CustomFieldDefinitions | null,
+  hiddenDefaults?: HiddenDefaults | null
 ): boolean {
-  const def = getEffectiveFields(subType, customFields).find(f => f.key === key)
+  const def = getEffectiveFields(subType, customFields, hiddenDefaults).find(f => f.key === key)
   if (!def) return false
   const subConfig = config?.[subType]
   if (subConfig && key in subConfig) return !!subConfig[key]
   return def.default
 }
 
-export function getFieldLabel(subType: string, key: string, customFields?: CustomFieldDefinitions | null): string {
-  return getEffectiveFields(subType, customFields).find(f => f.key === key)?.label || key
+export function getFieldLabel(subType: string, key: string, customFields?: CustomFieldDefinitions | null, hiddenDefaults?: HiddenDefaults | null): string {
+  return getEffectiveFields(subType, customFields, hiddenDefaults).find(f => f.key === key)?.label || key
 }
 
 export function getDefaultCustomFields(): CustomFieldDefinitions {
@@ -235,4 +239,60 @@ export function mergeCustomFields(saved: CustomFieldDefinitions | null | undefin
     }
   }
   return merged
+}
+
+export function mergeHiddenDefaults(saved: HiddenDefaults | null | undefined): HiddenDefaults {
+  const merged: HiddenDefaults = {}
+  for (const subType of Object.keys(FIELD_DEFINITIONS)) {
+    merged[subType] = []
+  }
+  if (!saved) return merged
+  for (const [subType, keys] of Object.entries(saved)) {
+    if (Array.isArray(keys)) merged[subType] = keys.filter(k => typeof k === 'string')
+  }
+  return merged
+}
+
+export function isFieldVisible(subType: string, key: string, customFields?: CustomFieldDefinitions | null, hiddenDefaults?: HiddenDefaults | null): boolean {
+  return getEffectiveFields(subType, customFields, hiddenDefaults).some(f => f.key === key)
+}
+
+const TRIP_DETAILS_KEY_MAP: Record<string, string> = {
+  tripStartDate: 'startDate',
+  tripEndDate: 'endDate',
+  transport: 'transport',
+  accommodationNights: 'accommodationNights',
+  accommodationUnitPrice: 'accommodationUnitPrice',
+  businessHours: 'businessHours',
+  dailyAllowanceDays: 'dailyAllowanceDays',
+  dailyAllowanceUnitPrice: 'dailyAllowanceUnitPrice',
+}
+
+export function filterFormDetailsByEffectiveKeys(
+  formDetails: Record<string, any>,
+  subType: string,
+  customFields?: CustomFieldDefinitions | null,
+  hiddenDefaults?: HiddenDefaults | null
+): Record<string, any> {
+  const effectiveKeys = new Set(getEffectiveFields(subType, customFields, hiddenDefaults).map(f => f.key))
+  const alwaysKeep = new Set(['tripDetails', 'transportTotal', 'accommodationTotal', 'dailyAllowanceTotal', 'tripTotal'])
+  const filtered: Record<string, any> = {}
+
+  for (const [key, value] of Object.entries(formDetails)) {
+    if (effectiveKeys.has(key) || alwaysKeep.has(key)) {
+      filtered[key] = value
+    }
+  }
+
+  if (subType === '出張旅費申請' && formDetails.tripDetails) {
+    const tripDetails: Record<string, any> = {}
+    for (const [fieldKey, nestedKey] of Object.entries(TRIP_DETAILS_KEY_MAP)) {
+      if (effectiveKeys.has(fieldKey)) {
+        tripDetails[nestedKey] = formDetails.tripDetails[nestedKey]
+      }
+    }
+    filtered.tripDetails = tripDetails
+  }
+
+  return filtered
 }
