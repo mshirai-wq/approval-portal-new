@@ -47,6 +47,11 @@ function isApplication(app: Application | AppSheetInformation | null): app is Ap
   return app !== null && 'workflow' in app;
 }
 
+// 空白/全角空白の差や重複を吸収するための正規化
+function normalizeName(name: string): string {
+  return name.replace(/[\s\u3000]+/g, '').trim()
+}
+
 function getEffectiveStatus(app: Application): string {
   const status = app.workflow.status
   if (status === '下書き' || status === '取り消し') return status
@@ -63,16 +68,21 @@ function getEffectiveStatus(app: Application): string {
     ...(app.workflow.confirmedBy || []),
     ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
   ])
-  return members.every(m => confirmed.has(m)) ? '回覧済み' : '回覧待ち'
+  const confirmedNorm = new Set(Array.from(confirmed).map(normalizeName))
+  return members.length > 0 && members.every(m => confirmedNorm.has(normalizeName(m)))
+    ? '回覧済み'
+    : '回覧待ち'
 }
 
 function isPostDecisionCirculationStep(app: Application, userName?: string): boolean {
   if (app.appName === '回覧報告' || !userName) return false
+  const userNorm = normalizeName(userName)
   const steps = app.workflow.steps || {}
   const currentStep = app.workflow.currentStep
   const stepData = steps[currentStep]
   return stepData?.status === '回覧待ち' &&
-    ((stepData?.approvers || []).includes(userName) || (app.workflow.currentApprovers || []).includes(userName))
+    ((stepData?.approvers || []).some((a: string) => normalizeName(a) === userNorm) ||
+      (app.workflow.currentApprovers || []).some((a: string) => normalizeName(a) === userNorm))
 }
 
 const EXCLUDED_FORM_KEYS = new Set(['description', 'remarks', 'imageUrl', 'imageUrls'])
@@ -460,6 +470,7 @@ export default function DashboardPage() {
   const [processedCirculations, setProcessedCirculations] = useState<Application[]>([])
   const [loadingProcessedApprovals, setLoadingProcessedApprovals] = useState(false)
   const [loadingProcessedCirculations, setLoadingProcessedCirculations] = useState(false)
+  const userNameCache = useRef<Record<string, string> | null>(null)
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
@@ -1487,7 +1498,20 @@ export default function DashboardPage() {
       const confirmedByList = workflow.confirmedBy || []
       const currentApproversList = workflow.currentApprovers || []
       const stepData = steps[currentStep] || { approvers: circulationsList, approvedBy: confirmedByList, status: '' }
-      const allApprovers: string[] = stepData.approvers?.length
+
+      // 社員マスタの現在の名前を正規化して、削除済み/重複社員が残った申請を補正する
+      if (userNameCache.current === null) {
+        const snap = await getDocs(collection(db, 'users'))
+        const map: Record<string, string> = {}
+        snap.docs.forEach(d => {
+          const u = d.data() as { name?: string }
+          if (u.name) map[normalizeName(u.name)] = u.name
+        })
+        userNameCache.current = map
+      }
+      const canonicalize = (name: string) => userNameCache.current![normalizeName(name)] || name
+
+      const rawApprovers: string[] = stepData.approvers?.length
         ? stepData.approvers
         : circulationsList.length
         ? circulationsList
@@ -1496,20 +1520,37 @@ export default function DashboardPage() {
         : currentApproversList.length
         ? currentApproversList
         : []
-      const approvedBy: string[] = stepData.approvedBy !== undefined ? stepData.approvedBy : confirmedByList
+      const allApprovers: string[] = Array.from(new Set(rawApprovers.map(canonicalize)))
+      const rawApprovedBy: string[] = stepData.approvedBy !== undefined ? stepData.approvedBy : confirmedByList
+      const approvedBy: string[] = Array.from(new Set(rawApprovedBy.map(canonicalize)))
 
-      if (approvedBy.includes(user.name)) {
+      const userName = canonicalize(user.name)
+      const userNorm = normalizeName(userName)
+      const isUserApprover = allApprovers.some(name => normalizeName(name) === userNorm)
+      if (!isUserApprover) {
+        alert('回覧対象者ではないため確認できません')
+        return
+      }
+
+      const approvedByNorm = new Set(approvedBy.map(normalizeName))
+      const alreadyConfirmed = approvedByNorm.has(userNorm)
+      const newApprovedBy = alreadyConfirmed
+        ? approvedBy
+        : Array.from(new Set([...approvedBy, userName]))
+      const newApprovedByNorm = new Set(newApprovedBy.map(normalizeName))
+
+      const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedByNorm.has(normalizeName(name)))
+      const completedStatus = isReport ? '回覧済み' : '承認済み'
+
+      // 削除済み/重複社員が解消されたことで全員確認済みになった場合も再実行を許可
+      if (alreadyConfirmed && !allApproved) {
         alert('既に回覧を確認済みです')
         return
       }
 
-      const newApprovedBy = Array.from(new Set([...approvedBy, user.name]))
-      const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedBy.includes(name))
-      const completedStatus = isReport ? '回覧済み' : '承認済み'
-
       let nextStepName = currentStep
       let nextStatus = workflow.status
-      let nextApprovers = allApprovers.filter(name => !newApprovedBy.includes(name))
+      let nextApprovers = allApprovers.filter(name => !newApprovedByNorm.has(normalizeName(name)))
       const nextStepStatus = allApproved ? completedStatus : '回覧待ち'
 
       if (allApproved) {
@@ -1519,12 +1560,15 @@ export default function DashboardPage() {
         for (let i = currentIndex + 1; i < stepOrder.length; i++) {
           const candidate = stepOrder[i]
           const candidateStepData = steps[candidate]
-          const candidateApprovers = candidateStepData?.approvers || []
-          const candidateApprovedBy = candidateStepData?.approvedBy || []
-          const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
+          const candidateApproversRaw: string[] = (candidateStepData?.approvers || []) as string[]
+          const candidateApprovedByRaw: string[] = (candidateStepData?.approvedBy || []) as string[]
+          const shouldSkip = candidateApproversRaw.length === 0 || candidateApproversRaw.every((a: string) => a === applicantName)
           if (!shouldSkip) {
             nextStepName = candidate
-            nextApprovers = candidateApprovers.filter((a: string) => !candidateApprovedBy.includes(a))
+            const candidateApprovers = Array.from(new Set(candidateApproversRaw.map(canonicalize)))
+            const candidateApprovedBy = Array.from(new Set(candidateApprovedByRaw.map(canonicalize)))
+            const candidateApprovedByNorm = new Set(candidateApprovedBy.map(normalizeName))
+            nextApprovers = candidateApprovers.filter((a: string) => !candidateApprovedByNorm.has(normalizeName(a)))
             nextStatus = candidateStepData?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
             advanced = true
             break
@@ -1532,7 +1576,7 @@ export default function DashboardPage() {
         }
         if (!advanced) {
           nextStepName = '完了'
-          nextStatus = '承認済み'
+          nextStatus = isReport ? '回覧済み' : '承認済み'
           nextApprovers = []
         }
       }
@@ -1544,19 +1588,25 @@ export default function DashboardPage() {
         'workflow.confirmedBy': newApprovedBy,
         updatedAt: serverTimestamp()
       }
+      if (isReport) {
+        updateData['workflow.circulations'] = allApprovers
+      }
       if (currentStep && steps[currentStep]) {
+        updateData[`workflow.steps.${currentStep}.approvers`] = allApprovers
         updateData[`workflow.steps.${currentStep}.approvedBy`] = newApprovedBy
         updateData[`workflow.steps.${currentStep}.status`] = nextStepStatus
       }
 
       await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
 
-      await addDoc(collection(db, 'circulations'), {
-        applicationId: selectedApplication.id,
-        userId: user.id,
-        userName: user.name,
-        confirmedAt: serverTimestamp()
-      })
+      if (!alreadyConfirmed) {
+        await addDoc(collection(db, 'circulations'), {
+          applicationId: selectedApplication.id,
+          userId: user.id,
+          userName: user.name,
+          confirmedAt: serverTimestamp()
+        })
+      }
 
       alert(
         allApproved
