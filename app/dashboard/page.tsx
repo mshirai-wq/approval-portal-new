@@ -460,6 +460,9 @@ export default function DashboardPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'processed' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
+  const [circulationHistory, setCirculationHistory] = useState<any[]>([])
+  const [showCommentedCirculationsOnly, setShowCommentedCirculationsOnly] = useState(true)
+  const [circulationComment, setCirculationComment] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
@@ -520,6 +523,40 @@ export default function DashboardPage() {
       setApprovalHistory(history)
     }, (error) => {
       console.error('Error fetching approval history:', error)
+    })
+
+    return () => unsubscribe()
+  }, [selectedApplication])
+
+  // 回覧確認履歴を取得
+  useEffect(() => {
+    if (!selectedApplication) {
+      setCirculationHistory([])
+      return
+    }
+
+    const circulationsQuery = query(
+      collection(db, 'circulations'),
+      where('applicationId', '==', selectedApplication.id)
+    )
+
+    const toMs = (value: any) => {
+      if (!value) return 0
+      if (typeof value.toDate === 'function') return value.toDate().getTime()
+      if (value instanceof Date) return value.getTime()
+      return new Date(value).getTime() || 0
+    }
+
+    const unsubscribe = onSnapshot(circulationsQuery, (snapshot) => {
+      const history = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .sort((a: any, b: any) => toMs(a.confirmedAt) - toMs(b.confirmedAt))
+      setCirculationHistory(history)
+    }, (error) => {
+      console.error('Error fetching circulation history:', error)
     })
 
     return () => unsubscribe()
@@ -670,6 +707,8 @@ export default function DashboardPage() {
     setSelectedApplication(app)
     setShowDetailModal(true)
     setModalSource(source)
+    setCirculationComment('')
+    setShowCommentedCirculationsOnly(true)
   }
 
   const fetchMyApplications = useCallback(async (page: number) => {
@@ -1017,6 +1056,8 @@ export default function DashboardPage() {
     setSelectedApplication(info)
     setShowDetailModal(true)
     setModalSource('information')
+    setCirculationComment('')
+    setShowCommentedCirculationsOnly(true)
   }
 
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
@@ -1485,7 +1526,7 @@ export default function DashboardPage() {
     return emails
   }
 
-  const handleCirculation = async () => {
+  const handleCirculation = async (comment: string = '') => {
     if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
       const isReport = selectedApplication.appName === '回覧報告'
@@ -1604,6 +1645,7 @@ export default function DashboardPage() {
           applicationId: selectedApplication.id,
           userId: user.id,
           userName: user.name,
+          comment: comment || null,
           confirmedAt: serverTimestamp()
         })
       }
@@ -1617,6 +1659,7 @@ export default function DashboardPage() {
             : '次の確認ステップに進みました'
           : '回覧を確認しました'
       )
+      setCirculationComment('')
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
@@ -2478,6 +2521,46 @@ export default function DashboardPage() {
                       </div>
                     )}
 
+                    {circulationHistory.length > 0 && (
+                      <div className="border-t border-slate-700 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">回覧確認履歴</h3>
+                          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={showCommentedCirculationsOnly}
+                              onChange={(e) => setShowCommentedCirculationsOnly(e.target.checked)}
+                              className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50"
+                            />
+                            コメント付きのみ
+                          </label>
+                        </div>
+                        <div className="space-y-3">
+                          {circulationHistory
+                            .filter((history) => !showCommentedCirculationsOnly || history.comment)
+                            .map((history) => (
+                            <div key={history.id} className="bg-slate-950/40 border border-slate-700/60 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-slate-200">回覧確認</span>
+                                <span className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                  確認済み
+                                </span>
+                              </div>
+                              <div className="text-sm text-slate-400">
+                                <p>担当者: {history.userName}</p>
+                                {history.comment && (
+                                  <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {history.confirmedAt ? new Date(history.confirmedAt.toDate()).toLocaleString('ja-JP') : '-'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
                       <div className="border-t border-slate-700 pt-4">
                         <ApplicationResubmitForm
@@ -2505,9 +2588,21 @@ export default function DashboardPage() {
                         isPostDecisionCirculationStep(selectedApplication, user?.name)
                       ))
                     ) && (
-                      <div className="border-t border-slate-700 pt-4">
+                      <div className="border-t border-slate-700 pt-4 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
+                            回覧確認コメント
+                          </label>
+                          <textarea
+                            value={circulationComment}
+                            onChange={(e) => setCirculationComment(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm transition-all"
+                            placeholder="回覧確認時のコメントを入力してください（任意）"
+                          />
+                        </div>
                         <button
-                          onClick={handleCirculation}
+                          onClick={() => handleCirculation(circulationComment)}
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           回覧を確認
