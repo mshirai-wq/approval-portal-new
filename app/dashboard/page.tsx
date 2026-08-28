@@ -1163,7 +1163,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
@@ -1240,7 +1240,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Skip error:', error)
       alert('スキップに失敗しました')
@@ -1327,10 +1327,16 @@ export default function DashboardPage() {
       }
 
       alert('修正して再申請しました。差し戻し元から処理を再開します。')
+
+      const resubmittedId = selectedApplication.id
+      setMyApplications(prev => prev.map(app => app.id === resubmittedId ? { ...app, workflow: { ...app.workflow, status: nextStatus, currentStep: nextStep, currentApprovers: nextApprovers } } : app))
+      setAllApplications(prev => prev.map(app => app.id === resubmittedId ? { ...app, workflow: { ...app.workflow, status: nextStatus, currentStep: nextStep, currentApprovers: nextApprovers } } : app))
+      setRejectedApplications(prev => prev.filter(app => app.id !== resubmittedId))
+
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Resubmit error:', error)
       alert('再申請に失敗しました')
@@ -1663,7 +1669,7 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Circulation error:', error)
       alert('処理に失敗しました')
@@ -1679,11 +1685,16 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-
-      window.location.reload()
     } catch (error) {
       console.error('Information confirm error:', error)
       alert('処理に失敗しました')
+      return
+    }
+
+    try {
+      await loadInformations()
+    } catch (e) {
+      console.error('Failed to refresh informations:', e)
     }
   }
 
@@ -1724,7 +1735,7 @@ export default function DashboardPage() {
       setSelectedApplication(null)
       setModalSource(null)
       alert('申請を取り消しました')
-      window.location.reload()
+
     } catch (error) {
       console.error('Delete application error:', error)
       alert('取消に失敗しました')
