@@ -74,13 +74,21 @@ function getEffectiveStatus(app: Application): string {
     : '回覧待ち'
 }
 
+function getEffectiveStepStatus(app: Application, stepKey: string, status: string): string {
+  if (app.subType === '出張旅費申請' && stepKey === '総務管理本部' && status === '回覧待ち') {
+    return '承認待ち'
+  }
+  return status
+}
+
 function isPostDecisionCirculationStep(app: Application, userName?: string): boolean {
   if (app.appName === '回覧報告' || !userName) return false
   const userNorm = normalizeName(userName)
   const steps = app.workflow.steps || {}
   const currentStep = app.workflow.currentStep
   const stepData = steps[currentStep]
-  return stepData?.status === '回覧待ち' &&
+  const stepStatus = getEffectiveStepStatus(app, currentStep, stepData?.status || '')
+  return stepStatus === '回覧待ち' &&
     ((stepData?.approvers || []).some((a: string) => normalizeName(a) === userNorm) ||
       (app.workflow.currentApprovers || []).some((a: string) => normalizeName(a) === userNorm))
 }
@@ -151,6 +159,16 @@ const FORM_DETAIL_LABELS: Record<string, string> = {
   accommodationTotal: '宿泊費合計',
   dailyAllowanceTotal: '日当合計',
   tripTotal: '出張旅費合計',
+  tripDetails: '出張旅費明細',
+  startDate: '出張開始日',
+  endDate: '出張終了日',
+  transport: '利用交通機関・料金',
+  method: '交通機関',
+  accommodationNights: '宿泊日数',
+  accommodationUnitPrice: '宿泊単価',
+  businessHours: '業務対応時間',
+  dailyAllowanceDays: '日当（日数）',
+  dailyAllowanceUnitPrice: '日当単価',
   leaseClassification: '分類',
   leaseVendor: '業者',
   leaseOtherVendor: '業者名（その他）',
@@ -1095,7 +1113,7 @@ export default function DashboardPage() {
           if (!shouldSkip) {
             nextStepName = candidateStep
             nextApprovers = candidateApprovers
-            nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
             break
           } else {
             skippedSteps.push(candidateStep)
@@ -1194,7 +1212,7 @@ export default function DashboardPage() {
         if (!shouldSkip) {
           nextStepName = candidateStep
           nextApprovers = candidateApprovers
-          nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+          nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
           didAdvance = true
           break
         } else {
@@ -1271,7 +1289,7 @@ export default function DashboardPage() {
             if (candidateApprovers.length > 0) {
               nextStep = candidateStep
               nextApprovers = candidateApprovers
-              nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+              nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
               break
             } else {
               skippedSteps.push(candidateStep)
@@ -1616,7 +1634,7 @@ export default function DashboardPage() {
             const candidateApprovedBy = Array.from(new Set(candidateApprovedByRaw.map(canonicalize)))
             const candidateApprovedByNorm = new Set(candidateApprovedBy.map(normalizeName))
             nextApprovers = candidateApprovers.filter((a: string) => !candidateApprovedByNorm.has(normalizeName(a)))
-            nextStatus = candidateStepData?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            nextStatus = getEffectiveStepStatus(selectedApplication, candidate, candidateStepData?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
             advanced = true
             break
           }
@@ -2450,7 +2468,7 @@ export default function DashboardPage() {
                           {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
                             const stepData = selectedApplication.workflow.steps?.[stepKey]
                             const approverNames = stepData?.approvers || []
-                            const stepStatus = stepData?.status || '未着手'
+                            const stepStatus = getEffectiveStepStatus(selectedApplication, stepKey, stepData?.status || '未着手')
 
                             return (
                               <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">

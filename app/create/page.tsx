@@ -219,7 +219,8 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda], 
       defaultPostDecisionCirculation: generalManagers.map(m => m.name),
-      stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧']
+      stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧'],
+      generalAffairsIsCirculation: false
     },
     '車両リース決済': { 
       decisionMaker: '社長', 
@@ -1074,7 +1075,7 @@ function CreatePageContent() {
         else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
         else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
 
-        const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
+        const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || (stepKey === '総務管理本部' && currentRoute.generalAffairsIsCirculation !== false)
         const skipped = isSelfOrEmpty(approvers)
 
         stepsObj[dbKey] = {
