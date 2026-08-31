@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, serverTimestamp, getDocs, query, where, doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car } from 'lucide-react'
+import { Users, Search, Check, ArrowLeft, Paperclip, X, ChevronDown, Send, FileText, Share2, Gavel, Clock, Car, Eye, Save } from 'lucide-react'
+import { FIELD_DEFINITIONS, isFieldRequired, getFieldLabel, mergeFieldConfig, getEffectiveFields, mergeCustomFields, mergeHiddenDefaults, filterFormDetailsByEffectiveKeys, FieldConfig, CustomFieldDefinitions, HiddenDefaults } from '@/lib/fieldConfig'
+
+function normalizeLabelText(s: string): string {
+  return s.replace(/\s/g, '').replace(/[＊*％%：:（(・].*$/,'')
+}
 
 // ==========================================
 // 1. 型定義・共通コンポーネント
@@ -57,17 +62,55 @@ const AccordItem = ({ title, count, children, isActive, onClick }: any) => (
 )
 
 function FileUploadField({ label, file, onChange, required = false }: { label: string; file: File | null; onChange: (file: File | null) => void; required?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const handleBoxClick = () => {
+    if (previewUrl) {
+      window.open(previewUrl, '_blank')
+    } else {
+      inputRef.current?.click()
+    }
+  }
+
   return (
     <div>
       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{label} {required && <span className="text-rose-500">*</span>}</label>
-      <label className="group flex items-center justify-between w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-all">
+      <button
+        type="button"
+        onClick={handleBoxClick}
+        className={`group flex items-center justify-between w-full px-4 py-6 border rounded-xl transition-all text-left ${
+          file
+            ? 'bg-slate-900/60 border-indigo-500/30 hover:border-indigo-500/60 cursor-pointer'
+            : 'bg-slate-950 border-slate-700 border-dashed hover:border-indigo-500/40 cursor-pointer'
+        }`}
+      >
         <span className={`text-sm truncate ${file ? 'text-slate-200' : 'text-slate-600'}`}>{file ? file.name : 'ファイルを選択'}</span>
-        <Paperclip size={16} className="text-slate-600 group-hover:text-indigo-400" />
-        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)} />
-      </label>
+        {file ? <Eye size={18} className="text-indigo-400 shrink-0" /> : <Paperclip size={18} className="text-slate-600 group-hover:text-indigo-400 shrink-0" />}
+      </button>
       {file && (
-        <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-400 hover:text-rose-300 mt-1">削除</button>
+        <div className="flex items-center gap-3 mt-2">
+          <button type="button" onClick={() => inputRef.current?.click()} className="text-xs text-indigo-400 hover:text-indigo-300">変更</button>
+          <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-400 hover:text-rose-300">削除</button>
+        </div>
       )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+      />
     </div>
   )
 }
@@ -82,7 +125,7 @@ function getRelatedGM(dept: string, generalManagers: any[]) {
   return generalManagers.find(m => m.dept === dept)
 }
 
-function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[], division: string = '') {
+function getApprovalRoute(subType: string, applicantDept: string, applicantTitle: string, employeeMaster: EmployeeMaster, generalManagers: any[], division: string = '', applicantName: string = '') {
   const relatedGM = getRelatedGM(applicantDept, generalManagers)
   const generalAffairsDept = employeeMaster['総務管理本部'] || []
   
@@ -102,6 +145,7 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
   
   const applicantDeptMembers = employeeMaster[applicantDept] || []
   const applicantDeptHead = applicantDeptMembers.find(m => m.title === '部長')
+  const isDeptHead = (applicantDeptHead && applicantDeptHead.name === applicantName) || (applicantTitle === '部長' && !applicantDeptHead)
 
   const routes: any = {
     '通常申請': { 
@@ -175,7 +219,8 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       defaultDeptHead: applicantDeptHead ? [applicantDeptHead.name] : [],
       defaultGeneralAffairs: [tanabe, kaneda], 
       defaultPostDecisionCirculation: generalManagers.map(m => m.name),
-      stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧']
+      stepOrder: ['部長', '総務管理本部', '社長', '決裁後回覧'],
+      generalAffairsIsCirculation: false
     },
     '車両リース決済': { 
       decisionMaker: '社長', 
@@ -201,7 +246,55 @@ function getApprovalRoute(subType: string, applicantDept: string, applicantTitle
       stepOrder: ['部長', '本部長', '社長', '総務管理本部']
     }
   }
-  return routes[subType] || routes['通常申請']
+  const route = routes[subType] || routes['通常申請']
+  const isGeneralManager = generalManagers.some(m => m.name === applicantName) || applicantTitle === '本部長'
+  const defaultExec: string[] = []
+  Object.values(employeeMaster).forEach((members: any) => members.forEach((m: any) => { if (m.title === '社長') defaultExec.push(m.name) }))
+  return {
+    ...route,
+    isDeptHead,
+    isGeneralManager,
+    defaultDeptHead: (isDeptHead || isGeneralManager) ? [] : (applicantDeptHead ? [applicantDeptHead.name] : []),
+    defaultGM: isGeneralManager ? [] : (route.defaultGM || []),
+    defaultExec,
+    effectiveStepOrder: route.stepOrder
+  }
+}
+
+function findEmployeeByName(master: EmployeeMaster, target: string): Employee | null {
+  for (const members of Object.values(master)) {
+    const exact = members.find(m => m.name === target)
+    if (exact) return exact
+  }
+  for (const members of Object.values(master)) {
+    const partial = members.find(m => m.name.includes(target))
+    if (partial) return partial
+  }
+  return null
+}
+
+function getDefaultReportCirculators(subType: string, master: EmployeeMaster): string[] {
+  const list = new Set<string>()
+  if (subType === '退職者通知') {
+    const residentMembers = master['常駐管理本部'] || []
+    const exclude = new Set(['村上努', '榊原有'])
+    residentMembers.filter(m => !exclude.has(m.name)).forEach(m => list.add(m.name))
+    for (const name of ['三浦暢子', '川上沙織', '朝倉千晶']) {
+      const found = findEmployeeByName(master, name)
+      if (found) list.add(found.name)
+    }
+  } else if (subType === '訃報連絡') {
+    for (const members of Object.values(master)) {
+      for (const m of members) {
+        if (m.title === '社長' || m.title === '本部長') list.add(m.name)
+      }
+    }
+    for (const name of ['三浦暢子', '朝倉千晶', '金田麻里江', '田邉洋']) {
+      const found = findEmployeeByName(master, name)
+      if (found) list.add(found.name)
+    }
+  }
+  return Array.from(list)
 }
 
 // 【維持】白井さんが追加した高性能な画像自動圧縮・リサイズロジック
@@ -265,11 +358,26 @@ function CreatePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const reuseId = searchParams.get('reuse')
+  const draftId = searchParams.get('draft')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [employeeMaster, setEmployeeMaster] = useState<EmployeeMaster>({})
+  const [fieldConfig, setFieldConfig] = useState<FieldConfig>({})
+  const [customFields, setCustomFields] = useState<CustomFieldDefinitions>({})
+  const [hiddenDefaults, setHiddenDefaults] = useState<HiddenDefaults>({})
+  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+  const [customFiles, setCustomFiles] = useState<Record<string, File | null>>({})
 
   const [mode, setMode] = useState<'approval' | 'report'>('approval')
+  const [departmentOverride, setDepartmentOverride] = useState<string | null>(null)
+  const selectedDepartment = departmentOverride ?? user?.department ?? ''
+
+  const userDepartments = useMemo(() => {
+    const depts = new Set<string>()
+    if (user?.department) depts.add(user.department)
+    ;(user as any)?.departments?.forEach((d: string) => depts.add(d))
+    return Array.from(depts)
+  }, [user])
 
   const [selectedDeptHead, setSelectedDeptHead] = useState<string[]>([])
   const [selectedGM, setSelectedGM] = useState<string[]>([])
@@ -282,6 +390,7 @@ function CreatePageContent() {
   const [activeAccord, setActiveAccord] = useState('所属長')
 
   const [subType, setSubType] = useState<string>('通常申請')
+  const isRequired = useCallback((key: string) => isFieldRequired(fieldConfig, subType, key, customFields, hiddenDefaults), [fieldConfig, subType, customFields, hiddenDefaults])
   const [recruitmentDivision, setRecruitmentDivision] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -386,7 +495,7 @@ function CreatePageContent() {
     dailyAllowanceUnitPrice: ''
   })
 
-  const fetchEmployeeMaster = async () => {
+  const fetchEmployeeMaster = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'))
       const master: EmployeeMaster = {}
@@ -397,11 +506,65 @@ function CreatePageContent() {
       })
       setEmployeeMaster(master)
     } catch (err) { console.error('Error fetching employee master:', err) }
-  }
+  }, [])
 
   useEffect(() => {
+    if (!firebaseUser) return
     fetchEmployeeMaster()
-  }, [])
+  }, [firebaseUser, fetchEmployeeMaster])
+
+  useEffect(() => {
+    if (!firebaseUser) return
+    const fetchFieldConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'fieldConfig'))
+        const data = snap.exists() ? (snap.data() as { configs?: FieldConfig; customFields?: CustomFieldDefinitions; hiddenDefaults?: HiddenDefaults }) : {}
+        setFieldConfig(mergeFieldConfig(data.configs))
+        setCustomFields(mergeCustomFields(data.customFields))
+        setHiddenDefaults(mergeHiddenDefaults(data.hiddenDefaults))
+      } catch (err) {
+        console.error('Error fetching field config:', err)
+        setFieldConfig(mergeFieldConfig(null))
+        setCustomFields(mergeCustomFields(null))
+        setHiddenDefaults(mergeHiddenDefaults(null))
+      }
+    }
+    fetchFieldConfig()
+  }, [firebaseUser])
+
+  // 管理画面で非表示にしたデフォルト項目を DOM から非表示にする
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hiddenKeys = hiddenDefaults?.[subType] || []
+    const hiddenLabels = new Set(
+      (FIELD_DEFINITIONS[subType] || [])
+        .filter(f => hiddenKeys.includes(f.key))
+        .map(f => normalizeLabelText(f.label))
+    )
+
+    const normalize = (s: string) => s.replace(/\s/g, '').replace(/[＊*％%：:（(・].*$/, '')
+
+    const allCandidates = Array.from(document.querySelectorAll('#create-form label, #create-form h4, #create-form [data-field-key]')) as HTMLElement[]
+
+    const hideTargets = new Set<HTMLElement>()
+
+    for (const el of allCandidates) {
+      const fieldKey = el.getAttribute('data-field-key')
+      const text = normalize(el.textContent || '')
+      const shouldHide = (fieldKey && hiddenKeys.includes(fieldKey)) || hiddenLabels.has(text)
+      const target = (el.getAttribute('data-field-key') ? el : el.parentElement) as HTMLElement | null
+      if (shouldHide && target) {
+        hideTargets.add(target)
+      }
+    }
+
+    for (const el of allCandidates) {
+      const target = (el.getAttribute('data-field-key') ? el : el.parentElement) as HTMLElement | null
+      if (target) {
+        target.style.display = hideTargets.has(target) ? 'none' : ''
+      }
+    }
+  }, [subType, hiddenDefaults])
 
   const handleModeChange = (newMode: 'approval' | 'report') => {
     setMode(newMode)
@@ -474,8 +637,27 @@ function CreatePageContent() {
     setLeaseMileage('')
     setLeaseEstimateFile(null)
     setFiles([])
-    setActiveAccord(newMode === 'approval' ? '所属長' : '回覧先')
+    setCustomValues({})
+    setCustomFiles({})
+    setSelectedCirculation(newMode === 'report' ? getDefaultReportCirculators('退職者通知', employeeMaster) : [])
+    setActiveAccord(newMode === 'approval' ? (getFirstActiveAccord(currentRoute) || '所属長') : '回覧先')
   }
+
+  const handleSubTypeChange = (newSubType: string) => {
+    setSubType(newSubType)
+    setCustomValues({})
+    setCustomFiles({})
+    if (mode === 'report') {
+      setSelectedCirculation(getDefaultReportCirculators(newSubType, employeeMaster))
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== 'report' || Object.keys(employeeMaster).length === 0) return
+    if (draftId || reuseId) return
+    if (subType !== '退職者通知' && subType !== '訃報連絡') return
+    setSelectedCirculation(getDefaultReportCirculators(subType, employeeMaster))
+  }, [mode, subType, employeeMaster, draftId, reuseId])
 
   const generalManagers = useMemo(() => {
     const gmList: (Employee & { dept: string })[] = []
@@ -485,9 +667,33 @@ function CreatePageContent() {
     return gmList
   }, [employeeMaster])
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const currentRoute = useMemo(() => {
-    return getApprovalRoute(subType, user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision)
-  }, [subType, user, employeeMaster, generalManagers, recruitmentDivision])
+    return getApprovalRoute(subType, selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, recruitmentDivision, user?.name || '')
+  }, [subType, selectedDepartment, user, employeeMaster, generalManagers, recruitmentDivision])
+
+  const getFirstActiveAccord = (route: any) => {
+    if (!route.stepOrder || route.stepOrder.length === 0) return '所属長'
+    for (const step of route.stepOrder) {
+      if (step === '部長') {
+        const list = (route.isDeptHead || route.isGeneralManager) ? [] : (route.defaultDeptHead || [])
+        if (list.length > 0) return '所属長'
+      } else if (step === '本部長') {
+        const list = route.isGeneralManager ? [] : (route.defaultGM || [])
+        if (list.length > 0) return '本部長'
+      } else if (step === '社長') {
+        if ((route.defaultExec || []).length > 0) return '社長'
+      } else if (step === '総務管理本部') {
+        if ((route.defaultGeneralAffairs || []).length > 0) return '総務管理本部'
+      } else if (step === '本部長回覧') {
+        if ((route.defaultGMForCirculation || []).length > 0) return '本部長回覧'
+      } else if (step === '決裁後回覧') {
+        if ((route.defaultPostDecisionCirculation || []).length > 0) return '決裁後回覧'
+      }
+    }
+    const first = route.stepOrder[0]
+    return first === '部長' ? '所属長' : first
+  }
 
   const transportTotal = useMemo(() =>
     tripDetails.transport.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
@@ -505,6 +711,147 @@ function CreatePageContent() {
     transportTotal + accommodationTotal + dailyAllowanceTotal,
   [transportTotal, accommodationTotal, dailyAllowanceTotal])
 
+  const loadCustomValues = useCallback((fd: Record<string, any>) => {
+    const next: Record<string, string> = {}
+    for (const [key, value] of Object.entries(fd)) {
+      if (key.startsWith('custom_') && (typeof value === 'string' || typeof value === 'number')) {
+        next[key] = String(value ?? '')
+      }
+    }
+    setCustomValues(next)
+  }, [])
+
+  const applyDraftData = useCallback((data: any) => {
+    const fd = data.formDetails || {}
+    const presidentList: string[] = []
+    Object.values(employeeMaster).forEach((members) => {
+      members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
+    })
+
+    setMode(data.appName === '回覧報告' ? 'report' : 'approval')
+    setSubType(data.subType || '')
+    setDepartmentOverride(data.applicantDept || null)
+    setTitle(data.title || '')
+    setDescription(fd.description != null ? String(fd.description) : '')
+    setRemarks(fd.remarks != null ? String(fd.remarks) : '')
+
+    setAmount(String(fd.amount ?? ''))
+    setPaymentDate(String(fd.paymentDate ?? ''))
+    setPayee(String(fd.payee ?? ''))
+    setRecruitmentDivision(String(fd.recruitmentDivision ?? ''))
+    setEmploymentType(String(fd.employmentType ?? ''))
+    setJobLocation(String(fd.jobLocation ?? ''))
+    setJobContent(String(fd.jobContent ?? ''))
+    setWorkHours(String(fd.workHours ?? ''))
+    setWorkDays(String(fd.workDays ?? ''))
+    setRecruitmentUnitPrice(String(fd.recruitmentUnitPrice ?? ''))
+    setPostingDate(String(fd.postingDate ?? ''))
+    setRecruitmentMedia(String(fd.recruitmentMedia ?? ''))
+    setPostingFee(String(fd.postingFee ?? ''))
+    setSalesAmount(String(fd.salesAmount ?? ''))
+    setCostAmount(String(fd.costAmount ?? ''))
+    setCostRate(String(fd.costRate ?? ''))
+    setRetireeName(String(fd.retireeName ?? ''))
+    setRetireeDate(String(fd.retireeDate ?? ''))
+
+    setCoCompanyName(String(fd.coCompanyName ?? ''))
+    setCoBackground(String(fd.coBackground ?? ''))
+    setCoStartDate(String(fd.coStartDate ?? ''))
+
+    setLeaseClassification(String(fd.leaseClassification ?? ''))
+    setLeaseVendor(String(fd.leaseVendor ?? ''))
+    setLeaseOtherVendor(String(fd.leaseOtherVendor ?? ''))
+    setLeaseCarNumber(String(fd.leaseCarNumber ?? ''))
+    setLeaseRequirements(String(fd.leaseRequirements ?? ''))
+    setLeaseCurrentAmount(String(fd.leaseCurrentAmount ?? ''))
+    setLeaseNewAmount(String(fd.leaseNewAmount ?? ''))
+    setLeaseTerm(String(fd.leaseTerm ?? ''))
+    setLeaseDeliveryDate(String(fd.leaseDeliveryDate ?? ''))
+    setLeaseExpiryDate(String(fd.leaseExpiryDate ?? ''))
+    setLeaseMileage(String(fd.leaseMileage ?? ''))
+
+    setSalaryCustomerName(String(fd.salaryCustomerName ?? ''))
+    setSalarySiteName(String(fd.salarySiteName ?? ''))
+    setSalaryEmployeeNumber(String(fd.salaryEmployeeNumber ?? ''))
+    setSalaryEmployeeName(String(fd.salaryEmployeeName ?? ''))
+    setSalaryChangeDetails(String(fd.salaryChangeDetails ?? ''))
+    setSalaryStartDate(String(fd.salaryStartDate ?? ''))
+    setSalaryReason(String(fd.salaryReason ?? ''))
+
+    setRetirementName(String(fd.retirementName ?? ''))
+    setRetirementSite(String(fd.retirementSite ?? ''))
+    setRetirementJobType(String(fd.retirementJobType ?? ''))
+    setRetirementDate(String(fd.retirementDate ?? ''))
+    setRetirementReason(String(fd.retirementReason ?? ''))
+
+    setObituaryType(String(fd.obituaryType ?? ''))
+    setObituaryTargetName(String(fd.obituaryTargetName ?? ''))
+    setObituarySite(String(fd.obituarySite ?? ''))
+    setObituaryDeceasedName(String(fd.obituaryDeceasedName ?? ''))
+    setObituaryRelation(String(fd.obituaryRelation ?? ''))
+    setObituaryChiefMourner(String(fd.obituaryChiefMourner ?? ''))
+    setObituaryWakeDate(String(fd.obituaryWakeDate ?? ''))
+    setObituaryFuneralDate(String(fd.obituaryFuneralDate ?? ''))
+    setObituaryVenue(String(fd.obituaryVenue ?? ''))
+    setObituaryCondolencePostal(String(fd.obituaryCondolencePostal ?? ''))
+    setObituaryCondolenceAddress(String(fd.obituaryCondolenceAddress ?? ''))
+    setObituaryCondolenceVenueName(String(fd.obituaryCondolenceVenueName ?? ''))
+    setObituaryCondolencePhone(String(fd.obituaryCondolencePhone ?? ''))
+    setObituaryCondolenceAmount(String(fd.obituaryCondolenceAmount ?? ''))
+    setObituaryRequest(String(fd.obituaryRequest ?? ''))
+    setObituaryAttendees(String(fd.obituaryAttendees ?? ''))
+
+    setCustomFiles({})
+    loadCustomValues(fd)
+
+    if (data.subType === '入札結果報告') {
+      const { description: _description, remarks: _remarks, ...bidRest } = fd
+      void _description; void _remarks
+      setBiddingDetails(prev => ({ ...prev, ...bidRest }))
+    }
+    if (data.subType === '出張旅費申請' && fd.tripDetails) {
+      setTripDetails(prev => ({
+        ...prev,
+        ...fd.tripDetails,
+        transport: fd.tripDetails.transport && fd.tripDetails.transport.length ? fd.tripDetails.transport : prev.transport
+      }))
+    }
+
+    const route = getApprovalRoute(
+      data.subType || '',
+      data.applicantDept || user?.department || '',
+      user?.title || '',
+      employeeMaster,
+      generalManagers,
+      fd.recruitmentDivision || '',
+      user?.name || ''
+    )
+
+    const wf = data.workflow || {}
+    const steps = wf.steps || {}
+    const stepOrder = wf.stepOrder || []
+    if (data.appName === '回覧報告') {
+      setSelectedCirculation(wf.circulations || [])
+    } else {
+      setSelectedDeptHead(steps['部長']?.approvers || [])
+      setSelectedExec(steps['社長']?.approvers?.length ? steps['社長'].approvers : presidentList)
+      const gmKey = stepOrder.find((k: string) => k === '本部長' || k === route.decisionMaker) || '本部長'
+      setSelectedGM(steps[gmKey]?.approvers || [])
+      const gaKey = stepOrder.find((k: string) => k === '総務管理本部' || k === route.generalAffairsLabel) || '総務管理本部'
+      setSelectedGeneralAffairs(steps[gaKey]?.approvers || [])
+      const gmCircKey = stepOrder.find((k: string) => k === '本部長回覧') || '本部長回覧'
+      setSelectedGMForCirculation(steps[gmCircKey]?.approvers || [])
+      const postKey = route.postDecisionCirculationLabel && stepOrder.find((k: string) => k === route.postDecisionCirculationLabel)
+      setSelectedPostDecisionCirculation(postKey ? steps[postKey]?.approvers || [] : [])
+      setSelectedCirculation(wf.circulations || [])
+    }
+
+    const firstActive = route.stepOrder && route.stepOrder.length > 0
+      ? (route.stepOrder[0] === '部長' ? '所属長' : route.stepOrder[0])
+      : '所属長'
+    setActiveAccord(data.appName === '回覧報告' ? '回覧先' : firstActive)
+  }, [employeeMaster, user, generalManagers, loadCustomValues])
+
   useEffect(() => {
     const loadOriginal = async () => {
       if (!reuseId || !user || Object.keys(employeeMaster).length === 0) return
@@ -518,7 +865,7 @@ function CreatePageContent() {
         setTitle(data.title || '')
         setDescription(data.description || '')
         setRemarks(data.remarks || '')
-        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : '所属長')
+        setActiveAccord(data.appName === '回覧報告' ? '回覧先' : (getFirstActiveAccord(currentRoute) || '所属長'))
 
         const fd = data.formDetails || {}
         if (fd.amount !== undefined) setAmount(String(fd.amount))
@@ -528,11 +875,13 @@ function CreatePageContent() {
         if (data.subType === '入札結果報告') {
           setBiddingDetails(prev => ({ ...prev, ...fd }))
         }
+        setCustomFiles({})
+        loadCustomValues(fd)
 
         const wf = data.workflow || {}
         const steps = wf.steps || {}
         const stepOrder = wf.stepOrder || []
-        const route = getApprovalRoute(data.subType || '', user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '')
+        const route = getApprovalRoute(data.subType || '', data.applicantDept || selectedDepartment || user?.department || '', user?.title || '', employeeMaster, generalManagers, fd.recruitmentDivision || '', user?.name || '')
 
         setSelectedDeptHead(steps['部長']?.approvers || [])
         setSelectedExec(steps['社長']?.approvers || [])
@@ -548,28 +897,45 @@ function CreatePageContent() {
       } catch (err) { console.error('Error loading reuse application:', err) }
     }
     loadOriginal()
-  }, [reuseId, user, employeeMaster, generalManagers])
+  }, [reuseId, user, selectedDepartment, employeeMaster, generalManagers, currentRoute, loadCustomValues])
 
   useEffect(() => {
-    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId) {
-      setSelectedDeptHead(currentRoute.defaultDeptHead || [])
+    let mounted = true
+    if (!draftId || !user || Object.keys(employeeMaster).length === 0) return
+    const loadDraft = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'applications', draftId))
+        if (!mounted) return
+        if (!snap.exists()) return
+        const data = snap.data() as any
+        if ((data.applicantId !== user.id && data.applicantId !== user.email) || data.workflow?.status !== '下書き') return
+        applyDraftData(data)
+      } catch (err) { console.error('Error loading draft:', err) }
+    }
+    loadDraft()
+    return () => { mounted = false }
+  }, [draftId, user, employeeMaster, applyDraftData])
+
+  useEffect(() => {
+    if (user && subType && Object.keys(employeeMaster).length > 0 && mode === 'approval' && !reuseId && !draftId) {
+      setSelectedDeptHead(currentRoute.isDeptHead ? [] : (currentRoute.defaultDeptHead || []))
       setSelectedGM(currentRoute.defaultGM || [])
       setSelectedGMForCirculation(currentRoute.defaultGMForCirculation || [])
       setSelectedGeneralAffairs(currentRoute.defaultGeneralAffairs || [])
       setSelectedPostDecisionCirculation(currentRoute.defaultPostDecisionCirculation || [])
-      setActiveAccord('所属長')
+      setActiveAccord(getFirstActiveAccord(currentRoute) || '所属長')
     }
-  }, [subType, user, employeeMaster, currentRoute, mode, reuseId])
+  }, [subType, user, employeeMaster, currentRoute, mode, reuseId, draftId])
 
   useEffect(() => {
-    if (employeeMaster && Object.keys(employeeMaster).length > 0) {
+    if (employeeMaster && Object.keys(employeeMaster).length > 0 && !draftId) {
       const presidentList: string[] = []
-      Object.entries(employeeMaster).forEach(([dept, members]) => {
+      Object.values(employeeMaster).forEach((members) => {
         members.forEach(m => { if (m.title === '社長') { presidentList.push(m.name) } })
       })
       if (presidentList.length > 0) { setSelectedExec(presidentList) }
     }
-  }, [employeeMaster])
+  }, [employeeMaster, draftId])
 
   const toggleMemberSelection = (member: string, list: string[], setList: (list: string[]) => void) => {
     if (list.includes(member)) setList(list.filter(m => m !== member))
@@ -578,15 +944,301 @@ function CreatePageContent() {
 
   const removeFile = (indexToRemove: number) => setFiles(files.filter((_, index) => index !== indexToRemove))
 
+  const buildFormDetails = () => {
+    let formDetails: any = { description, remarks }
+    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
+      formDetails = {
+        ...formDetails,
+        recruitmentDivision,
+        employmentType,
+        jobLocation,
+        jobContent,
+        workHours,
+        workDays,
+        recruitmentUnitPrice: recruitmentUnitPrice ? Number(recruitmentUnitPrice) : '',
+        postingDate,
+        recruitmentMedia,
+        postingFee: postingFee ? Number(postingFee) : '',
+        salesAmount: salesAmount ? Number(salesAmount) : '',
+        costAmount: costAmount ? Number(costAmount) : '',
+        costRate,
+        retireeName,
+        retireeDate
+      }
+    }
+    if (mode === 'approval' && subType === '通常申請') {
+      formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
+    }
+    if (mode === 'approval' && subType === '代表者印捺印申請') {
+      formDetails = { ...formDetails, amount: Number(amount) || 0 }
+    }
+    if (mode === 'approval' && subType === '出張旅費申請') {
+      formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
+    }
+    if (mode === 'approval' && subType === '協力会社登録') {
+      formDetails = { ...formDetails, coCompanyName, coBackground, coStartDate }
+    }
+    if (mode === 'approval' && subType === '給与情報変更申請') {
+      formDetails = {
+        ...formDetails,
+        salaryCustomerName,
+        salarySiteName,
+        salaryEmployeeNumber,
+        salaryEmployeeName,
+        salaryChangeDetails,
+        salaryStartDate,
+        salaryReason
+      }
+    }
+    if (mode === 'approval' && subType === '車両リース決済') {
+      formDetails = {
+        ...formDetails,
+        leaseClassification,
+        leaseVendor,
+        leaseOtherVendor,
+        leaseCarNumber,
+        leaseRequirements,
+        leaseCurrentAmount: leaseCurrentAmount ? Number(leaseCurrentAmount) : '',
+        leaseNewAmount: leaseNewAmount ? Number(leaseNewAmount) : '',
+        leaseTerm,
+        leaseDeliveryDate,
+        leaseExpiryDate,
+        leaseMileage
+      }
+    }
+    if (mode === 'report' && subType === '入札結果報告') {
+      formDetails = { ...formDetails, ...biddingDetails }
+    }
+    if (mode === 'report' && subType === '退職者通知') {
+      formDetails = {
+        ...formDetails,
+        retirementName,
+        retirementSite,
+        retirementJobType,
+        retirementDate,
+        retirementReason
+      }
+    }
+    if (mode === 'report' && subType === '訃報連絡') {
+      formDetails = {
+        ...formDetails,
+        obituaryType,
+        obituaryTargetName,
+        obituarySite,
+        obituaryDeceasedName,
+        obituaryRelation,
+        obituaryChiefMourner,
+        obituaryWakeDate,
+        obituaryFuneralDate,
+        obituaryVenue,
+        obituaryCondolencePostal,
+        obituaryCondolenceAddress,
+        obituaryCondolenceVenueName,
+        obituaryCondolencePhone,
+        obituaryCondolenceAmount: obituaryCondolenceAmount ? Number(obituaryCondolenceAmount) : '',
+        obituaryRequest,
+        obituaryAttendees
+      }
+    }
+    const customEntries: Record<string, any> = {}
+    for (const [key, value] of Object.entries(customValues)) {
+      const field = getEffectiveFields(subType, customFields, hiddenDefaults).find(f => f.key === key)
+      customEntries[key] = field?.type === 'number' && value !== '' ? Number(value) : value
+    }
+    return filterFormDetailsByEffectiveKeys({ ...formDetails, ...customEntries }, subType, customFields, hiddenDefaults)
+  }
+
+  const buildWorkflow = () => {
+    const dbKeyFor = (stepKey: string) => {
+      if (stepKey === '本部長') return currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
+      if (stepKey === '決裁後回覧') return currentRoute.postDecisionCirculationLabel
+      return stepKey
+    }
+    let firstStepKey = mode === 'report' ? '回覧先' : ''
+    let initialApprovers: string[] = []
+
+    const applicantName = user?.name || ''
+    const isSelfOrEmpty = (approvers: string[]) =>
+      approvers.length === 0 || (approvers.length === 1 && approvers[0] === applicantName) || approvers.every(a => a === applicantName)
+
+    const stepsObj: any = {}
+
+    if (mode === 'approval') {
+      (currentRoute.stepOrder || []).forEach((stepKey: string) => {
+        let approvers: string[] = []
+        const dbKey = dbKeyFor(stepKey)
+
+        if (stepKey === '部長') approvers = selectedDeptHead
+        else if (stepKey === '本部長') approvers = selectedGM
+        else if (stepKey === '社長') approvers = selectedExec
+        else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
+        else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
+        else if (stepKey === '決裁後回覧') approvers = selectedPostDecisionCirculation
+
+        const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || (stepKey === '総務管理本部' && currentRoute.generalAffairsIsCirculation !== false)
+        const skipped = isSelfOrEmpty(approvers)
+
+        stepsObj[dbKey] = {
+          approvers,
+          status: skipped ? '承認済み(スキップ)' : (isCirculation ? '回覧待ち' : '承認待ち'),
+          comments: [],
+          approvedBy: []
+        }
+
+        if (!skipped && firstStepKey === '') {
+          firstStepKey = dbKey
+          initialApprovers = approvers
+        }
+      })
+
+      if (!firstStepKey) {
+        firstStepKey = '完了'
+        initialApprovers = []
+      }
+    } else if (mode === 'report') {
+      firstStepKey = '回覧先'
+      initialApprovers = selectedCirculation
+      stepsObj['回覧先'] = {
+        approvers: selectedCirculation,
+        status: '回覧待ち',
+        comments: [],
+        approvedBy: []
+      }
+    }
+
+    const allCirculators = Array.from(new Set([
+      ...selectedCirculation,
+      ...(mode === 'approval' ? selectedGeneralAffairs : []),
+      ...(mode === 'approval' ? selectedGMForCirculation : []),
+      ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
+    ]))
+
+    return {
+      currentStep: firstStepKey,
+      status: mode === 'report' ? '回覧待ち' : (firstStepKey === '完了' ? '承認済み' : '承認待ち'),
+      currentApprovers: initialApprovers,
+      allCirculators,
+      decisionMaker: currentRoute.decisionMaker,
+      stepOrder: mode === 'approval' ? (currentRoute.stepOrder || []).map((k: string) => dbKeyFor(k)) : ['回覧先'],
+      steps: stepsObj,
+      circulations: selectedCirculation, confirmedBy: []
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return setError('件名を入力してください')
-    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !recruitmentDivision) {
-      return setError('採用区分を選択してください')
+
+    const getFieldValue = (key: string): any => {
+      switch (key) {
+        case 'amount': return amount
+        case 'paymentDate': return paymentDate
+        case 'payee': return payee
+        case 'description': return description
+        case 'remarks': return remarks
+        case 'attachments': return files.length > 0
+        case 'recruitmentDivision': return recruitmentDivision
+        case 'employmentType': return employmentType
+        case 'jobLocation': return jobLocation
+        case 'jobContent': return jobContent
+        case 'workHours': return workHours
+        case 'workDays': return workDays
+        case 'recruitmentUnitPrice': return recruitmentUnitPrice
+        case 'postingDate': return postingDate
+        case 'recruitmentMedia': return recruitmentMedia
+        case 'postingFee': return postingFee
+        case 'salesAmount': return salesAmount
+        case 'costAmount': return costAmount
+        case 'costRate': return costRate
+        case 'retireeName': return retireeName
+        case 'retireeDate': return retireeDate
+        case 'coCompanyName': return coCompanyName
+        case 'coStartDate': return coStartDate
+        case 'coBackground': return coBackground
+        case 'coRegistrationFile': return !!coRegistrationFile
+        case 'coFinancialStatements': return !!coFinancialStatements
+        case 'coInsuranceFile': return !!coInsuranceFile
+        case 'coAntiSocialFile': return !!coAntiSocialFile
+        case 'coCompanyBrochure': return !!coCompanyBrochure
+        case 'coLicenseFile': return !!coLicenseFile
+        case 'tripStartDate': return tripDetails.startDate
+        case 'tripEndDate': return tripDetails.endDate
+        case 'transport': return tripDetails.transport.some(t => t.method.trim() || t.amount.trim())
+        case 'accommodationNights': return tripDetails.accommodationNights
+        case 'accommodationUnitPrice': return tripDetails.accommodationUnitPrice
+        case 'businessHours': return tripDetails.businessHours
+        case 'dailyAllowanceDays': return tripDetails.dailyAllowanceDays
+        case 'dailyAllowanceUnitPrice': return tripDetails.dailyAllowanceUnitPrice
+        case 'leaseClassification': return leaseClassification
+        case 'leaseVendor': return leaseVendor
+        case 'leaseOtherVendor': return leaseVendor === 'その他' ? leaseOtherVendor : 'skip'
+        case 'leaseCarNumber': return leaseCarNumber
+        case 'leaseRequirements': return leaseRequirements
+        case 'leaseCurrentAmount': return leaseCurrentAmount
+        case 'leaseNewAmount': return leaseNewAmount
+        case 'leaseTerm': return leaseTerm
+        case 'leaseDeliveryDate': return leaseDeliveryDate
+        case 'leaseExpiryDate': return leaseExpiryDate
+        case 'leaseMileage': return leaseMileage
+        case 'leaseEstimateFile': return !!leaseEstimateFile
+        case 'salaryCustomerName': return salaryCustomerName
+        case 'salarySiteName': return salarySiteName
+        case 'salaryEmployeeNumber': return salaryEmployeeNumber
+        case 'salaryEmployeeName': return salaryEmployeeName
+        case 'salaryChangeDetails': return salaryChangeDetails
+        case 'salaryStartDate': return salaryStartDate
+        case 'salaryReason': return salaryReason
+        case 'salaryLaborCostFile': return !!salaryLaborCostFile
+        case 'retirementName': return retirementName
+        case 'retirementSite': return retirementSite
+        case 'retirementJobType': return retirementJobType
+        case 'retirementDate': return retirementDate
+        case 'retirementReason': return retirementReason
+        case 'retirementResignationFile': return !!retirementResignationFile
+        case 'obituaryType': return obituaryType
+        case 'obituaryTargetName': return obituaryTargetName
+        case 'obituarySite': return obituaryType === '社員' ? obituarySite : 'skip'
+        case 'obituaryDeceasedName': return obituaryDeceasedName
+        case 'obituaryRelation': return obituaryRelation
+        case 'obituaryChiefMourner': return obituaryChiefMourner
+        case 'obituaryWakeDate': return obituaryWakeDate
+        case 'obituaryFuneralDate': return obituaryFuneralDate
+        case 'obituaryNoticeFile': return !!obituaryNoticeFile
+        case 'obituaryVenue': return obituaryVenue
+        case 'obituaryCondolencePostal': return obituaryCondolencePostal
+        case 'obituaryCondolencePhone': return obituaryCondolencePhone
+        case 'obituaryCondolenceVenueName': return obituaryCondolenceVenueName
+        case 'obituaryCondolenceAddress': return obituaryCondolenceAddress
+        case 'obituaryCondolenceAmount': return obituaryCondolenceAmount
+        case 'obituaryRequest': return obituaryRequest
+        case 'obituaryAttendees': return obituaryAttendees
+        case 'biddingLocation': return biddingDetails.location
+        case 'biddingDate': return biddingDetails.date
+        case 'biddingTime': return biddingDetails.time
+        case 'winnerName': return biddingDetails.winnerName
+        case 'winnerBid1': return biddingDetails.winnerBid1
+        case 'winnerBid2': return biddingDetails.winnerBid2
+        case 'ourBid1': return biddingDetails.ourBid1
+        case 'ourBid2': return biddingDetails.ourBid2
+        case 'participants': return biddingDetails.participants.some(p => p.name.trim())
+        case 'prevWinnerName': return biddingDetails.prevWinnerName
+        case 'prevWinnerAmount': return biddingDetails.prevWinnerAmount
+        default:
+          if (customFiles[key]) return !!customFiles[key]
+          return customValues[key] ?? ''
+      }
     }
-    if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && !employmentType) {
-      return setError('区分を選択してください')
+
+    for (const field of getEffectiveFields(subType, customFields, hiddenDefaults)) {
+      if (!isFieldRequired(fieldConfig, subType, field.key, customFields, hiddenDefaults)) continue
+      const value = getFieldValue(field.key)
+      if (value === 'skip') continue
+      const isEmpty = typeof value === 'boolean' ? !value : String(value).trim() === ''
+      if (isEmpty) {
+        return setError(`${getFieldLabel(subType, field.key, customFields, hiddenDefaults)}を入力してください`)
+      }
     }
+
     setLoading(true)
     if (!firebaseUser) {
       setLoading(false)
@@ -595,12 +1247,17 @@ function CreatePageContent() {
     let stage = '申請処理開始'
 
     try {
+      let existingNo: number | null = null
+      if (draftId) {
+        const draftSnap = await getDoc(doc(db, 'applications', draftId))
+        if (draftSnap.exists()) existingNo = draftSnap.data()?.applicationNo ?? null
+      }
       stage = '添付ファイルアップロード'
       const uploadedAttachments: { name: string; url: string; type: string }[] = []
       let fileIndex = 0
 
-      const addFile = (file: File | null) => file && allFiles.push(file)
       const allFiles: File[] = [...files]
+      const addFile = (file: File | null) => file && allFiles.push(file)
       if (mode === 'approval' && subType === '協力会社登録') {
         addFile(coRegistrationFile)
         addFile(coFinancialStatements)
@@ -620,6 +1277,12 @@ function CreatePageContent() {
       }
       if (mode === 'approval' && subType === '車両リース決済') {
         addFile(leaseEstimateFile)
+      }
+      for (const field of getEffectiveFields(subType, customFields, hiddenDefaults)) {
+        if (field.custom && field.type === 'file' && customFiles[field.key]) {
+          const customFile = customFiles[field.key]
+          if (customFile) allFiles.push(customFile)
+        }
       }
 
       for (const file of allFiles) {
@@ -642,150 +1305,8 @@ function CreatePageContent() {
         fileIndex++
       }
 
-      let formDetails: any = { description, remarks }
-      if (mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）') {
-        formDetails = {
-          ...formDetails,
-          recruitmentDivision,
-          employmentType,
-          jobLocation,
-          jobContent,
-          workHours,
-          workDays,
-          recruitmentUnitPrice: recruitmentUnitPrice ? Number(recruitmentUnitPrice) : '',
-          postingDate,
-          recruitmentMedia,
-          postingFee: postingFee ? Number(postingFee) : '',
-          salesAmount: salesAmount ? Number(salesAmount) : '',
-          costAmount: costAmount ? Number(costAmount) : '',
-          costRate,
-          retireeName,
-          retireeDate
-        }
-      }
-      if (mode === 'approval' && subType === '通常申請') {
-        formDetails = { ...formDetails, amount: Number(amount) || 0, paymentDate, payee }
-      }
-      if (mode === 'approval' && subType === '代表者印捺印申請') {
-        formDetails = { ...formDetails, amount: Number(amount) || 0 }
-      }
-      if (mode === 'approval' && subType === '出張旅費申請') {
-        formDetails = { ...formDetails, tripDetails, transportTotal, accommodationTotal, dailyAllowanceTotal, tripTotal }
-      }
-      if (mode === 'approval' && subType === '協力会社登録') {
-        formDetails = { ...formDetails, coCompanyName, coBackground, coStartDate }
-      }
-      if (mode === 'approval' && subType === '給与情報変更申請') {
-        formDetails = {
-          ...formDetails,
-          salaryCustomerName,
-          salarySiteName,
-          salaryEmployeeNumber,
-          salaryEmployeeName,
-          salaryChangeDetails,
-          salaryStartDate,
-          salaryReason
-        }
-      }
-      if (mode === 'approval' && subType === '車両リース決済') {
-        formDetails = {
-          ...formDetails,
-          leaseClassification,
-          leaseVendor,
-          leaseOtherVendor,
-          leaseCarNumber,
-          leaseRequirements,
-          leaseCurrentAmount: leaseCurrentAmount ? Number(leaseCurrentAmount) : '',
-          leaseNewAmount: leaseNewAmount ? Number(leaseNewAmount) : '',
-          leaseTerm,
-          leaseDeliveryDate,
-          leaseExpiryDate,
-          leaseMileage
-        }
-      }
-      if (mode === 'report' && subType === '入札結果報告') {
-        formDetails = { ...formDetails, ...biddingDetails }
-      }
-      if (mode === 'report' && subType === '退職者通知') {
-        formDetails = {
-          ...formDetails,
-          retirementName,
-          retirementSite,
-          retirementJobType,
-          retirementDate,
-          retirementReason
-        }
-      }
-      if (mode === 'report' && subType === '訃報連絡') {
-        formDetails = {
-          ...formDetails,
-          obituaryType,
-          obituaryTargetName,
-          obituarySite,
-          obituaryDeceasedName,
-          obituaryRelation,
-          obituaryChiefMourner,
-          obituaryWakeDate,
-          obituaryFuneralDate,
-          obituaryVenue,
-          obituaryCondolencePostal,
-          obituaryCondolenceAddress,
-          obituaryCondolenceVenueName,
-          obituaryCondolencePhone,
-          obituaryCondolenceAmount: obituaryCondolenceAmount ? Number(obituaryCondolenceAmount) : '',
-          obituaryRequest,
-          obituaryAttendees
-        }
-      }
-      
-      const appName = mode === 'approval' ? '稟議' : '回覧報告'
-
-      const stepsObj: any = {}
-      let firstStepKey = mode === 'report' ? '回覧先' : currentRoute.stepOrder[0]
-      let initialApprovers: string[] = []
-
-      if (mode === 'approval') {
-        currentRoute.stepOrder.forEach((stepKey: string, index: number) => {
-          let approvers: string[] = []
-          let dbKey = stepKey
-
-          if (stepKey === '部長') approvers = selectedDeptHead
-          else if (stepKey === '本部長') {
-            approvers = selectedGM
-            dbKey = currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker
-          }
-          else if (stepKey === '社長') approvers = selectedExec
-          else if (stepKey === '総務管理本部') approvers = selectedGeneralAffairs
-          else if (stepKey === '本部長回覧') approvers = selectedGMForCirculation
-          else if (stepKey === '決裁後回覧') {
-            approvers = selectedPostDecisionCirculation
-            dbKey = currentRoute.postDecisionCirculationLabel
-          }
-
-          if (index === 0) {
-            initialApprovers = approvers
-            firstStepKey = dbKey
-          }
-
-          const isCirculation = stepKey === '本部長回覧' || stepKey === '決裁後回覧' || stepKey === '総務管理本部'
-          stepsObj[dbKey] = {
-            approvers,
-            status: isCirculation ? '回覧待ち' : '承認待ち',
-            comments: [],
-            approvedBy: []
-          }
-        })
-      }
-
-      const allCirculators = Array.from(new Set([
-        ...selectedCirculation,
-        ...(mode === 'approval' ? selectedGeneralAffairs : []),
-        ...(mode === 'approval' ? selectedGMForCirculation : []),
-        ...(mode === 'approval' ? selectedPostDecisionCirculation : [])
-      ]))
-      
-      stage = '申請データ登録'
-      const applicationNo = await runTransaction(db, async (transaction) => {
+      stage = '申請番号取得'
+      const applicationNo = existingNo ?? await runTransaction(db, async (transaction) => {
         const counterRef = doc(db, 'counters', 'applications')
         const counterDoc = await transaction.get(counterRef)
         const nextNo = (counterDoc.exists() ? (counterDoc.data().nextNumber || 0) : 0) + 1
@@ -793,36 +1314,78 @@ function CreatePageContent() {
         return nextNo
       })
 
-      const applicationData = {
+      stage = '申請データ登録'
+      const appName = mode === 'approval' ? '稟議' : '回覧報告'
+      const formDetails = buildFormDetails()
+      const workflow = buildWorkflow()
+      const baseData: any = {
         appName, subType, title, description, remarks,
-        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '', applicantName: user?.name || '', applicantDept: user?.department || '', applicantTitle: user?.title || '',
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '',
+        applicantName: user?.name || '',
+        applicantDept: selectedDepartment || user?.department || '',
+        applicantTitle: user?.title || '',
         applicationNo,
         formDetails,
-        workflow: {
-          currentStep: firstStepKey,
-          status: mode === 'report' ? '承認済み' : '承認待ち',
-          currentApprovers: initialApprovers,
-          allCirculators: allCirculators,
-          decisionMaker: currentRoute.decisionMaker,
-          stepOrder: mode === 'approval' ? currentRoute.stepOrder.map((k: string) => k === '本部長' ? (currentRoute.decisionMaker === '社長' ? '本部長' : currentRoute.decisionMaker) : k === '決裁後回覧' ? currentRoute.postDecisionCirculationLabel : k) : ['回覧先'],
-          steps: stepsObj,
-          circulations: selectedCirculation, confirmedBy: []
-        },
+        workflow,
         attachments: uploadedAttachments,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp()
       }
 
-      await addDoc(collection(db, 'applications'), applicationData)
-      
-      // 【マージ成功】稟議申請と回覧報告それぞれで、適切な通知メールを一斉送信する
-      if (mode === 'approval' && initialApprovers.length > 0) {
-        await sendNewApplicationNotification(applicationData, initialApprovers)
-      } else if (mode === 'report' && selectedCirculation.length > 0) {
-        await sendNewReportNotification(applicationData, selectedCirculation)
+      if (draftId) {
+        await updateDoc(doc(db, 'applications', draftId), baseData)
+      } else {
+        await addDoc(collection(db, 'applications'), { ...baseData, createdAt: serverTimestamp() })
       }
-      
+
+      if (mode === 'approval' && workflow.currentApprovers.length > 0) {
+        await sendNewApplicationNotification(baseData, workflow.currentApprovers)
+      } else if (mode === 'report' && selectedCirculation.length > 0) {
+        await sendNewReportNotification(baseData, selectedCirculation)
+      }
+
       router.push('/dashboard')
     } catch (err: any) { setError(`${stage}で失敗しました: ${err.message} (code: ${err.code || 'unknown'})`) } finally { setLoading(false) }
+  }
+
+  const handleSaveDraft = async () => {
+    if (!user || !firebaseUser) {
+      return setError('ログイン情報が取得できません。再度ログインしてください。')
+    }
+    setLoading(true)
+    try {
+      let existingNo: number | null = null
+      let existingAttachments: any[] | undefined
+      if (draftId) {
+        const draftSnap = await getDoc(doc(db, 'applications', draftId))
+        if (draftSnap.exists()) {
+          const draftData = draftSnap.data() as any
+          existingNo = draftData.applicationNo ?? null
+          existingAttachments = draftData.attachments
+        }
+      }
+      const appName = mode === 'approval' ? '稟議' : '回覧報告'
+      const formDetails = buildFormDetails()
+      const workflow = buildWorkflow()
+      workflow.status = '下書き'
+      const baseData: any = {
+        appName, subType, title, description, remarks,
+        applicantId: user?.id || user?.email || firebaseUser?.email || firebaseUser?.uid || '',
+        applicantName: user?.name || '',
+        applicantDept: selectedDepartment || user?.department || '',
+        applicantTitle: user?.title || '',
+        applicationNo: existingNo,
+        formDetails,
+        workflow,
+        attachments: existingAttachments || [],
+        updatedAt: serverTimestamp()
+      }
+      if (draftId) {
+        await updateDoc(doc(db, 'applications', draftId), baseData)
+      } else {
+        await addDoc(collection(db, 'applications'), { ...baseData, createdAt: serverTimestamp() })
+      }
+      router.push('/dashboard')
+    } catch (err: any) { setError(`下書き保存に失敗しました: ${err.message}`) } finally { setLoading(false) }
   }
 
   const sendNewApplicationNotification = async (applicationData: any, initialApprovers: string[]) => {
@@ -943,7 +1506,7 @@ function CreatePageContent() {
           {Object.entries(employeeMaster).map(([dept, members]) => {
             let filtered = members
             if (filterType === '社長') filtered = members.filter(m => m.title.includes('社長'))
-            else if (filterType === '部長' && user) { if (dept !== user.department) return null; filtered = members.filter(m => m.title.includes('部長')) }
+            else if (filterType === '部長' && user) { if (dept !== selectedDepartment && dept !== user.department) return null; filtered = members.filter(m => m.title.includes('部長')) }
             else if (filterType === '本部長') filtered = members.filter(m => m.title.includes('本部長'))
             else if (filterType === '総務') { if (dept !== '総務管理本部') return null; filtered = searchQuery ? members.filter(m => m.name.includes(searchQuery)) : members }
             else if (filterType === '回覧') filtered = searchQuery ? members.filter(m => m.name.includes(searchQuery)) : members
@@ -986,13 +1549,13 @@ function CreatePageContent() {
         <div className="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
           {error && <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-5 py-4 rounded-xl mb-8 text-sm font-medium animate-in zoom-in duration-300">⚠️ {error}</div>}
 
-          <form onSubmit={handleSubmit} className="space-y-10">
+          <form id="create-form" onSubmit={handleSubmit} className="space-y-10">
             <section className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">書類種別</label>
                   <div className="relative">
-                    <select value={subType} onChange={(e) => setSubType(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                    <select value={subType} onChange={(e) => handleSubTypeChange(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                       {mode === 'approval' ? (
                         <>
                           <option value="通常申請">通常申請</option>
@@ -1023,6 +1586,26 @@ function CreatePageContent() {
                 </div>
               </div>
 
+              {userDepartments.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">申請者 <span className="text-rose-500">*</span></label>
+                    <div className="w-full px-4 py-3 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200">{user?.name || '未設定'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">所属 <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <select value={selectedDepartment} onChange={(e) => setDepartmentOverride(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        {userDepartments.map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {mode === 'approval' && subType === '求人稟議（パート・アルバイト採用）' && (
                 <div className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
                   <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
@@ -1031,9 +1614,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">採用区分 {isRequired('recruitmentDivision') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={recruitmentDivision} onChange={(e) => setRecruitmentDivision(e.target.value)} required={isRequired('recruitmentDivision')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="三保事業所">三保事業所</option>
                           <option value="九州支店">九州支店</option>
@@ -1046,9 +1629,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">区分 {isRequired('employmentType') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} required={isRequired('employmentType')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="新規雇用">新規雇用</option>
                           <option value="欠員補充">欠員補充</option>
@@ -1195,7 +1778,7 @@ function CreatePageContent() {
                       <input type="number" value={biddingDetails.ourBid2} onChange={(e) => setBiddingDetails({...biddingDetails, ourBid2: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none text-right" />
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-field-key="participants">
                     {biddingDetails.participants.map((p, idx) => (
                       <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                         <div className="flex items-center gap-3">
@@ -1243,8 +1826,8 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">会社名 {isRequired('coCompanyName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={coCompanyName} onChange={(e) => setCoCompanyName(e.target.value)} required={isRequired('coCompanyName')} placeholder="会社名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">取引開始予定日</label>
@@ -1256,12 +1839,12 @@ function CreatePageContent() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <FileUploadField label="協力会社登録票" file={coRegistrationFile} onChange={setCoRegistrationFile} />
-                    <FileUploadField label="決算書（直近2年分）" file={coFinancialStatements} onChange={setCoFinancialStatements} />
-                    <FileUploadField label="賠償保険写し" file={coInsuranceFile} onChange={setCoInsuranceFile} />
-                    <FileUploadField label="反社確約書" file={coAntiSocialFile} onChange={setCoAntiSocialFile} />
-                    <FileUploadField label="会社案内" file={coCompanyBrochure} onChange={setCoCompanyBrochure} />
-                    <FileUploadField label="許認可登録写し" file={coLicenseFile} onChange={setCoLicenseFile} />
+                    <FileUploadField label="協力会社登録票" file={coRegistrationFile} onChange={setCoRegistrationFile} required={isRequired('coRegistrationFile')} />
+                    <FileUploadField label="決算書（直近2年分）" file={coFinancialStatements} onChange={setCoFinancialStatements} required={isRequired('coFinancialStatements')} />
+                    <FileUploadField label="賠償保険写し" file={coInsuranceFile} onChange={setCoInsuranceFile} required={isRequired('coInsuranceFile')} />
+                    <FileUploadField label="反社確約書" file={coAntiSocialFile} onChange={setCoAntiSocialFile} required={isRequired('coAntiSocialFile')} />
+                    <FileUploadField label="会社案内" file={coCompanyBrochure} onChange={setCoCompanyBrochure} required={isRequired('coCompanyBrochure')} />
+                    <FileUploadField label="許認可登録写し" file={coLicenseFile} onChange={setCoLicenseFile} required={isRequired('coLicenseFile')} />
                   </div>
                 </div>
               )}
@@ -1298,7 +1881,7 @@ function CreatePageContent() {
                       <input type="date" value={salaryStartDate} onChange={(e) => setSalaryStartDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} />
+                      <FileUploadField label="労務費積算表" file={salaryLaborCostFile} onChange={setSalaryLaborCostFile} required={isRequired('salaryLaborCostFile')} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">事由及び変更後の状況</label>
@@ -1316,9 +1899,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">分類 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">分類 {isRequired('leaseClassification') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={leaseClassification} onChange={(e) => setLeaseClassification(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={leaseClassification} onChange={(e) => setLeaseClassification(e.target.value)} required={isRequired('leaseClassification')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="新規">新規</option>
                           <option value="入れ替え">入れ替え</option>
@@ -1329,9 +1912,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">業者 {isRequired('leaseVendor') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={leaseVendor} onChange={(e) => { setLeaseVendor(e.target.value); if (e.target.value !== 'その他') setLeaseOtherVendor('') }} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={leaseVendor} onChange={(e) => { setLeaseVendor(e.target.value); if (e.target.value !== 'その他') setLeaseOtherVendor('') }} required={isRequired('leaseVendor')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="清水リース＆カード">清水リース＆カード</option>
                           <option value="静銀リース">静銀リース</option>
@@ -1347,12 +1930,12 @@ function CreatePageContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">登録車番 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={leaseCarNumber} onChange={(e) => setLeaseCarNumber(e.target.value)} required placeholder="例：静岡500 あ 1234" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">登録車番 {isRequired('leaseCarNumber') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={leaseCarNumber} onChange={(e) => setLeaseCarNumber(e.target.value)} required={isRequired('leaseCarNumber')} placeholder="例：静岡500 あ 1234" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">用件 <span className="text-rose-500">*</span></label>
-                      <textarea value={leaseRequirements} onChange={(e) => setLeaseRequirements(e.target.value)} required rows={3} placeholder="用件を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">用件 {isRequired('leaseRequirements') && <span className="text-rose-500">*</span>}</label>
+                      <textarea value={leaseRequirements} onChange={(e) => setLeaseRequirements(e.target.value)} required={isRequired('leaseRequirements')} rows={3} placeholder="用件を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">現在リース金額（月額）</label>
@@ -1396,7 +1979,7 @@ function CreatePageContent() {
                       <input type="text" value={leaseMileage} onChange={(e) => setLeaseMileage(e.target.value)} placeholder="例：50,000km" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <FileUploadField label="見積等" file={leaseEstimateFile} onChange={setLeaseEstimateFile} />
+                      <FileUploadField label="見積等" file={leaseEstimateFile} onChange={setLeaseEstimateFile} required={isRequired('leaseEstimateFile')} />
                     </div>
                   </div>
                 </div>
@@ -1410,27 +1993,27 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者氏名 {isRequired('retirementName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementName} onChange={(e) => setRetirementName(e.target.value)} required={isRequired('retirementName')} placeholder="退職者氏名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職者所属現場 {isRequired('retirementSite') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementSite} onChange={(e) => setRetirementSite(e.target.value)} required={isRequired('retirementSite')} placeholder="所属現場を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">職種 {isRequired('retirementJobType') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={retirementJobType} onChange={(e) => setRetirementJobType(e.target.value)} required={isRequired('retirementJobType')} placeholder="職種を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 <span className="text-rose-500">*</span></label>
-                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職日 {isRequired('retirementDate') && <span className="text-rose-500">*</span>}</label>
+                      <input type="date" value={retirementDate} onChange={(e) => setRetirementDate(e.target.value)} required={isRequired('retirementDate')} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 <span className="text-rose-500">*</span></label>
-                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">退職理由 {isRequired('retirementReason') && <span className="text-rose-500">*</span>}</label>
+                      <textarea value={retirementReason} onChange={(e) => setRetirementReason(e.target.value)} required={isRequired('retirementReason')} rows={3} placeholder="退職理由を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
-                    <div className="md:col-span-2">
-                      <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} />
+                    <div className="md:col-span-2" data-field-key="retirementResignationFile">
+                      <FileUploadField label="退職願" file={retirementResignationFile} onChange={setRetirementResignationFile} required={isRequired('retirementResignationFile')} />
                     </div>
                   </div>
                 </div>
@@ -1444,9 +2027,9 @@ function CreatePageContent() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">申請区分 {isRequired('obituaryType') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryType} onChange={(e) => setObituaryType(e.target.value)} required={isRequired('obituaryType')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="社員">社員</option>
                           <option value="社員家族">社員家族</option>
@@ -1456,8 +2039,8 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員・お客様名 {isRequired('obituaryTargetName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryTargetName} onChange={(e) => setObituaryTargetName(e.target.value)} required={isRequired('obituaryTargetName')} placeholder="社員またはお客様名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     {obituaryType === '社員' && (
                       <div>
@@ -1466,12 +2049,12 @@ function CreatePageContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">故人名 {isRequired('obituaryDeceasedName') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryDeceasedName} onChange={(e) => setObituaryDeceasedName(e.target.value)} required={isRequired('obituaryDeceasedName')} placeholder="故人名を入力" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 <span className="text-rose-500">*</span></label>
-                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required placeholder="例：実父" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">社員との関係 {isRequired('obituaryRelation') && <span className="text-rose-500">*</span>}</label>
+                      <input type="text" value={obituaryRelation} onChange={(e) => setObituaryRelation(e.target.value)} required={isRequired('obituaryRelation')} placeholder="例：実父" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">喪主名</label>
@@ -1486,7 +2069,7 @@ function CreatePageContent() {
                       <input type="datetime-local" value={obituaryFuneralDate} onChange={(e) => setObituaryFuneralDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} />
+                      <FileUploadField label="訃報案内" file={obituaryNoticeFile} onChange={setObituaryNoticeFile} required={isRequired('obituaryNoticeFile')} />
                       <p className="text-xs text-slate-500 mt-1">※訃報案内を添付した場合、下記①②は省略できます</p>
                     </div>
                     <div className="md:col-span-2">
@@ -1509,9 +2092,9 @@ function CreatePageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 <span className="text-rose-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">依頼事項 {isRequired('obituaryRequest') && <span className="text-rose-500">*</span>}</label>
                       <div className="relative">
-                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
+                        <select value={obituaryRequest} onChange={(e) => setObituaryRequest(e.target.value)} required={isRequired('obituaryRequest')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer pr-10">
                           <option value="">選択してください</option>
                           <option value="弔電依頼">弔電依頼</option>
                           <option value="弔電・生花依頼">弔電・生花依頼</option>
@@ -1530,24 +2113,24 @@ function CreatePageContent() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
+              <div data-field-key="description">
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">内容説明 {isRequired('description') && <span className="text-rose-500">*</span>}</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} required={isRequired('description')} rows={4} placeholder="内容を詳しく入力してください" className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500/50 outline-none leading-relaxed" />
               </div>
             </section>
 
             {mode === 'approval' && subType === '通常申請' && (
               <section className="bg-slate-950/40 border border-slate-700 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-300">
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">金額</label>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">金額 {isRequired('amount') && <span className="text-rose-500">*</span>}</label>
                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold">¥</span>
-                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required={isRequired('amount')} className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none"/>
                   </div>
                 </div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日</label>
-                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none"/>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払予定日 {isRequired('paymentDate') && <span className="text-rose-500">*</span>}</label>
+                  <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required={isRequired('paymentDate')} style={{ colorScheme: 'dark' }} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 outline-none"/>
                 </div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払先</label>
-                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl outline-none"/>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">支払先 {isRequired('payee') && <span className="text-rose-500">*</span>}</label>
+                  <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} required={isRequired('payee')} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl outline-none"/>
                 </div>
               </section>
             )}
@@ -1555,9 +2138,9 @@ function CreatePageContent() {
             {mode === 'approval' && subType === '代表者印捺印申請' && (
               <section className='space-y-6 bg-slate-950/40 border border-slate-700 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300'>
                 <div>
-                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額</label>
+                  <label className='block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2'>金額 {isRequired('amount') && <span className="text-rose-500">*</span>}</label>
                   <div className='relative'><span className='absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 font-bold'>¥</span>
-                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none' />
+                    <input type='number' value={amount} onChange={(e) => setAmount(e.target.value)} required={isRequired('amount')} className='w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-black text-cyan-400 outline-none' />
                   </div>
                 </div>
               </section>
@@ -1647,12 +2230,12 @@ function CreatePageContent() {
             )}
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-              <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考</label>
-                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
+              <div data-field-key="remarks">
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">備考 {isRequired('remarks') && <span className="text-rose-500">*</span>}</label>
+                <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} required={isRequired('remarks')} rows={3} className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 outline-none" />
               </div>
-              <div>
-                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル</label>
+              <div data-field-key="attachments">
+                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 px-1">添付ファイル {isRequired('attachments') && <span className="text-rose-500">*</span>}</label>
                 <label className="group flex flex-col items-center justify-center w-full h-32 bg-slate-950/30 border-2 border-dashed border-slate-700 rounded-2xl hover:border-indigo-500/40 cursor-pointer transition-all">
                   <Paperclip size={24} className="text-slate-600 group-hover:text-indigo-400 mb-2" />
                   <span className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">選択してアップロード</span>
@@ -1667,12 +2250,55 @@ function CreatePageContent() {
               </div>
             </div>
 
+            {getEffectiveFields(subType, customFields, hiddenDefaults).filter(f => f.custom).length > 0 && (
+              <section className="space-y-6 bg-slate-950/30 p-6 rounded-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-3 border-b border-slate-700 pb-4 mb-6">
+                  <FileText size={22} className="text-cyan-400" />
+                  <h3 className="text-lg font-bold text-slate-100">追加項目</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {getEffectiveFields(subType, customFields, hiddenDefaults).filter(f => f.custom).map(field => (
+                    <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">
+                        {field.label} {isRequired(field.key) && <span className="text-rose-500">*</span>}
+                      </label>
+                      {field.type === 'textarea' ? (
+                        <textarea
+                          value={customValues[field.key] || ''}
+                          onChange={(e) => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          required={isRequired(field.key)}
+                          rows={3}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none"
+                        />
+                      ) : field.type === 'file' ? (
+                        <FileUploadField
+                          label={field.label}
+                          file={customFiles[field.key] || null}
+                          onChange={(file) => setCustomFiles(prev => ({ ...prev, [field.key]: file }))}
+                          required={isRequired(field.key)}
+                        />
+                      ) : (
+                        <input
+                          type={field.type === 'number' ? 'number' : field.type || 'text'}
+                          value={customValues[field.key] || ''}
+                          onChange={(e) => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          required={isRequired(field.key)}
+                          style={field.type === 'date' ? { colorScheme: 'dark' } : undefined}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 outline-none"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="space-y-4">
               <h3 className="text-sm font-black text-slate-300 uppercase tracking-[0.2em] flex items-center gap-3 mb-6"><Users size={18} className="text-indigo-500" /> {mode === 'approval' ? '承認・回覧経路の設定' : '回覧先の選択'}</h3>
               <div className="bg-slate-950/40 border border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-800 shadow-lg">
                 {mode === 'approval' ? (
                   <>
-                    {currentRoute.stepOrder.map((stepKey: string) => {
+                    {currentRoute.effectiveStepOrder.map((stepKey: string) => {
                       if (stepKey === '部長') {
                         return (
                           <AccordItem key={stepKey} title="所属長 (部長承認)" count={selectedDeptHead.length} isActive={activeAccord === '所属長'} onClick={() => setActiveAccord(activeAccord === '所属長' ? '' : '所属長')}>
@@ -1724,8 +2350,11 @@ function CreatePageContent() {
               </div>
             </section>
 
-            <div className="flex gap-4 pt-6 border-t border-slate-700/80">
+            <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-slate-700/80">
               <button type="button" onClick={() => router.push('/dashboard')} className="flex-1 bg-slate-800/40 text-slate-400 font-bold py-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:text-slate-50 transition-all text-sm tracking-widest uppercase">キャンセル</button>
+              <button type="button" onClick={handleSaveDraft} disabled={loading} className="flex-1 bg-slate-700/50 text-slate-200 font-bold py-3 rounded-xl border border-slate-600/50 hover:bg-slate-700 hover:text-slate-50 transition-all text-sm tracking-widest uppercase flex items-center justify-center gap-2 disabled:opacity-50">
+                {loading ? <div className="w-4 h-4 border-2 border-slate-50/20 border-t-slate-50 rounded-full animate-spin"></div> : <><Save size={18} /> 一時保存</>}
+              </button>
               <button type="submit" disabled={loading} className="flex-[2] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-50 font-black py-4 rounded-xl shadow-lg transition-all text-base tracking-[0.2em] flex items-center justify-center gap-3 uppercase disabled:opacity-50">
                 {loading ? <div className="w-5 h-5 border-2 border-slate-50/20 border-t-slate-50 rounded-full animate-spin"></div> : <><Send size={18} /> {mode === 'approval' ? '申請を送信する' : '回覧を開始する'}</>}
               </button>

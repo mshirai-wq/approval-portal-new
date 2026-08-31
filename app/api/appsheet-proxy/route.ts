@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // 3. GASへリクエスト
-    const response = await fetch(targetUrl.toString())
+    // 3. GASへリクエスト（30秒でタイムアウト。トンネルの504を避けるため）
+    const response = await fetch(targetUrl.toString(), { signal: AbortSignal.timeout(30000) })
     const text = await response.text()
 
     let data
@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: response.status })
   } catch (error: any) {
     // 予測不能なエラーをすべてここで捕まえる
+    if (error?.name === 'AbortError' || error?.message?.includes('AbortError')) {
+      return NextResponse.json({ error: 'GAS通信がタイムアウトしました。しばらくしてからリロードしてください。' }, { status: 504 })
+    }
     return NextResponse.json({ error: `プロキシ内部エラー (GET): ${error.message}` }, { status: 500 })
   }
 }
@@ -71,6 +74,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
     })
 
     const text = await response.text()
@@ -84,6 +88,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data, { status: response.status })
   } catch (error: any) {
+    if (error?.name === 'AbortError' || error?.message?.includes('AbortError')) {
+      return NextResponse.json({ error: 'GAS通信がタイムアウトしました。しばらくしてからリロードしてください。' }, { status: 504 })
+    }
     return NextResponse.json({ error: `プロキシ内部エラー (POST): ${error.message}` }, { status: 500 })
   }
 }

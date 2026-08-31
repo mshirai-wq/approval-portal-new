@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { 
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -8,7 +8,9 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  updateProfile,
+  getIdToken
 } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
@@ -19,6 +21,7 @@ interface User {
   email: string
   title: string
   department: string
+  departments?: string[]
   canViewAllApplications?: boolean
 }
 
@@ -34,20 +37,41 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+async function syncDisplayName(firebaseUser: FirebaseUser, name: string) {
+  if (!name || !firebaseUser) return
+  try {
+    if (firebaseUser.displayName !== name) {
+      await updateProfile(firebaseUser, { displayName: name })
+    }
+    await getIdToken(firebaseUser, true)
+  } catch (error) {
+    console.error('Auth profile sync error:', error)
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const authResolved = useRef(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      authResolved.current = true
       setFirebaseUser(firebaseUser)
 
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.email!))
+          const userDoc = await Promise.race([
+            getDoc(doc(db, 'users', firebaseUser.email!)),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Firestore timeout')), 10000)
+            )
+          ])
           if (userDoc.exists()) {
-            setUser(userDoc.data() as User)
+            const userData = userDoc.data() as User
+            setUser(userData)
+            await syncDisplayName(firebaseUser, userData.name)
           } else {
             // 社員マスタに未登録の場合はサインアウトしてログイン画面へ
             setUser(null)
@@ -64,12 +88,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    // iPad Safari 等で onAuthStateChanged が発火しない場合のフォールバック
+    const timeout = setTimeout(() => {
+      if (!authResolved.current) {
+        console.warn('Auth state resolution timed out')
+        setLoading(false)
+      }
+    }, 15000)
+
+    return () => {
+      clearTimeout(timeout)
+      unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const cred = await signInWithEmailAndPassword(auth, email, password)
+      const userDoc = await getDoc(doc(db, 'users', email))
+      if (!userDoc.exists()) {
+        await firebaseSignOut(auth)
+        throw new Error('社員マスタに登録されていません。管理者にお問い合わせください。')
+      }
+      await syncDisplayName(cred.user, (userDoc.data() as User).name)
     } catch (error: any) {
       console.error('Sign in error:', error)
       throw new Error(error.message || 'ログインに失敗しました')
@@ -89,6 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('社員マスタに登録されていません。管理者にお問い合わせください。')
       }
       
+      // Sync employee master name to auth profile so Firestore rules can match token.name
+      await syncDisplayName(result.user, (userDoc.data() as User).name)
+      
       // User exists, authentication successful
     } catch (error: any) {
       console.error('Google sign in error:', error)
@@ -98,7 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string, title: string, department: string) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password)
+      const cred = await createUserWithEmailAndPassword(auth, email, password)
+      await syncDisplayName(cred.user, name)
       
       // Create user document in Firestore
       await setDoc(doc(db, 'users', email), {

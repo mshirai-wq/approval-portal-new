@@ -3,10 +3,10 @@
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, limit, getDocs, startAfter } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, updateDoc, addDoc, doc, getDoc, serverTimestamp, limit, getDocs, startAfter, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { getInformations, confirmInformation, getExpenses, Information as AppSheetInformation, Expense } from '@/lib/appsheet'
-import { Search, Printer, FileText } from 'lucide-react'
+import { Search, Printer, FileText, Trash2 } from 'lucide-react'
 
 // 型定義の拡張
 interface Application {
@@ -36,6 +36,7 @@ interface Application {
     allCirculators?: string[]
     steps?: Record<string, any>
     circulations?: string[]
+    confirmedBy?: string[]
     stepOrder?: string[]
     decisionMaker?: string
   }
@@ -44,6 +45,52 @@ interface Application {
 
 function isApplication(app: Application | AppSheetInformation | null): app is Application {
   return app !== null && 'workflow' in app;
+}
+
+// 空白/全角空白の差や重複を吸収するための正規化
+function normalizeName(name: string): string {
+  return name.replace(/[\s\u3000]+/g, '').trim()
+}
+
+function getEffectiveStatus(app: Application): string {
+  const status = app.workflow.status
+  if (status === '下書き' || status === '取り消し') return status
+  if (app.appName !== '回覧報告') return status
+  const members: string[] =
+    (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
+    (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
+    app.workflow.steps?.['回覧先']?.approvers || []
+  if (members.length === 0) {
+    if (status === '承認済み') return '回覧待ち'
+    return status
+  }
+  const confirmed = new Set<string>([
+    ...(app.workflow.confirmedBy || []),
+    ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
+  ])
+  const confirmedNorm = new Set(Array.from(confirmed).map(normalizeName))
+  return members.length > 0 && members.every(m => confirmedNorm.has(normalizeName(m)))
+    ? '回覧済み'
+    : '回覧待ち'
+}
+
+function getEffectiveStepStatus(app: Application, stepKey: string, status: string): string {
+  if (app.subType === '出張旅費申請' && stepKey === '総務管理本部' && status === '回覧待ち') {
+    return '承認待ち'
+  }
+  return status
+}
+
+function isPostDecisionCirculationStep(app: Application, userName?: string): boolean {
+  if (app.appName === '回覧報告' || !userName) return false
+  const userNorm = normalizeName(userName)
+  const steps = app.workflow.steps || {}
+  const currentStep = app.workflow.currentStep
+  const stepData = steps[currentStep]
+  const stepStatus = getEffectiveStepStatus(app, currentStep, stepData?.status || '')
+  return stepStatus === '回覧待ち' &&
+    ((stepData?.approvers || []).some((a: string) => normalizeName(a) === userNorm) ||
+      (app.workflow.currentApprovers || []).some((a: string) => normalizeName(a) === userNorm))
 }
 
 const EXCLUDED_FORM_KEYS = new Set(['description', 'remarks', 'imageUrl', 'imageUrls'])
@@ -112,6 +159,16 @@ const FORM_DETAIL_LABELS: Record<string, string> = {
   accommodationTotal: '宿泊費合計',
   dailyAllowanceTotal: '日当合計',
   tripTotal: '出張旅費合計',
+  tripDetails: '出張旅費明細',
+  startDate: '出張開始日',
+  endDate: '出張終了日',
+  transport: '利用交通機関・料金',
+  method: '交通機関',
+  accommodationNights: '宿泊日数',
+  accommodationUnitPrice: '宿泊単価',
+  businessHours: '業務対応時間',
+  dailyAllowanceDays: '日当（日数）',
+  dailyAllowanceUnitPrice: '日当単価',
   leaseClassification: '分類',
   leaseVendor: '業者',
   leaseOtherVendor: '業者名（その他）',
@@ -122,7 +179,10 @@ const FORM_DETAIL_LABELS: Record<string, string> = {
   leaseTerm: '期間',
   leaseDeliveryDate: '納車希望日',
   leaseExpiryDate: '期間満了日',
-  leaseMileage: '走行距離'
+  leaseMileage: '走行距離',
+  name: '業者名',
+  bid1: '第1回入札金額',
+  bid2: '第2回入札金額'
 }
 
 function isCurrencyField(key: string): boolean {
@@ -134,6 +194,16 @@ function formatFormValue(key: string, value: unknown): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return ''
     if (typeof value[0] === 'string' || typeof value[0] === 'number') return value.join(', ')
+    if (typeof value[0] === 'object' && value[0] !== null && !Array.isArray(value[0])) {
+      const lines = value.map((item, i) => {
+        const parts = Object.entries(item)
+          .filter(([_, v]) => v !== '' && v !== null && v !== undefined)
+          .map(([k, v]) => `${FORM_DETAIL_LABELS[k] || k}: ${formatFormValue(k, v)}`)
+          .join(', ')
+        return parts ? `(${i + 1}) ${parts}` : ''
+      }).filter(line => line !== '')
+      return lines.length > 0 ? lines.join('\n') : ''
+    }
     return value.map((item, i) => `(${i + 1}) ${JSON.stringify(item)}`).join('\n')
   }
   if (typeof value === 'object') return ''
@@ -238,9 +308,12 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
   const classes =
     status === '承認待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
     status === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+    status === '回覧待ち' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+    status === '回覧済み' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
     status === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
     status === '取り消し' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
     status === '未確認' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+    status === '下書き' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
     'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border whitespace-nowrap shrink-0 ${classes} ${className}`}>
@@ -253,10 +326,12 @@ function ApplicationList({
   applications,
   onItemClick,
   showApplicant = false,
+  onDelete,
 }: {
   applications: Application[]
   onItemClick: (app: Application) => void
   showApplicant?: boolean
+  onDelete?: (app: Application) => void
 }) {
   return (
     <div className="space-y-3">
@@ -269,12 +344,29 @@ function ApplicationList({
           <div className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-200 break-words leading-snug flex-1 min-w-0">{app.title}</h3>
-              <span className="text-xs text-slate-500 font-mono shrink-0 whitespace-nowrap">#{app.applicationNo ?? '-'}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (window.confirm('下書きを削除しますか？削除したデータは元に戻せません。')) {
+                        onDelete(app)
+                      }
+                    }}
+                    className="p-1.5 rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
+                    title="削除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                <span className="text-xs text-slate-500 font-mono whitespace-nowrap">#{app.applicationNo ?? '-'}</span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400 mt-1">
               {showApplicant && <span className="break-words max-w-full text-slate-300">{app.applicantName}</span>}
               <span className="break-words">{app.subType}</span>
-              <StatusBadge status={app.workflow.status} />
+              <StatusBadge status={getEffectiveStatus(app)} />
               <span className="ml-auto whitespace-nowrap text-slate-500">{app.createdAt ? new Date(app.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}</span>
             </div>
           </div>
@@ -292,6 +384,7 @@ function ApplicationAccordion({
   loading,
   applications,
   onItemClick,
+  onDelete,
   emptyMessage,
   showCount = false
 }: {
@@ -302,6 +395,7 @@ function ApplicationAccordion({
   loading: boolean
   applications: Application[]
   onItemClick: (app: Application) => void
+  onDelete?: (app: Application) => void
   emptyMessage: string
   showCount?: boolean
 }) {
@@ -337,7 +431,7 @@ function ApplicationAccordion({
               {emptyMessage}
             </div>
           ) : (
-            <ApplicationList applications={applications} onItemClick={onItemClick} />
+            <ApplicationList applications={applications} onItemClick={onItemClick} onDelete={onDelete} />
           )}
         </div>
       )}
@@ -373,17 +467,31 @@ export default function DashboardPage() {
   const [completedApplications, setCompletedApplications] = useState<Application[]>([])
   const [completedAppsOpen, setCompletedAppsOpen] = useState(false)
   const [loadingCompletedApps, setLoadingCompletedApps] = useState(false)
+  const [draftApplications, setDraftApplications] = useState<Application[]>([])
+  const [draftAppsOpen, setDraftAppsOpen] = useState(false)
+  const [loadingDraftApps, setLoadingDraftApps] = useState(false)
   const [confirmedAppIds, setConfirmedAppIds] = useState<string[]>([])
   const [informations, setInformations] = useState<AppSheetInformation[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   
   const [selectedApplication, setSelectedApplication] = useState<Application | AppSheetInformation | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'information' | null>(null)
+  const [modalSource, setModalSource] = useState<'pending' | 'circulation' | 'sent' | 'processed' | 'information' | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
+  const [circulationHistory, setCirculationHistory] = useState<any[]>([])
+  const [showCommentedCirculationsOnly, setShowCommentedCirculationsOnly] = useState(true)
+  const [circulationComment, setCirculationComment] = useState('')
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   const [approvalTab, setApprovalTab] = useState<'pending' | 'circulation'>('pending')
+
+  const [processedAppsOpen, setProcessedAppsOpen] = useState(false)
+  const [processedTab, setProcessedTab] = useState<'approval' | 'circulation'>('approval')
+  const [processedApprovals, setProcessedApprovals] = useState<Application[]>([])
+  const [processedCirculations, setProcessedCirculations] = useState<Application[]>([])
+  const [loadingProcessedApprovals, setLoadingProcessedApprovals] = useState(false)
+  const [loadingProcessedCirculations, setLoadingProcessedCirculations] = useState(false)
+  const userNameCache = useRef<Record<string, string> | null>(null)
 
   const circulations = useMemo(() => {
     return rawCirculations.filter(app => !confirmedAppIds.includes(app.id))
@@ -433,6 +541,40 @@ export default function DashboardPage() {
       setApprovalHistory(history)
     }, (error) => {
       console.error('Error fetching approval history:', error)
+    })
+
+    return () => unsubscribe()
+  }, [selectedApplication])
+
+  // 回覧確認履歴を取得
+  useEffect(() => {
+    if (!selectedApplication) {
+      setCirculationHistory([])
+      return
+    }
+
+    const circulationsQuery = query(
+      collection(db, 'circulations'),
+      where('applicationId', '==', selectedApplication.id)
+    )
+
+    const toMs = (value: any) => {
+      if (!value) return 0
+      if (typeof value.toDate === 'function') return value.toDate().getTime()
+      if (value instanceof Date) return value.getTime()
+      return new Date(value).getTime() || 0
+    }
+
+    const unsubscribe = onSnapshot(circulationsQuery, (snapshot) => {
+      const history = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .sort((a: any, b: any) => toMs(a.confirmedAt) - toMs(b.confirmedAt))
+      setCirculationHistory(history)
+    }, (error) => {
+      console.error('Error fetching circulation history:', error)
     })
 
     return () => unsubscribe()
@@ -491,26 +633,28 @@ export default function DashboardPage() {
       } as Application))
 
       const filtered = apps.filter(app => {
-        const status = app.workflow.status
-        const currentStep = app.workflow.currentStep
-        const steps = app.workflow.steps || {}
-        const stepData = currentStep ? steps[currentStep] : null
-        const circulationsList = app.workflow.circulations || []
-        const allCirculators = app.workflow.allCirculators || []
+        const status = getEffectiveStatus(app)
 
         // 承認段階（承認待ち）の申請は回覧一覧に出さない
         // 自分が承認者の場合は承認待ち一覧で表示される
         if (status === '承認待ち') return false
 
-        // 回覧段階： currentStep が回覧ステップで、自分がその回覧対象になっている場合
+        // 回覧段階：自分がその回覧対象になっている場合
         if (status === '回覧待ち') {
-          const currentApprovers = app.workflow.currentApprovers || (stepData?.approvers || [])
-          return currentApprovers.includes(user.name) || (stepData?.approvers || []).includes(user.name)
-        }
-
-        // 全承認完了後や回覧報告： circulations / allCirculators に自分が含まれる
-        if (status === '承認済み') {
-          return circulationsList.includes(user.name) || allCirculators.includes(user.name)
+          if (app.appName === '回覧報告') {
+            const members =
+              (app.workflow.circulations?.length ? app.workflow.circulations : undefined) ||
+              (app.workflow.allCirculators?.length ? app.workflow.allCirculators : undefined) ||
+              app.workflow.steps?.['回覧先']?.approvers || []
+            return members.includes(user.name)
+          }
+          // 稟議の場合は現在のステップの currentApprovers / 承認者リストを回覧対象とする
+          const currentStep = app.workflow.currentStep
+          const stepData = currentStep ? app.workflow.steps?.[currentStep] : null
+          const members = app.workflow.currentApprovers?.length
+            ? app.workflow.currentApprovers
+            : (stepData?.approvers || [])
+          return members.includes(user.name)
         }
 
         return false
@@ -540,13 +684,14 @@ export default function DashboardPage() {
     const loadExpenses = async () => {
       if (!user?.email) return
       try {
-        const exps = await getExpenses(undefined)
+        // 経費一覧ページと同じ条件で取得（承認待ち＆自分宛て）
+        const exps = await getExpenses('承認待ち', user.email)
         // フロントエンドで承認待ちかつ自分宛てのデータをフィルタリング
         const filtered = exps.filter(exp => {
           const status = (exp.承認ステータス || '').trim()
           const approverEmail = (exp.承認者メールアドレス || '').trim().toLowerCase()
           const myEmail = user.email.trim().toLowerCase()
-          return status === '承認待ち' && approverEmail === myEmail
+          return status === '承認待ち' && approverEmail.includes(myEmail)
         })
         setExpenses(filtered)
       } catch (error) {
@@ -576,10 +721,12 @@ export default function DashboardPage() {
     router.push('/admin/users')
   }
 
-  const handleApplicationClick = (app: Application, source: 'pending' | 'circulation' | 'sent') => {
+  const handleApplicationClick = (app: Application, source: 'pending' | 'circulation' | 'sent' | 'processed') => {
     setSelectedApplication(app)
     setShowDetailModal(true)
     setModalSource(source)
+    setCirculationComment('')
+    setShowCommentedCirculationsOnly(true)
   }
 
   const fetchMyApplications = useCallback(async (page: number) => {
@@ -610,7 +757,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setMyApplications(apps)
+      setMyApplications(apps.filter(app => app.workflow.status !== '下書き'))
       if (docs.length >= 30) {
         myAppsCursorsRef.current[page - 1] = docs[29]
       }
@@ -619,6 +766,49 @@ export default function DashboardPage() {
       console.error('Error fetching my applications:', error)
     } finally {
       setLoadingMyApps(false)
+    }
+  }, [user])
+
+  const fetchDraftApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingDraftApps(true)
+    try {
+      const q = query(
+        collection(db, 'applications'),
+        where('applicantId', '==', user?.id || user?.email),
+        orderBy('createdAt', 'desc'),
+        limit(31)
+      )
+      const snapshot = await getDocs(q)
+      const docs = snapshot.docs
+      const apps = docs.slice(0, 30).map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Application))
+      setDraftApplications(apps.filter(app => app.workflow.status === '下書き'))
+    } catch (error) {
+      console.error('Error fetching draft applications:', error)
+    } finally {
+      setLoadingDraftApps(false)
+    }
+  }, [user])
+
+  const handleDeleteDraft = useCallback(async (app: Application) => {
+    if (!user) return
+    if (app.applicantId !== user.id && app.applicantId !== user.email) {
+      alert('削除権限がありません')
+      return
+    }
+    if (app.workflow.status !== '下書き') {
+      alert('下書き状態の申請のみ削除できます')
+      return
+    }
+    try {
+      await deleteDoc(doc(db, 'applications', app.id))
+      setDraftApplications(prev => prev.filter(a => a.id !== app.id))
+    } catch (error) {
+      console.error('Error deleting draft application:', error)
+      alert('削除に失敗しました')
     }
   }, [user])
 
@@ -663,9 +853,10 @@ export default function DashboardPage() {
   const visibleAllApplications = useMemo(() => {
     if (!user) return []
     const q = allAppsSearchQuery.trim()
-    if (!q) return allApplications
+    const nonDraft = allApplications.filter(app => app.workflow.status !== '下書き')
+    if (!q) return nonDraft
     const lowerQ = q.toLowerCase()
-    return allApplications.filter(app => {
+    return nonDraft.filter(app => {
       const idMatch = app.applicationNo ? String(app.applicationNo).includes(q) : false
       return (
         idMatch ||
@@ -714,7 +905,7 @@ export default function DashboardPage() {
         id: doc.id,
         ...doc.data()
       } as Application))
-      setCompletedApplications(apps.filter(app => app.workflow.status === '承認済み'))
+      setCompletedApplications(apps.filter(app => ['承認済み', '回覧済み'].includes(getEffectiveStatus(app))))
     } catch (error) {
       console.error('Error fetching completed applications:', error)
     } finally {
@@ -722,11 +913,134 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  const getTimestampMs = useCallback((value: any): number => {
+    if (!value) return 0
+    if (typeof value.toDate === 'function') return value.toDate().getTime()
+    if (value instanceof Date) return value.getTime()
+    return new Date(value).getTime() || 0
+  }, [])
+
+  const fetchProcessedApplications = useCallback(async () => {
+    if (!user) return
+    setLoadingProcessedApprovals(true)
+    try {
+      let approvalDocs: any[] = []
+      try {
+        const q = query(
+          collection(db, 'approvals'),
+          where('approverId', '==', user.id),
+          orderBy('createdAt', 'desc'),
+          limit(50)
+        )
+        const snapshot = await getDocs(q)
+        approvalDocs = snapshot.docs
+      } catch (queryError) {
+        console.warn('approval collection query failed (missing index?), falling back to document scan:', queryError)
+      }
+      const appIds = Array.from(new Set(approvalDocs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      const apps = await Promise.all(appIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'applications', id))
+        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
+      }))
+      const appMap = new Map<string, Application>()
+      apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
+
+      // 古い申請では approvals コレクション未作成の場合があるため、ステップの approvedBy からも補完する
+      try {
+        const allAppsQuery = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          limit(300)
+        )
+        const allAppsSnap = await getDocs(allAppsQuery)
+        allAppsSnap.docs.forEach(docSnap => {
+          const app = { id: docSnap.id, ...docSnap.data() } as Application
+          if (app.appName === '回覧報告') return
+          if (appMap.has(app.id)) return
+          const steps = app.workflow.steps || {}
+          const acted = Object.values(steps).some((step: any) =>
+            (step?.approvedBy || []).includes(user.name) || (step?.approvedBy || []).includes(user.id)
+          )
+          if (acted) appMap.set(app.id, app)
+        })
+      } catch (scanError) {
+        console.error('Error scanning applications for processed approvals:', scanError)
+      }
+
+      setProcessedApprovals(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
+    } catch (error) {
+      console.error('Error fetching processed approvals:', error)
+    } finally {
+      setLoadingProcessedApprovals(false)
+    }
+  }, [user, getTimestampMs])
+
+  const fetchProcessedCirculations = useCallback(async () => {
+    if (!user) return
+    setLoadingProcessedCirculations(true)
+    try {
+      let circulationDocs: any[] = []
+      try {
+        const q = query(
+          collection(db, 'circulations'),
+          where('userId', '==', user.id),
+          orderBy('confirmedAt', 'desc'),
+          limit(50)
+        )
+        const snapshot = await getDocs(q)
+        circulationDocs = snapshot.docs
+      } catch (queryError) {
+        console.warn('circulation collection query failed (missing index?), falling back to document scan:', queryError)
+      }
+      const appIds = Array.from(new Set(circulationDocs.map(d => d.data().applicationId).filter((id): id is string => typeof id === 'string' && id.length > 0)))
+      const apps = await Promise.all(appIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'applications', id))
+        return snap.exists() ? ({ id: snap.id, ...snap.data() } as Application) : null
+      }))
+      const appMap = new Map<string, Application>()
+      apps.filter((a): a is Application => a !== null).forEach(app => appMap.set(app.id, app))
+
+      // 古い回覧報告で circulations コレクション未作成の場合を補完する
+      try {
+        const allAppsQuery = query(
+          collection(db, 'applications'),
+          orderBy('createdAt', 'desc'),
+          limit(300)
+        )
+        const allAppsSnap = await getDocs(allAppsQuery)
+        allAppsSnap.docs.forEach(docSnap => {
+          const app = { id: docSnap.id, ...docSnap.data() } as Application
+          if (app.appName !== '回覧報告') return
+          if (appMap.has(app.id)) return
+          const confirmed = new Set([
+            ...(app.workflow.confirmedBy || []),
+            ...(app.workflow.steps?.['回覧先']?.approvedBy || [])
+          ])
+          if (confirmed.has(user.name) || confirmed.has(user.id)) appMap.set(app.id, app)
+        })
+      } catch (scanError) {
+        console.error('Error scanning applications for processed circulations:', scanError)
+      }
+
+      setProcessedCirculations(Array.from(appMap.values()).sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt)))
+    } catch (error) {
+      console.error('Error fetching processed circulations:', error)
+    } finally {
+      setLoadingProcessedCirculations(false)
+    }
+  }, [user, getTimestampMs])
+
   // 送信一覧の遅延読み込み
   useEffect(() => {
     if (!sendHistoryOpen) return
     fetchMyApplications(myAppsPage)
   }, [sendHistoryOpen, myAppsPage, fetchMyApplications])
+
+  // 下書き一覧の遅延読み込み
+  useEffect(() => {
+    if (!draftAppsOpen) return
+    fetchDraftApplications()
+  }, [draftAppsOpen, fetchDraftApplications])
 
   // 全社員申請一覧の遅延読み込み + 30秒おきの自動更新
   useEffect(() => {
@@ -749,10 +1063,19 @@ export default function DashboardPage() {
     fetchCompletedApplications()
   }, [completedAppsOpen, fetchCompletedApplications])
 
+  // 自分が承認・回覧を完了した申請の遅延読み込み
+  useEffect(() => {
+    if (!processedAppsOpen) return
+    fetchProcessedApplications()
+    fetchProcessedCirculations()
+  }, [processedAppsOpen, fetchProcessedApplications, fetchProcessedCirculations])
+
   const handleInformationClick = (info: AppSheetInformation) => {
     setSelectedApplication(info)
     setShowDetailModal(true)
     setModalSource('information')
+    setCirculationComment('')
+    setShowCommentedCirculationsOnly(true)
   }
 
   const handleApproval = async (action: 'approve' | 'reject', comment: string) => {
@@ -780,15 +1103,17 @@ export default function DashboardPage() {
         didAdvance = true
         let currentIndex = stepNames.indexOf(currentStepName)
 
+        const applicantName = selectedApplication.applicantName || ''
         while (currentIndex !== -1 && currentIndex < stepNames.length - 1) {
           currentIndex++
           const candidateStep = stepNames[currentIndex]
           const candidateApprovers = steps[candidateStep]?.approvers || []
+          const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
 
-          if (candidateApprovers.length > 0) {
+          if (!shouldSkip) {
             nextStepName = candidateStep
             nextApprovers = candidateApprovers
-            nextStatus = steps[candidateStep]?.status === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
             break
           } else {
             skippedSteps.push(candidateStep)
@@ -856,10 +1181,87 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Approval error:', error)
       alert('処理に失敗しました')
+    }
+  }
+
+  const handleSkip = async (comment: string) => {
+    if (!selectedApplication || !isApplication(selectedApplication) || !user) return
+    try {
+      const workflow = selectedApplication.workflow
+      const steps = workflow.steps || {}
+      const stepNames = workflow.stepOrder || Object.keys(steps)
+      const currentStepName = workflow.currentStep
+      const currentIndex = stepNames.indexOf(currentStepName)
+      if (currentIndex === -1) throw new Error('current step not found')
+
+      let nextStepName = currentStepName
+      let nextApprovers: string[] = []
+      let nextStatus = workflow.status
+      let didAdvance = false
+      const skippedSteps: string[] = [currentStepName]
+
+      const applicantName = selectedApplication.applicantName || ''
+      for (let i = currentIndex + 1; i < stepNames.length; i++) {
+        const candidateStep = stepNames[i]
+        const candidateApprovers = steps[candidateStep]?.approvers || []
+        const shouldSkip = candidateApprovers.length === 0 || candidateApprovers.every((a: string) => a === applicantName)
+        if (!shouldSkip) {
+          nextStepName = candidateStep
+          nextApprovers = candidateApprovers
+          nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
+          didAdvance = true
+          break
+        } else {
+          skippedSteps.push(candidateStep)
+        }
+      }
+
+      if (!didAdvance) {
+        nextStepName = '完了'
+        nextStatus = '承認済み'
+        nextApprovers = []
+      }
+
+      const updateData: any = {
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStepName,
+        'workflow.currentApprovers': nextApprovers,
+        updatedAt: serverTimestamp()
+      }
+
+      skippedSteps.forEach(step => {
+        updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
+      })
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+
+      await addDoc(collection(db, 'approvals'), {
+        applicationId: selectedApplication.id,
+        stepName: currentStepName,
+        approverId: user.id,
+        approverName: user.name,
+        action: 'skip',
+        comment,
+        createdAt: serverTimestamp()
+      })
+
+      if (nextApprovers.length > 0) {
+        await sendApprovalNotification(selectedApplication, user.name, nextApprovers)
+      } else if (nextStatus === '承認済み') {
+        await sendFinalApprovalNotification(selectedApplication)
+      }
+
+      setShowDetailModal(false)
+      setSelectedApplication(null)
+      setModalSource(null)
+
+    } catch (error) {
+      console.error('Skip error:', error)
+      alert('スキップに失敗しました')
     }
   }
 
@@ -870,15 +1272,52 @@ export default function DashboardPage() {
       const currentStep = workflow.currentStep
       const steps = workflow.steps || {}
       const originalApprovers = steps[currentStep]?.approvers || []
+      const isDeptHeadResubmit = currentStep === '部長' && user?.title === '部長' && selectedApplication.applicantTitle === '部長'
+
+      let nextStep = currentStep
+      let nextApprovers = originalApprovers
+      let nextStatus = '承認待ち'
+      const skippedSteps: string[] = []
+
+      if (isDeptHeadResubmit) {
+        const stepNames = workflow.stepOrder || Object.keys(steps)
+        const currentIndex = stepNames.indexOf(currentStep)
+        if (currentIndex !== -1) {
+          for (let i = currentIndex + 1; i < stepNames.length; i++) {
+            const candidateStep = stepNames[i]
+            const candidateApprovers = steps[candidateStep]?.approvers || []
+            if (candidateApprovers.length > 0) {
+              nextStep = candidateStep
+              nextApprovers = candidateApprovers
+              nextStatus = getEffectiveStepStatus(selectedApplication, candidateStep, steps[candidateStep]?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
+              break
+            } else {
+              skippedSteps.push(candidateStep)
+            }
+          }
+          if (nextStep === currentStep) {
+            nextStep = '完了'
+            nextStatus = '承認済み'
+            nextApprovers = []
+          }
+        }
+      }
 
       const updateData: any = {
-        'workflow.status': '承認待ち',
-        'workflow.currentApprovers': originalApprovers,
-        [`workflow.steps.${currentStep}.status`]: '承認待ち',
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStep,
+        'workflow.currentApprovers': nextApprovers,
+        [`workflow.steps.${currentStep}.status`]: isDeptHeadResubmit ? '承認済み(スキップ)' : '承認待ち',
         [`workflow.steps.${currentStep}.approvedBy`]: [],
         'description': newDescription,
         'remarks': newRemarks,
         updatedAt: serverTimestamp()
+      }
+
+      if (isDeptHeadResubmit && skippedSteps.length > 0) {
+        skippedSteps.forEach(step => {
+          updateData[`workflow.steps.${step}.status`] = '承認済み(スキップ)'
+        })
       }
 
       if (selectedApplication.formDetails) {
@@ -899,15 +1338,23 @@ export default function DashboardPage() {
         createdAt: serverTimestamp()
       })
 
-      if (originalApprovers.length > 0) {
-        await sendResubmitNotification(selectedApplication, user.name, originalApprovers)
+      if (nextApprovers.length > 0) {
+        await sendResubmitNotification(selectedApplication, user.name, nextApprovers)
+      } else if (nextStatus === '承認済み') {
+        await sendFinalApprovalNotification(selectedApplication)
       }
 
       alert('修正して再申請しました。差し戻し元から処理を再開します。')
+
+      const resubmittedId = selectedApplication.id
+      setMyApplications(prev => prev.map(app => app.id === resubmittedId ? { ...app, workflow: { ...app.workflow, status: nextStatus, currentStep: nextStep, currentApprovers: nextApprovers } } : app))
+      setAllApplications(prev => prev.map(app => app.id === resubmittedId ? { ...app, workflow: { ...app.workflow, status: nextStatus, currentStep: nextStep, currentApprovers: nextApprovers } } : app))
+      setRejectedApplications(prev => prev.filter(app => app.id !== resubmittedId))
+
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Resubmit error:', error)
       alert('再申請に失敗しました')
@@ -1103,20 +1550,144 @@ export default function DashboardPage() {
     return emails
   }
 
-  const handleCirculation = async () => {
+  const handleCirculation = async (comment: string = '') => {
     if (!selectedApplication || !isApplication(selectedApplication) || !user) return
     try {
-      await addDoc(collection(db, 'circulations'), {
-        applicationId: selectedApplication.id,
-        userId: user.id,
-        userName: user.name,
-        confirmedAt: serverTimestamp()
-      })
-      alert('回覧を確認しました')
+      const isReport = selectedApplication.appName === '回覧報告'
+      const workflow = selectedApplication.workflow
+      const currentStep = workflow.currentStep || '回覧先'
+      const steps = workflow.steps || {}
+      const stepOrder = workflow.stepOrder || Object.keys(steps)
+      const circulationsList = workflow.circulations || []
+      const allCirculatorsList = workflow.allCirculators || []
+      const confirmedByList = workflow.confirmedBy || []
+      const currentApproversList = workflow.currentApprovers || []
+      const stepData = steps[currentStep] || { approvers: circulationsList, approvedBy: confirmedByList, status: '' }
+
+      // 社員マスタの現在の名前を正規化して、削除済み/重複社員が残った申請を補正する
+      if (userNameCache.current === null) {
+        const snap = await getDocs(collection(db, 'users'))
+        const map: Record<string, string> = {}
+        snap.docs.forEach(d => {
+          const u = d.data() as { name?: string }
+          if (u.name) map[normalizeName(u.name)] = u.name
+        })
+        userNameCache.current = map
+      }
+      const canonicalize = (name: string) => userNameCache.current![normalizeName(name)] || name
+
+      const rawApprovers: string[] = stepData.approvers?.length
+        ? stepData.approvers
+        : circulationsList.length
+        ? circulationsList
+        : allCirculatorsList.length
+        ? allCirculatorsList
+        : currentApproversList.length
+        ? currentApproversList
+        : []
+      const allApprovers: string[] = Array.from(new Set(rawApprovers.map(canonicalize)))
+      const rawApprovedBy: string[] = stepData.approvedBy !== undefined ? stepData.approvedBy : confirmedByList
+      const approvedBy: string[] = Array.from(new Set(rawApprovedBy.map(canonicalize)))
+
+      const userName = canonicalize(user.name)
+      const userNorm = normalizeName(userName)
+      const isUserApprover = allApprovers.some(name => normalizeName(name) === userNorm)
+      if (!isUserApprover) {
+        alert('回覧対象者ではないため確認できません')
+        return
+      }
+
+      const approvedByNorm = new Set(approvedBy.map(normalizeName))
+      const alreadyConfirmed = approvedByNorm.has(userNorm)
+      const newApprovedBy = alreadyConfirmed
+        ? approvedBy
+        : Array.from(new Set([...approvedBy, userName]))
+      const newApprovedByNorm = new Set(newApprovedBy.map(normalizeName))
+
+      const allApproved = allApprovers.length > 0 && allApprovers.every(name => newApprovedByNorm.has(normalizeName(name)))
+      const completedStatus = isReport ? '回覧済み' : '承認済み'
+
+      // 削除済み/重複社員が解消されたことで全員確認済みになった場合も再実行を許可
+      if (alreadyConfirmed && !allApproved) {
+        alert('既に回覧を確認済みです')
+        return
+      }
+
+      let nextStepName = currentStep
+      let nextStatus = workflow.status
+      let nextApprovers = allApprovers.filter(name => !newApprovedByNorm.has(normalizeName(name)))
+      const nextStepStatus = allApproved ? completedStatus : '回覧待ち'
+
+      if (allApproved) {
+        const applicantName = selectedApplication.applicantName || ''
+        const currentIndex = stepOrder.indexOf(currentStep)
+        let advanced = false
+        for (let i = currentIndex + 1; i < stepOrder.length; i++) {
+          const candidate = stepOrder[i]
+          const candidateStepData = steps[candidate]
+          const candidateApproversRaw: string[] = (candidateStepData?.approvers || []) as string[]
+          const candidateApprovedByRaw: string[] = (candidateStepData?.approvedBy || []) as string[]
+          const shouldSkip = candidateApproversRaw.length === 0 || candidateApproversRaw.every((a: string) => a === applicantName)
+          if (!shouldSkip) {
+            nextStepName = candidate
+            const candidateApprovers = Array.from(new Set(candidateApproversRaw.map(canonicalize)))
+            const candidateApprovedBy = Array.from(new Set(candidateApprovedByRaw.map(canonicalize)))
+            const candidateApprovedByNorm = new Set(candidateApprovedBy.map(normalizeName))
+            nextApprovers = candidateApprovers.filter((a: string) => !candidateApprovedByNorm.has(normalizeName(a)))
+            nextStatus = getEffectiveStepStatus(selectedApplication, candidate, candidateStepData?.status || '') === '回覧待ち' ? '回覧待ち' : '承認待ち'
+            advanced = true
+            break
+          }
+        }
+        if (!advanced) {
+          nextStepName = '完了'
+          nextStatus = isReport ? '回覧済み' : '承認済み'
+          nextApprovers = []
+        }
+      }
+
+      const updateData: any = {
+        'workflow.status': nextStatus,
+        'workflow.currentStep': nextStepName,
+        'workflow.currentApprovers': nextApprovers,
+        'workflow.confirmedBy': newApprovedBy,
+        updatedAt: serverTimestamp()
+      }
+      if (isReport) {
+        updateData['workflow.circulations'] = allApprovers
+      }
+      if (currentStep && steps[currentStep]) {
+        updateData[`workflow.steps.${currentStep}.approvers`] = allApprovers
+        updateData[`workflow.steps.${currentStep}.approvedBy`] = newApprovedBy
+        updateData[`workflow.steps.${currentStep}.status`] = nextStepStatus
+      }
+
+      await updateDoc(doc(db, 'applications', selectedApplication.id), updateData)
+
+      if (!alreadyConfirmed) {
+        await addDoc(collection(db, 'circulations'), {
+          applicationId: selectedApplication.id,
+          userId: user.id,
+          userName: user.name,
+          comment: comment || null,
+          confirmedAt: serverTimestamp()
+        })
+      }
+
+      alert(
+        allApproved
+          ? isReport
+            ? '全員の回覧が完了しました'
+            : nextStepName === '完了'
+            ? '承認が完了しました'
+            : '次の確認ステップに進みました'
+          : '回覧を確認しました'
+      )
+      setCirculationComment('')
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-      window.location.reload()
+
     } catch (error) {
       console.error('Circulation error:', error)
       alert('処理に失敗しました')
@@ -1132,11 +1703,16 @@ export default function DashboardPage() {
       setShowDetailModal(false)
       setSelectedApplication(null)
       setModalSource(null)
-
-      window.location.reload()
     } catch (error) {
       console.error('Information confirm error:', error)
       alert('処理に失敗しました')
+      return
+    }
+
+    try {
+      await loadInformations()
+    } catch (e) {
+      console.error('Failed to refresh informations:', e)
     }
   }
 
@@ -1146,8 +1722,12 @@ export default function DashboardPage() {
       alert('申請者のみ取消できます')
       return
     }
-    if (selectedApplication.workflow.status === '承認済み') {
-      alert('承認済みの申請は取消できません')
+    if (selectedApplication.workflow.status === '取り消し') {
+      alert('既に取り消し済みです')
+      return
+    }
+    if (selectedApplication.appName !== '回覧報告' && ['承認済み', '回覧済み'].includes(selectedApplication.workflow.status)) {
+      alert('完了済みの申請は取消できません')
       return
     }
     if (!window.confirm('この申請を取り消しますか？')) return
@@ -1173,7 +1753,7 @@ export default function DashboardPage() {
       setSelectedApplication(null)
       setModalSource(null)
       alert('申請を取り消しました')
-      window.location.reload()
+
     } catch (error) {
       console.error('Delete application error:', error)
       alert('取消に失敗しました')
@@ -1247,12 +1827,20 @@ export default function DashboardPage() {
           </h1>
           <div className="flex items-center gap-6">
             {user?.email === 'm.shirai@yunia.co.jp' && (
-              <button
-                onClick={handleAdminUsers}
-                className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
-              >
-                社員マスタ管理
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAdminUsers}
+                  className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                >
+                  社員マスタ管理
+                </button>
+                <button
+                  onClick={() => router.push('/admin/field-settings')}
+                  className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors border border-cyan-500/20 px-3 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                >
+                  必須項目設定
+                </button>
+              </div>
             )}
             <span className="text-sm text-slate-300 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
               <strong className="text-slate-200 font-semibold">{user.name}</strong> 
@@ -1322,6 +1910,19 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            <ApplicationAccordion
+              title="下書き"
+              subtitle="（保存中の申請・回覧報告）"
+              isOpen={draftAppsOpen}
+              onToggle={() => setDraftAppsOpen(prev => !prev)}
+              loading={loadingDraftApps}
+              applications={draftApplications}
+              onItemClick={(app) => router.push('/create?draft=' + app.id)}
+              onDelete={handleDeleteDraft}
+              emptyMessage="下書きはありません"
+              showCount
+            />
 
             <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               <button
@@ -1443,6 +2044,68 @@ export default function DashboardPage() {
               onItemClick={(app) => handleApplicationClick(app, 'sent')}
               emptyMessage="承認完了した申請はありません"
             />
+
+            <div className="bg-slate-900/60 border border-slate-700/80 rounded-xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+              <button
+                type="button"
+                onClick={() => setProcessedAppsOpen(prev => !prev)}
+                className="w-full flex justify-between items-center group"
+                aria-expanded={processedAppsOpen}
+              >
+                <h2 className="text-lg font-bold text-slate-200 tracking-wide flex items-center gap-2">
+                  <span>✅</span> 承認・回覧済みの申請 <span className="text-sm font-normal text-slate-500">（自分が承認または回覧を確認した申請）</span>
+                </h2>
+                <span className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${processedAppsOpen ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </button>
+              {processedAppsOpen && (
+                <div className="mt-4 space-y-4">
+                  <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700/80 text-xs font-semibold w-fit">
+                    <button
+                      onClick={() => setProcessedTab('approval')}
+                      className={`px-3 py-1.5 rounded-md transition-all ${
+                        processedTab === 'approval'
+                          ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      承認 ({processedApprovals.length})
+                    </button>
+                    <button
+                      onClick={() => setProcessedTab('circulation')}
+                      className={`px-3 py-1.5 rounded-md transition-all ${
+                        processedTab === 'circulation'
+                          ? 'bg-blue-500/20 text-blue-400 shadow-sm border border-blue-500/30'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      回覧 ({processedCirculations.length})
+                    </button>
+                  </div>
+                  {(() => {
+                    const loading = processedTab === 'approval' ? loadingProcessedApprovals : loadingProcessedCirculations
+                    const apps = processedTab === 'approval' ? processedApprovals : processedCirculations
+                    const empty = processedTab === 'approval' ? '承認した申請はありません' : '回覧を確認した申請はありません'
+                    if (loading) {
+                      return (
+                        <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40 animate-pulse">
+                          読み込み中...
+                        </div>
+                      )
+                    }
+                    if (apps.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg bg-slate-950/40">
+                          {empty}
+                        </div>
+                      )
+                    }
+                    return <ApplicationList applications={apps} onItemClick={(app) => handleApplicationClick(app, 'processed')} showApplicant />
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1672,7 +2335,7 @@ export default function DashboardPage() {
                       <span className="text-slate-700">•</span>
                       <span>{selectedApplication.subType}</span>
                       <span className="text-slate-700">•</span>
-                      <StatusBadge status={selectedApplication.workflow.status} />
+                      <StatusBadge status={getEffectiveStatus(selectedApplication)} />
                     </div>
 
                     {(() => {
@@ -1702,49 +2365,6 @@ export default function DashboardPage() {
                         <p><span className="text-slate-500 mr-2">氏名:</span>{selectedApplication.applicantName}</p>
                         <p><span className="text-slate-500 mr-2">所属:</span>{selectedApplication.applicantDept}</p>
                         <p><span className="text-slate-500 mr-2">役職:</span>{selectedApplication.applicantTitle}</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
-                      <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
-                      <div className="relative border-l border-slate-700 ml-2 pl-6 space-y-4 my-2">
-                        {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
-                          const stepData = selectedApplication.workflow.steps?.[stepKey]
-                          const approverNames = stepData?.approvers || []
-                          const stepStatus = stepData?.status || '未着手'
-
-                          return (
-                            <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                              <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
-                                stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
-                                stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
-                                stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
-                                stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
-                                'border-slate-700'
-                              }`} />
-                              
-                              <div>
-                                <span className="font-bold text-slate-200">{stepKey}</span>
-                                <span className="text-xs text-slate-500 ml-2">メンバー:</span>
-                                <span className="text-slate-400 font-semibold ml-1">
-                                  {Array.isArray(approverNames) ? approverNames.join(', ') : '（指定なし）'}
-                                </span>
-                              </div>
-
-                              <div className="sm:text-right">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
-                                  stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
-                                  stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                  'bg-slate-900 text-slate-600 border-slate-700/50'
-                                }`}>
-                                  {stepStatus}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
                       </div>
                     </div>
 
@@ -1809,6 +2429,83 @@ export default function DashboardPage() {
                       </div>
                     )}
 
+                    {selectedApplication.appName === '回覧報告' ? (
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">回覧状況</h3>
+                        {(() => {
+                          const members = selectedApplication.workflow.circulations || selectedApplication.workflow.allCirculators || selectedApplication.workflow.steps?.['回覧先']?.approvers || []
+                          const confirmed = new Set<string>([
+                            ...(selectedApplication.workflow.confirmedBy || []),
+                            ...(selectedApplication.workflow.steps?.['回覧先']?.approvedBy || [])
+                          ])
+                          const total = members.length
+                          const done = members.filter((m: string) => confirmed.has(m)).length
+                          if (total === 0) {
+                            return <p className="text-sm text-slate-500">回覧先メンバーは指定されていません</p>
+                          }
+                          return (
+                            <div className="space-y-2">
+                              <p className="text-xs text-slate-500 mb-2">{done}/{total} 名が回覧済み</p>
+                              {members.map((member: string) => {
+                                const isConfirmed = confirmed.has(member)
+                                return (
+                                  <div key={member} className="flex items-center justify-between text-sm border-b border-slate-800/50 pb-2 last:border-0 last:pb-0">
+                                    <span className="text-slate-200">{member}</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${isConfirmed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                      {isConfirmed ? '回覧済み' : '回覧待ち'}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-950/30 border border-slate-700/80 p-4 rounded-xl">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">現在の承認ルート進捗状況</h3>
+                        <div className="relative border-l border-slate-700 ml-2 pl-6 space-y-4 my-2">
+                          {(selectedApplication.workflow.stepOrder || Object.keys(selectedApplication.workflow.steps || {})).map((stepKey: string) => {
+                            const stepData = selectedApplication.workflow.steps?.[stepKey]
+                            const approverNames = stepData?.approvers || []
+                            const stepStatus = getEffectiveStepStatus(selectedApplication, stepKey, stepData?.status || '未着手')
+
+                            return (
+                              <div key={stepKey} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                                <div className={`absolute -left-[31px] w-3 h-3 rounded-full border-2 bg-slate-900 ${
+                                  stepStatus === '承認済み' ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' :
+                                  stepStatus === '承認済み(スキップ)' ? 'border-slate-600' :
+                                  stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'border-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' :
+                                  stepStatus === '差し戻し' ? 'border-orange-500 shadow-[0_0_8px_#f97316]' :
+                                  'border-slate-700'
+                                }`} />
+
+                                <div>
+                                  <span className="font-bold text-slate-200">{stepKey}</span>
+                                  <span className="text-xs text-slate-500 ml-2">メンバー:</span>
+                                  <span className="text-slate-400 font-semibold ml-1">
+                                    {Array.isArray(approverNames) ? approverNames.join(', ') : '（指定なし）'}
+                                  </span>
+                                </div>
+
+                                <div className="sm:text-right">
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                                    stepStatus === '承認済み' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                    stepStatus === '承認済み(スキップ)' ? 'bg-slate-800/50 text-slate-500 border-slate-700/30' :
+                                    stepStatus === '承認待ち' || stepStatus === '回覧待ち' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    stepStatus === '差し戻し' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    'bg-slate-900 text-slate-600 border-slate-700/50'
+                                  }`}>
+                                    {stepStatus}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedApplication.remarks && (
                       <div>
                         <h3 className="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">備考</h3>
@@ -1853,6 +2550,46 @@ export default function DashboardPage() {
                       </div>
                     )}
 
+                    {circulationHistory.length > 0 && (
+                      <div className="border-t border-slate-700 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">回覧確認履歴</h3>
+                          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={showCommentedCirculationsOnly}
+                              onChange={(e) => setShowCommentedCirculationsOnly(e.target.checked)}
+                              className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50"
+                            />
+                            コメント付きのみ
+                          </label>
+                        </div>
+                        <div className="space-y-3">
+                          {circulationHistory
+                            .filter((history) => !showCommentedCirculationsOnly || history.comment)
+                            .map((history) => (
+                            <div key={history.id} className="bg-slate-950/40 border border-slate-700/60 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-slate-200">回覧確認</span>
+                                <span className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                  確認済み
+                                </span>
+                              </div>
+                              <div className="text-sm text-slate-400">
+                                <p>担当者: {history.userName}</p>
+                                {history.comment && (
+                                  <p className="mt-1 text-slate-500">コメント: {history.comment}</p>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {history.confirmedAt ? new Date(history.confirmedAt.toDate()).toLocaleString('ja-JP') : '-'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedApplication.workflow.status === '差し戻し' && selectedApplication.applicantId === user.id && (
                       <div className="border-t border-slate-700 pt-4">
                         <ApplicationResubmitForm
@@ -1862,20 +2599,39 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && selectedApplication.workflow.status === '承認待ち' && (
+                    {modalSource !== 'sent' && modalSource !== 'processed' && selectedApplication.workflow.status === '承認待ち' && (
                       <div className="border-t border-slate-700 pt-4">
                         <ApplicationApprovalForm
                           application={selectedApplication}
                           user={user}
                           onApprove={handleApproval}
+                          onSkip={handleSkip}
                         />
                       </div>
                     )}
 
-                    {modalSource !== 'sent' && selectedApplication.workflow.status !== '承認待ち' && selectedApplication.workflow.status !== '差し戻し' && (
-                      <div className="border-t border-slate-700 pt-4">
+                    {modalSource !== 'sent' && modalSource !== 'processed' && (
+                      (selectedApplication.appName === '回覧報告' && getEffectiveStatus(selectedApplication) === '回覧待ち') ||
+                      (selectedApplication.appName !== '回覧報告' && (
+                        selectedApplication.workflow.status === '承認済み' ||
+                        isPostDecisionCirculationStep(selectedApplication, user?.name)
+                      ))
+                    ) && (
+                      <div className="border-t border-slate-700 pt-4 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">
+                            回覧確認コメント
+                          </label>
+                          <textarea
+                            value={circulationComment}
+                            onChange={(e) => setCirculationComment(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm transition-all"
+                            placeholder="回覧確認時のコメントを入力してください（任意）"
+                          />
+                        </div>
                         <button
-                          onClick={handleCirculation}
+                          onClick={() => handleCirculation(circulationComment)}
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-200 text-sm tracking-wide"
                         >
                           回覧を確認
@@ -1883,7 +2639,9 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {modalSource === 'sent' && selectedApplication.applicantId === user.id && selectedApplication.workflow.status !== '承認済み' && (
+                    {selectedApplication.applicantId === user.id &&
+                      selectedApplication.workflow.status !== '取り消し' &&
+                      (selectedApplication.appName === '回覧報告' || (selectedApplication.workflow.status !== '承認済み' && selectedApplication.workflow.status !== '回覧済み')) && (
                       <div className="border-t border-slate-700 pt-4">
                         <button
                           onClick={handleDeleteApplication}
@@ -1946,11 +2704,13 @@ export default function DashboardPage() {
 function ApplicationApprovalForm({ 
   application,
   user,
-  onApprove, 
+  onApprove,
+  onSkip,
 }: { 
   application: Application
   user: any
   onApprove: (action: 'approve' | 'reject', comment: string) => void
+  onSkip?: (comment: string) => void
   onClose?: () => void
 }) {
   const [comment, setComment] = useState('')
@@ -1968,10 +2728,45 @@ function ApplicationApprovalForm({
     return currentApprovers.includes(user.name) || stepApprovers.includes(user.name)
   }, [application, user])
 
-  const handleAction = async (action: 'approve' | 'reject') => {
+  const isSkipAllowed = useMemo(() => {
+    if (!application || !user) return false
+    const currentStep = application.workflow.currentStep
+    const currentApprovers = application.workflow.currentApprovers || []
+    const isRankStep = ['部長', '本部長'].some(t => currentStep.includes(t))
+    const isApplicantRank = ['部長', '本部長'].includes(application.applicantTitle || '')
+    return isRankStep &&
+      isApplicantRank &&
+      application.applicantId === user.id &&
+      (currentApprovers.length === 0 || currentApprovers.every(a => a === user.name))
+  }, [application, user])
+
+  const handleAction = async (action: 'approve' | 'reject' | 'skip') => {
     setProcessing(true)
-    await onApprove(action, comment)
+    if (action === 'skip' && onSkip) {
+      await onSkip(comment)
+    } else {
+      await onApprove(action as 'approve' | 'reject', comment)
+    }
     setProcessing(false)
+  }
+
+  if (isSkipAllowed) {
+    return (
+      <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl">
+        <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">承認処理</h3>
+        <p className="text-sm text-slate-400 mb-4">
+          あなたは部長/本部長クラスです。自身の承認ステップをスキップして次のステップへ進めます。
+        </p>
+        <button
+          type="button"
+          onClick={() => handleAction('skip')}
+          disabled={processing}
+          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-50 font-semibold py-2.5 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          {processing ? '処理中...' : '承認ステップをスキップして進む'}
+        </button>
+      </div>
+    )
   }
 
   if (!isCurrentApprover) {

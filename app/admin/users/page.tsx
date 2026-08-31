@@ -12,6 +12,7 @@ interface User {
   email: string
   title: string
   department: string
+  departments?: string[]
   canViewAllApplications?: boolean
   createdAt: any
 }
@@ -27,6 +28,7 @@ export default function AdminUsersPage() {
     email: '',
     title: '',
     department: '',
+    departments: '',
     canViewAllApplications: false
   })
   const [processing, setProcessing] = useState(false)
@@ -66,17 +68,29 @@ export default function AdminUsersPage() {
     setProcessing(true)
 
     try {
+      const departmentsList = formData.departments
+        ? formData.departments.split(/[,，]/).map(d => d.trim()).filter(Boolean)
+        : []
+      const dataToSave = {
+        name: formData.name,
+        email: formData.email,
+        title: formData.title,
+        department: formData.department,
+        ...(departmentsList.length > 0 ? { departments: departmentsList } : {}),
+        canViewAllApplications: formData.canViewAllApplications,
+      }
+
       if (editingUser) {
         // Update existing user
         await setDoc(doc(db, 'users', editingUser.id), {
-          ...formData,
+          ...dataToSave,
           updatedAt: serverTimestamp()
         }, { merge: true })
       } else {
         // Create new user
         await setDoc(doc(db, 'users', formData.email), {
           id: formData.email,
-          ...formData,
+          ...dataToSave,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         })
@@ -84,7 +98,7 @@ export default function AdminUsersPage() {
 
       setShowModal(false)
       setEditingUser(null)
-      setFormData({ name: '', email: '', title: '', department: '', canViewAllApplications: false })
+      setFormData({ name: '', email: '', title: '', department: '', departments: '', canViewAllApplications: false })
       fetchUsers()
     } catch (error) {
       console.error('Error saving user:', error)
@@ -101,6 +115,7 @@ export default function AdminUsersPage() {
       email: user.email,
       title: user.title,
       department: user.department,
+      departments: Array.isArray(user.departments) ? user.departments.join(', ') : '',
       canViewAllApplications: user.canViewAllApplications || false
     })
     setShowModal(true)
@@ -120,7 +135,7 @@ export default function AdminUsersPage() {
 
   const handleAddUser = () => {
     setEditingUser(null)
-    setFormData({ name: '', email: '', title: '', department: '', canViewAllApplications: false })
+    setFormData({ name: '', email: '', title: '', department: '', departments: '', canViewAllApplications: false })
     setShowModal(true)
   }
 
@@ -209,7 +224,7 @@ export default function AdminUsersPage() {
                       {user.title}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {user.department}
+                      {user.department}{user.departments && user.departments.length > 0 ? `（兼：${user.departments.join('、')}）` : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       {user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString('ja-JP') : '-'}
@@ -304,6 +319,18 @@ export default function AdminUsersPage() {
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     required
+                    className="w-full px-3 py-2 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    兼務部署（カンマ区切り）
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.departments}
+                    onChange={(e) => setFormData({ ...formData, departments: e.target.value })}
+                    placeholder="例：品質管理本部, 技術管理本部"
                     className="w-full px-3 py-2 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
